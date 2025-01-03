@@ -52,11 +52,41 @@ class _HomePageState extends State<HomePage> {
 class DashboardPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Text('Dashboard Content'),
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Welcome to E-ComposThink!',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 20),
+            Card(
+              elevation: 4,
+              child: ListTile(
+                leading: Icon(Icons.thermostat, color: Colors.green),
+                title: Text('Temperature Monitoring'),
+                subtitle: Text('Current: 27°C'),
+              ),
+            ),
+            SizedBox(height: 10),
+            Card(
+              elevation: 4,
+              child: ListTile(
+                leading: Icon(Icons.water_drop, color: Colors.blue),
+                title: Text('Moisture Level'),
+                subtitle: Text('Current: 45%'),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
+
 
 // Placeholder for Container page
 class ContainerPage extends StatelessWidget {
