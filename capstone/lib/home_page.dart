@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'login_page.dart';
+import 'account_management_page.dart';
+import 'esp_connection_page.dart';
+import 'app_guide_page.dart';
+
 
 class HomePage extends StatefulWidget {
   @override
@@ -102,8 +107,71 @@ class ContainerPage extends StatelessWidget {
 class OthersPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Text('Others Content'),
+    return ListView(
+      children: [
+        ListTile(
+          leading: Icon(Icons.person, color: Colors.green),
+          title: Text('Account Management'),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => AccountManagementPage()),
+            );
+          },
+        ),
+        ListTile(
+          leading: Icon(Icons.wifi, color: Colors.blue),
+          title: Text('ESP Connection'),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => ESPConnectionPage()),
+            );
+          },
+        ),
+        ListTile(
+          leading: Icon(Icons.help_outline, color: Colors.orange),
+          title: Text('App Guide'),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => AppGuidePage()),
+            );
+          },
+        ),
+        ListTile(
+          leading: Icon(Icons.logout, color: Colors.red),
+          title: Text('Log Out'),
+          onTap: () {
+            showDialog(
+              context: context,
+              builder: (BuildContext context) {
+                return AlertDialog(
+                  title: Text('Log Out'),
+                  content: Text('Are you sure you want to log out?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(context).pop(); // Close dialog
+                      },
+                      child: Text('Cancel'),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (context) => LoginPage()),
+                        );
+                      },
+                      child: Text('Log Out'),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        ),
+      ],
     );
   }
 }
