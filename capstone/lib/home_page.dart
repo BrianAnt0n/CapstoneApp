@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'login_page.dart';
-import 'account_management_page.dart';
-import 'esp_connection_page.dart';
-import 'app_guide_page.dart';
+import 'Others tab/account_management_page.dart';
+import 'Others tab/esp_connection_page.dart';
+import 'Others tab/app_guide_page.dart';
+import 'package:url_launcher/url_launcher.dart';
+
 
 
 class HomePage extends StatefulWidget {
@@ -105,6 +107,18 @@ class ContainerPage extends StatelessWidget {
 
 // Placeholder for Others page
 class OthersPage extends StatelessWidget {
+  // Function to launch the URL
+  Future<void> _downloadApk() async {
+    final Uri apkUri = Uri.parse(
+      "https://github.com/BrianAnt0n/ESP-CONNECTION-APP/releases/download/ESP.V.2.4.0/EspTouch.vv2.4.0.apk",
+    );
+
+    if (!await launchUrl(apkUri, mode: LaunchMode.externalApplication)) {
+      // Handle the error if the URL cannot be launched
+      throw 'Could not launch $apkUri';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListView(
@@ -122,12 +136,7 @@ class OthersPage extends StatelessWidget {
         ListTile(
           leading: Icon(Icons.wifi, color: Colors.blue),
           title: Text('ESP Connection'),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => ESPConnectionPage()),
-            );
-          },
+          onTap: _downloadApk, // Call the download function here
         ),
         ListTile(
           leading: Icon(Icons.help_outline, color: Colors.orange),
