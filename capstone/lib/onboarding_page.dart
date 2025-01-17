@@ -20,60 +20,55 @@ class _OnboardingPageState extends State<OnboardingPage> {
             controller: _controller,
             children: [
               OnboardingScreen(
-                image: 'assets/feature1.png',
-                title: 'Feature 1',
-                description: 'Description of Feature 1',
+                image: 'assets/onboard_1.png',
+                title: '',
+                description: '',
               ),
               OnboardingScreen(
-                image: 'assets/feature2.png',
-                title: 'Feature 2',
-                description: 'Description of Feature 2',
+                image: 'assets/onboard_2.png',
+                title: '',
+                description: '',
               ),
               OnboardingScreen(
-                image: 'assets/feature3.png',
-                title: 'Feature 3',
-                description: 'Description of Feature 3',
+                image: 'assets/onboard_3.png',
+                title: '',
+                description: '',
+              ),
+              OnboardingScreenWithButton(
+                image: 'assets/onboard_4.png',
+                title: '',
+                description: '',
+                onButtonPressed: () async {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setBool('seenOnboarding', true);
+
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => LoginPage()),
+                  );
+                },
               ),
             ],
           ),
           Positioned(
-            bottom: 80, // Position above the bottom sheet
+            bottom: 5, // Position above the bottom sheet
             left: 0,
             right: 0,
             child: Center(
               child: SmoothPageIndicator(
                 controller: _controller, // PageController
-                count: 3, // Number of pages
+                count: 4, // Number of pages
                 effect: WormEffect(
                   dotWidth: 10.0,
                   dotHeight: 10.0,
                   spacing: 16.0,
-                  activeDotColor: Colors.blue,
+                  activeDotColor: const Color.fromARGB(255, 81, 183, 2),
                   dotColor: Colors.grey,
                 ),
               ),
             ),
           ),
         ],
-      ),
-      bottomSheet: Container(
-        height: 60,
-        width: double.infinity,
-        color: Colors.white,
-        child: Center(
-          child: ElevatedButton(
-            onPressed: () async {
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.setBool('seenOnboarding', true);
-
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => LoginPage()),
-              );
-            },
-            child: Text('Get Started'),
-          ),
-        ),
       ),
     );
   }
@@ -92,25 +87,122 @@ class OnboardingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Image.asset(image),
-          SizedBox(height: 20),
-          Text(
-            title,
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-          ),
-          SizedBox(height: 10),
-          Text(
-            description,
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 16),
-          ),
-        ],
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Image.asset(
+          image,
+          fit: BoxFit.cover,
+        ),
+        Column(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  SizedBox(height: 10),
+                  Text(
+                    description,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.white70,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+//Placeholder for Button
+class OnboardingScreenWithButton extends StatelessWidget {
+  final String image;
+  final String title;
+  final String description;
+  final VoidCallback onButtonPressed;
+
+  OnboardingScreenWithButton({
+    required this.image,
+    required this.title,
+    required this.description,
+    required this.onButtonPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Image.asset(
+          image,
+          fit: BoxFit.cover,
+        ),
+        Column(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  SizedBox(height: 10),
+                  Text(
+                    description,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: const Color.fromARGB(255, 255, 255, 255),
+                    ),
+                  ),
+                  SizedBox(
+  width: double.infinity, // Button stretches to screen width
+  child: ElevatedButton(
+    style: ElevatedButton.styleFrom(
+      padding: EdgeInsets.symmetric(vertical: 16.0), // Height of the button
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8.0), // Slightly rounded corners
       ),
+      backgroundColor: const Color.fromARGB(255, 9, 133, 0), // Button background color
+    ),
+    onPressed: onButtonPressed,
+    child: Text(
+      'Get Started',
+      style: TextStyle(
+        fontSize: 18,
+        fontWeight: FontWeight.bold,
+        color: Colors.white, // Set text color to white
+      ),
+    ),
+  ),
+),
+
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

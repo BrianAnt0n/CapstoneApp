@@ -14,19 +14,21 @@ class LoginPage extends StatelessWidget {
             children: [
               // Placeholder for Logo
               Container(
-                width: 150,
-                height: 150,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(75),
-                ),
-                child: Center(
-                  child: Text(
-                    'LOGO',
-                    style: TextStyle(fontSize: 20, color: Colors.grey),
-                  ),
+              width: 150,
+              height: 150,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                shape: BoxShape.circle, // Makes the container circular
+              ),
+              child: ClipOval(
+                child: Image.asset(
+                  'assets/logo_login.png', // Path to your image
+                  fit: BoxFit.contain,     // Ensures the whole image is visible
                 ),
               ),
+            ),
+
+
               SizedBox(height: 40), // Spacing between logo and text fields
               
               // Email Field
