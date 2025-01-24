@@ -64,6 +64,7 @@ flutter:
     - assets/onboard_2.png
     - assets/onboard_3.png
     - assets/onboard_4.png
+    - assets/bg.png
    # - assets/feature3.png
 
   # The following line ensures that the Material Icons font is
