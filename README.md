@@ -17,6 +17,7 @@ The following folders/files are critical for synchronization. Please ensure they
 
 - **`lib/`**: Contains the main source code for the Flutter application.  
 - **`pubspec.yaml`**: Manages dependencies and configuration for the Flutter app.
+- **`assets/`**: Pictures, etc.
 
 > **Note:** Other folders are excluded using `.gitignore`.
 
