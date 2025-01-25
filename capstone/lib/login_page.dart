@@ -32,7 +32,8 @@ class LoginPage extends StatelessWidget {
                     child: ClipOval(
                       child: Image.asset(
                         'assets/logo_login.png', // Path to your logo image
-                        fit: BoxFit.contain, // Ensures the whole image is visible
+                        fit: BoxFit
+                            .contain, // Ensures the whole image is visible
                       ),
                     ),
                   ),
@@ -64,7 +65,7 @@ class LoginPage extends StatelessWidget {
                   // Login Button (Green Theme)
                   GestureDetector(
                     onTap: () {
-                      // Add login logic here later testestestetste
+                      // Add login logic here later testes ni brian papakapon
                       Navigator.pushReplacement(
                         context,
                         MaterialPageRoute(builder: (context) => HomePage()),
@@ -75,7 +76,8 @@ class LoginPage extends StatelessWidget {
                       height: 50, // Set the height of the button
                       decoration: BoxDecoration(
                         color: Colors.green, // Button background color (Green)
-                        borderRadius: BorderRadius.circular(8), // Rounded corners
+                        borderRadius:
+                            BorderRadius.circular(8), // Rounded corners
                       ),
                       alignment: Alignment.center,
                       child: Text(
@@ -101,20 +103,24 @@ class LoginPage extends StatelessWidget {
                       style: TextStyle(color: Colors.blue),
                     ),
                   ),
-                  SizedBox(height: 40), // Add some spacing before the guest button
+                  SizedBox(
+                      height: 40), // Add some spacing before the guest button
 
                   // Continue as Guest Button (Yellow Theme)
                   GestureDetector(
                     onTap: () {
                       // Add guest login logic here
-                      Navigator.pushNamed(context, '/guestHome'); // Example navigation
+                      Navigator.pushNamed(
+                          context, '/guestHome'); // Example navigation
                     },
                     child: Container(
                       width: double.infinity, // Full-width button
                       height: 50, // Set the height of the button
                       decoration: BoxDecoration(
-                        color: Colors.yellow[700], // Button background color (Yellow)
-                        borderRadius: BorderRadius.circular(8), // Rounded corners
+                        color: Colors
+                            .yellow[700], // Button background color (Yellow)
+                        borderRadius:
+                            BorderRadius.circular(8), // Rounded corners
                       ),
                       alignment: Alignment.center,
                       child: Text(
