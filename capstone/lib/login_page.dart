@@ -65,7 +65,7 @@ class LoginPage extends StatelessWidget {
                   // Login Button (Green Theme)
                   GestureDetector(
                     onTap: () {
-                      // Add login logic here later testes ni brian papakapon
+                      // Add login logic here later
                       Navigator.pushReplacement(
                         context,
                         MaterialPageRoute(builder: (context) => HomePage()),
@@ -110,8 +110,13 @@ class LoginPage extends StatelessWidget {
                   GestureDetector(
                     onTap: () {
                       // Add guest login logic here
-                      Navigator.pushNamed(
-                          context, '/guestHome'); // Example navigation
+                      //Navigator.pushNamed(
+                          //context, '/guestHome'); // Example navigation
+
+                          Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(builder: (context) => HomePage()),
+                      );
                     },
                     child: Container(
                       width: double.infinity, // Full-width button
