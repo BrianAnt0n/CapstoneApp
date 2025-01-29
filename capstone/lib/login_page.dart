@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'home_page.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'constants.dart';
 
 class LoginPage extends StatelessWidget {
   @override
