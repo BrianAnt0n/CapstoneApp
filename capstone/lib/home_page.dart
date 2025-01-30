@@ -70,103 +70,112 @@ class _HomePageState extends State<HomePage> {
 }
 
 // Dashboard Page: Displays sensor data for the selected container
-class DashboardPage extends StatelessWidget {
+// Dashboard Page with pull-to-refresh functionality
+class DashboardPage extends StatefulWidget {
+  @override
+  _DashboardPageState createState() => _DashboardPageState();
+}
+
+class _DashboardPageState extends State<DashboardPage> {
+  Future<Map<String, dynamic>>? _sensorDataFuture;
+  int? selectedContainerId;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final containerState = Provider.of<ContainerState>(context);
+    selectedContainerId = containerState.selectedContainerId;
+    if (selectedContainerId != null) {
+      _sensorDataFuture = fetchSensorData(selectedContainerId!);
+    }
+  }
+
+  Future<void> _refreshData() async {
+    if (selectedContainerId != null) {
+      setState(() {
+        _sensorDataFuture = fetchSensorData(selectedContainerId!);
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final containerState = Provider.of<ContainerState>(context);
-    final selectedContainerId = containerState.selectedContainerId;
-
-    return SingleChildScrollView(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Dashboard',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 20),
-            if (selectedContainerId != null) ...[
-              Text('Selected Container: $selectedContainerId',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
-              SizedBox(height: 10),
-              FutureBuilder(
-                future: fetchSensorData(selectedContainerId),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return CircularProgressIndicator();
-                  } else if (snapshot.hasError) {
-                    return Text('');
-                  } else {
-                    final sensorData = snapshot.data as Map<String, dynamic>;
-                    return Column(
-                      children: [
-                        Card(
-                          elevation: 4,
-                          child: ListTile(
-                            leading:
-                                Icon(Icons.thermostat, color: Colors.green),
-                            title: Text('Temperature Monitoring'),
-                            subtitle: Text('${sensorData['temperature']}°C'),
-                          ),
-                        ),
-                        SizedBox(height: 10),
-                        Card(
-                          elevation: 4,
-                          child: ListTile(
-                            leading: Icon(Icons.water_drop, color: Colors.blue),
-                            title: Text('Moisture Level'),
-                            subtitle: Text('${sensorData['moisture']}%'),
-                          ),
-                        ),
-                        SizedBox(height: 10),
-                        Card(
-                          elevation: 4,
-                          child: ListTile(
-                            leading: Icon(Icons.science, color: Colors.purple),
-                            title: Text('pH Level 1'),
-                            subtitle: Text('${sensorData['ph_level']}'),
-                          ),
-                        ),
-                        SizedBox(height: 10),
-                        Card(
-                          elevation: 4,
-                          child: ListTile(
-                            leading: Icon(Icons.science_outlined,
-                                color: Colors.deepPurple),
-                            title: Text('pH Level 2'),
-                            subtitle: Text('${sensorData['ph_level2']}'),
-                          ),
-                        ),
-                        SizedBox(height: 10),
-                        Card(
-                          elevation: 4,
-                          child: ListTile(
-                            leading: Icon(Icons.cloud, color: Colors.orange),
-                            title: Text('Humidity'),
-                            subtitle: Text('${sensorData['humidity']}%'),
-                          ),
-                        ),
-                        SizedBox(height: 10),
-                        Card(
-                          elevation: 4,
-                          child: ListTile(
-                            leading:
-                                Icon(Icons.access_time, color: Colors.grey),
-                            title: Text('Timestamp'),
-                            subtitle: Text('${sensorData['timestamp']}'),
-                          ),
-                        ),
-                      ],
-                    );
-                  }
-                },
+    return selectedContainerId == null
+        ? Center(
+            child: Text('Please select a container from the Container tab.'))
+        : RefreshIndicator(
+            onRefresh: _refreshData,
+            child: SingleChildScrollView(
+              physics: AlwaysScrollableScrollPhysics(),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Dashboard',
+                      style:
+                          TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                    ),
+                    SizedBox(height: 20),
+                    Text('Selected Container: $selectedContainerId',
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.w500)),
+                    SizedBox(height: 10),
+                    FutureBuilder(
+                      future: _sensorDataFuture,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return Center(child: CircularProgressIndicator());
+                        } else if (snapshot.hasError) {
+                          return Text('');
+                        } else {
+                          final sensorData =
+                              snapshot.data as Map<String, dynamic>;
+                          return Column(
+                            children: [
+                              buildSensorCard(
+                                  Icons.thermostat,
+                                  'Temperature Monitoring',
+                                  '${sensorData['temperature']}°C',
+                                  Colors.green),
+                              buildSensorCard(
+                                  Icons.water_drop,
+                                  'Moisture Level',
+                                  '${sensorData['moisture']}%',
+                                  Colors.blue),
+                              buildSensorCard(Icons.science, 'pH Level 1',
+                                  '${sensorData['ph_level']}', Colors.purple),
+                              buildSensorCard(
+                                  Icons.science_outlined,
+                                  'pH Level 2',
+                                  '${sensorData['ph_level2']}',
+                                  Colors.deepPurple),
+                              buildSensorCard(Icons.cloud, 'Humidity',
+                                  '${sensorData['humidity']}%', Colors.orange),
+                              buildSensorCard(Icons.access_time, 'Timestamp',
+                                  '${sensorData['timestamp']}', Colors.grey),
+                            ],
+                          );
+                        }
+                      },
+                    ),
+                  ],
+                ),
               ),
-            ] else
-              Text('Please select a container from the Container tab.'),
-          ],
-        ),
+            ),
+          );
+  }
+
+  Widget buildSensorCard(
+      IconData icon, String title, String value, Color color) {
+    return Card(
+      elevation: 4,
+      child: ListTile(
+        leading: Icon(icon, color: color),
+        title: Text(title),
+        subtitle: Text(value),
       ),
     );
   }
@@ -195,12 +204,32 @@ Future<Map<String, dynamic>> fetchSensorData(int containerId) async {
 
 // Container Page: Displays a list of available containers
 
-class ContainerPage extends StatelessWidget {
+class ContainerPage extends StatefulWidget {
+  @override
+  _ContainerPageState createState() => _ContainerPageState();
+}
+
+class _ContainerPageState extends State<ContainerPage> {
+  late Future<List<Map<String, dynamic>>> _containersFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchContainers();
+  }
+
+  void _fetchContainers() {
+    setState(() {
+      _containersFuture = fetchContainers();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final containerState = Provider.of<ContainerState>(context);
+
     return FutureBuilder(
-      future: fetchContainers(),
+      future: _containersFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Center(child: CircularProgressIndicator());
@@ -209,6 +238,7 @@ class ContainerPage extends StatelessWidget {
               child: Text('Error fetching containers: ${snapshot.error}'));
         } else {
           final containers = snapshot.data as List<Map<String, dynamic>>;
+
           return Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
@@ -235,9 +265,7 @@ class ContainerPage extends StatelessWidget {
                           containerState.selectedContainerId;
 
                       return Card(
-                        color: isSelected
-                            ? Colors.green[100]
-                            : null, // Highlight selected container
+                        color: isSelected ? Colors.green[100] : null,
                         child: ListTile(
                           title: Text('${container['container_name']}'),
                           subtitle:
@@ -265,10 +293,8 @@ class ContainerPage extends StatelessWidget {
                           ),
                           onTap: () {
                             if (isSelected) {
-                              // If already selected, deselect
-                              containerState.selectContainer(0); //di pa eto tapos null dapat ko kaso di tinanggap pag di int value
+                              containerState.selectContainer(0);
                             } else {
-                              // Otherwise, select it
                               containerState
                                   .selectContainer(container['container_id']);
                             }
@@ -331,9 +357,10 @@ class ContainerPage extends StatelessWidget {
             child: Text("Cancel"),
           ),
           TextButton(
-            onPressed: () {
-              renameContainer(containerId, _renameController.text);
+            onPressed: () async {
+              await renameContainer(containerId, _renameController.text);
               Navigator.pop(context);
+              _fetchContainers(); // 🔄 Refresh UI after renaming
             },
             child: Text("Rename"),
           ),
