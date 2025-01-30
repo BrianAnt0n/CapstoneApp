@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'home_page.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'constants.dart';
 
 class LoginPage extends StatefulWidget {
   @override
@@ -12,60 +14,61 @@ class _LoginPageState extends State<LoginPage> {
   final SupabaseClient supabase = Supabase.instance.client;
 
   Future<String?> loginUser(String email, String password) async {
-  final SupabaseClient supabase = Supabase.instance.client;
+    final SupabaseClient supabase = Supabase.instance.client;
 
-  try {
-    // Fetch user from Supabase based on email
-    final response = await supabase
-        .from('Users')
-        .select('user_id, email, password, user_level')  // Select necessary fields
-        .eq('email', email)
-        .maybeSingle();  // Get a single record or null
+    try {
+      // Fetch user from Supabase based on email
+      final response = await supabase
+          .from('Users')
+          .select(
+              'user_id, email, password, user_level') // Select necessary fields
+          .eq('email', email)
+          .maybeSingle(); // Get a single record or null
 
-    // If no user is found
-    if (response == null) {
-      return "User not found";
+      // If no user is found
+      if (response == null) {
+        return "User not found";
+      }
+
+      // Compare passwords (⚠️ Should use **hashed passwords** in production)
+      if (response['password'] != password) {
+        return "Incorrect password";
+      }
+
+      // Retrieve user level
+      String userLevel = response['user_level'];
+
+      // Return success message
+      return "Login successful, User Level: $userLevel";
+    } catch (error) {
+      return "Login failed: ${error.toString()}";
     }
-
-    // Compare passwords (⚠️ Should use **hashed passwords** in production)
-    if (response['password'] != password) {
-      return "Incorrect password";
-    }
-
-    // Retrieve user level
-    String userLevel = response['user_level'];
-
-    // Return success message
-    return "Login successful, User Level: $userLevel";
-  } catch (error) {
-    return "Login failed: ${error.toString()}";
   }
-}
 
-void handleLogin() async {
-  String email = _emailController.text.trim();
-  String password = _passwordController.text.trim();
+  void handleLogin() async {
+    String email = _emailController.text.trim();
+    String password = _passwordController.text.trim();
 
-  String? result = await loginUser(email, password);
+    String? result = await loginUser(email, password);
 
-  if (result != null && result.startsWith("Login successful")) {
-    // Navigate based on user level
-    if (result.contains("User Level: Admin")) {
-      ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("You are an Admin")),
-    );
+    if (result != null && result.startsWith("Login successful")) {
+      // Navigate based on user level
+      if (result.contains("User Level: Admin")) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("You are an Admin")),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("You are a Member")),
+        );
+      }
     } else {
+      // Show error message
       ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("You are a Member")),
-    );
+        SnackBar(content: Text(result ?? "Unknown error")),
+      );
     }
-  } else {
-    // Show error message
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(result ?? "Unknown error")),
-    );
   }
-}
 
   @override
   Widget build(BuildContext context) {
