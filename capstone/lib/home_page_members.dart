@@ -40,7 +40,7 @@ class _HomePageState extends State<HomePage> {
       create: (_) => ContainerState(),
       child: Scaffold(
         appBar: AppBar(
-          title: Text('E-ComposThink Home'), // AppBar title
+          title: Text('E-ComposThink Home - Welcome Member!'), // AppBar title
         ),
         body: _pages[_currentIndex], // Show the selected page
         bottomNavigationBar: BottomNavigationBar(

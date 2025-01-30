@@ -39,7 +39,7 @@ class _HomePageState extends State<HomePage> {
       create: (_) => ContainerState(),
       child: Scaffold(
         appBar: AppBar(
-          title: Text('E-ComposThink Home'), // AppBar title
+          title: Text('E-ComposThink Home - Welcome Guest!'), // AppBar title
         ),
         body: _pages[_currentIndex], // Show the selected page
         bottomNavigationBar: BottomNavigationBar(
@@ -252,11 +252,11 @@ class OthersPage extends StatelessWidget {
         // Account Management
         ListTile(
           leading: Icon(Icons.person, color: Colors.green),
-          title: Text('Account Management'),
+          title: Text('Sign In'),
           onTap: () {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => AccountManagementPage()),
+              MaterialPageRoute(builder: (context) => LoginPage()),
             );
           },
         ),
