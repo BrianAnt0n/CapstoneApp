@@ -30,8 +30,11 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  provider: ^6.1.2
+  supabase_flutter: ^2.0.0
   shared_preferences: ^2.0.15
   smooth_page_indicator: ^1.0.0
+  url_launcher: ^6.1.11
 
 
 
@@ -56,9 +59,14 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
- # assets:
-   # - assets/feature1.png
-   # - assets/feature2.png
+  assets:
+    - assets/logo_login.png
+    - assets/main_logo.png
+    - assets/onboard_1.png
+    - assets/onboard_2.png
+    - assets/onboard_3.png
+    - assets/onboard_4.png
+    - assets/bg.png
    # - assets/feature3.png
 
   # The following line ensures that the Material Icons font is
