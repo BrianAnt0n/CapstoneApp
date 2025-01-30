@@ -1,21 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '/constants.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+final supabase = Supabase.instance.client;
+
 class AddAccountPage extends StatefulWidget {
   @override
   _AddAccountPageState createState() => _AddAccountPageState();
 }
 
 class _AddAccountPageState extends State<AddAccountPage> {
-  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _fullnameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final SupabaseClient supabase = Supabase.instance.client;
+  String _selectedUserLevel = 'Admin';
 
   Future<void> _addAccount() async {
-    final String username = _usernameController.text.trim();
+    final String fullname = _fullnameController.text.trim();
+    final String email = _emailController.text.trim();
     final String password = _passwordController.text.trim();
+    final String userLevel = _selectedUserLevel;
 
-    if (username.isEmpty || password.isEmpty) {
+    if (fullname.isEmpty ||
+        email.isEmpty ||
+        password.isEmpty ||
+        userLevel.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Please fill in all fields')),
       );
@@ -23,12 +34,15 @@ class _AddAccountPageState extends State<AddAccountPage> {
     }
 
     try {
-      await supabase.from('Accounts').insert({
-        'username': username,
-        'password': password, // Consider hashing the password before storing
+      final response = await supabase.from('Users').insert({
+        'fullname': fullname,
+        'email': email,
+        'password': password,
+        'user_level': userLevel,
       });
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Account added successfully')),
+        SnackBar(content: Text('Account added successfully!')),
       );
       Navigator.pop(context);
     } catch (error) {
@@ -41,37 +55,41 @@ class _AddAccountPageState extends State<AddAccountPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Add Account'),
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
+      appBar: AppBar(title: Text('Add Account')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Username', style: TextStyle(fontSize: 16)),
-            TextField(controller: _usernameController),
-            SizedBox(height: 16),
-            Text('Password', style: TextStyle(fontSize: 16)),
+            Text('Fullname'),
+            TextField(controller: _fullnameController),
+            SizedBox(height: 10),
+            Text('Email'),
+            TextField(controller: _emailController),
+            SizedBox(height: 10),
+            Text('Password'),
             TextField(controller: _passwordController, obscureText: true),
-            SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _addAccount,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child:
-                    Text('Add Account', style: TextStyle(color: Colors.white)),
-              ),
+            SizedBox(height: 10),
+            Text('User Level'),
+            DropdownButton<String>(
+              value: _selectedUserLevel,
+              onChanged: (String? newValue) {
+                setState(() {
+                  _selectedUserLevel = newValue!;
+                });
+              },
+              items: <String>['Admin', 'Member']
+                  .map<DropdownMenuItem<String>>((String value) {
+                return DropdownMenuItem<String>(
+                  value: value,
+                  child: Text(value),
+                );
+              }).toList(),
+            ),
+            SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _addAccount,
+              child: Text('Add Account'),
             ),
           ],
         ),
