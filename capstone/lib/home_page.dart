@@ -70,15 +70,7 @@ class _HomePageState extends State<HomePage> {
 }
 
 // Dashboard Page: Displays sensor data for the selected container
-// Dashboard Page: Displays sensor data for the selected container
-class DashboardPage extends StatefulWidget {
-  @override
-  _DashboardPageState createState() => _DashboardPageState();
-}
-
-class _DashboardPageState extends State<DashboardPage> {
-  final TextEditingController _notesController = TextEditingController();
-
+class DashboardPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final containerState = Provider.of<ContainerState>(context);
@@ -105,7 +97,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return CircularProgressIndicator();
                   } else if (snapshot.hasError) {
-                    return Text('Error fetching data');
+                    return Text('');
                   } else {
                     final sensorData = snapshot.data as Map<String, dynamic>;
                     return Column(
@@ -166,35 +158,6 @@ class _DashboardPageState extends State<DashboardPage> {
                             subtitle: Text('${sensorData['timestamp']}'),
                           ),
                         ),
-                        SizedBox(height: 20),
-
-                        // 📌 Notes Section
-                        Text(
-                          'Notes',
-                          style: TextStyle(
-                              fontSize: 20, fontWeight: FontWeight.bold),
-                        ),
-                        SizedBox(height: 10),
-                        TextField(
-                          controller: _notesController,
-                          maxLines: 3,
-                          decoration: InputDecoration(
-                            hintText: 'Enter your notes here...',
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                        SizedBox(height: 10),
-                        ElevatedButton(
-                          onPressed: () {
-                            String notes = _notesController.text;
-                            print("Notes saved: $notes");
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                  content: Text('Notes saved successfully!')),
-                            );
-                          },
-                          child: Text('Save Notes'),
-                        ),
                       ],
                     );
                   }
@@ -231,6 +194,7 @@ Future<Map<String, dynamic>> fetchSensorData(int containerId) async {
 }
 
 // Container Page: Displays a list of available containers
+
 class ContainerPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -245,33 +209,181 @@ class ContainerPage extends StatelessWidget {
               child: Text('Error fetching containers: ${snapshot.error}'));
         } else {
           final containers = snapshot.data as List<Map<String, dynamic>>;
-          return ListView.builder(
-            itemCount: containers.length,
-            itemBuilder: (context, index) {
-              final container = containers[index];
-              final isSelected = container['container_id'] ==
-                  containerState.selectedContainerId;
-              return Card(
-                color: isSelected
-                    ? Colors.green[100]
-                    : null, // Highlight selected container
-                child: ListTile(
-                  title: Text('Container ${container['container_id']}'),
-                  subtitle: Text('Hardware ID: ${container['hardware_id']}'),
-                  trailing: isSelected
-                      ? Icon(Icons.check_circle, color: Colors.green)
-                      : null,
-                  onTap: () {
-                    containerState.selectContainer(container['container_id']);
+          return Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              children: [
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    minimumSize: Size(double.infinity, 50),
+                  ),
+                  onPressed: () {
+                    _showAddContainerDialog(context);
                   },
+                  icon: Icon(Icons.add, color: Colors.white),
+                  label: Text('New container',
+                      style: TextStyle(color: Colors.white)),
                 ),
-              );
-            },
+                SizedBox(height: 16),
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: containers.length,
+                    itemBuilder: (context, index) {
+                      final container = containers[index];
+                      final isSelected = container['container_id'] ==
+                          containerState.selectedContainerId;
+
+                      return Card(
+                        color: isSelected
+                            ? Colors.green[100]
+                            : null, // Highlight selected container
+                        child: ListTile(
+                          title: Text('${container['container_name']}'),
+                          subtitle:
+                              Text('Date Added: ${container['date_added']}'),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (isSelected)
+                                Icon(Icons.check_circle, color: Colors.green),
+                              IconButton(
+                                icon: Icon(Icons.edit, color: Colors.blue),
+                                onPressed: () {
+                                  _showRenameContainerDialog(
+                                      context, container['container_id']);
+                                },
+                              ),
+                              IconButton(
+                                icon: Icon(Icons.delete, color: Colors.red),
+                                onPressed: () {
+                                  _showDeleteConfirmationDialog(
+                                      context, container['container_id']);
+                                },
+                              ),
+                            ],
+                          ),
+                          onTap: () {
+                            if (isSelected) {
+                              // If already selected, deselect
+                              containerState.selectContainer(0); //di pa eto tapos null dapat ko kaso di tinanggap pag di int value
+                            } else {
+                              // Otherwise, select it
+                              containerState
+                                  .selectContainer(container['container_id']);
+                            }
+                          },
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
           );
         }
       },
     );
   }
+
+  void _showAddContainerDialog(BuildContext context) {
+    TextEditingController _nameController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text("Add New Container"),
+        content: TextField(
+          controller: _nameController,
+          decoration: InputDecoration(hintText: "Enter container name"),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () {
+              addContainer(_nameController.text);
+              Navigator.pop(context);
+            },
+            child: Text("Add"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showRenameContainerDialog(BuildContext context, int containerId) {
+    TextEditingController _renameController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text("Rename Container"),
+        content: TextField(
+          controller: _renameController,
+          decoration: InputDecoration(hintText: "Enter new container name"),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () {
+              renameContainer(containerId, _renameController.text);
+              Navigator.pop(context);
+            },
+            child: Text("Rename"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteConfirmationDialog(BuildContext context, int containerId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text("Delete Container"),
+        content: Text("Are you sure you want to delete this container?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () {
+              deleteContainer(containerId);
+              Navigator.pop(context);
+            },
+            child: Text("Delete"),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+Future<void> addContainer(String name) async {
+  final supabase = Supabase.instance.client;
+  await supabase.from('Containers_test').insert({'container_name': name});
+}
+
+Future<void> renameContainer(int containerId, String newName) async {
+  final supabase = Supabase.instance.client;
+  await supabase
+      .from('Containers_test')
+      .update({'container_name': newName}).eq('container_id', containerId);
+}
+
+Future<void> deleteContainer(int containerId) async {
+  final supabase = Supabase.instance.client;
+  await supabase
+      .from('Containers_test')
+      .delete()
+      .eq('container_id', containerId);
 }
 
 Future<List<Map<String, dynamic>>> fetchContainers() async {
