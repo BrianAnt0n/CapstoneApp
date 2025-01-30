@@ -70,7 +70,15 @@ class _HomePageState extends State<HomePage> {
 }
 
 // Dashboard Page: Displays sensor data for the selected container
-class DashboardPage extends StatelessWidget {
+// Dashboard Page: Displays sensor data for the selected container
+class DashboardPage extends StatefulWidget {
+  @override
+  _DashboardPageState createState() => _DashboardPageState();
+}
+
+class _DashboardPageState extends State<DashboardPage> {
+  final TextEditingController _notesController = TextEditingController();
+
   @override
   Widget build(BuildContext context) {
     final containerState = Provider.of<ContainerState>(context);
@@ -105,7 +113,8 @@ class DashboardPage extends StatelessWidget {
                         Card(
                           elevation: 4,
                           child: ListTile(
-                            leading: Icon(Icons.thermostat, color: Colors.green),
+                            leading:
+                                Icon(Icons.thermostat, color: Colors.green),
                             title: Text('Temperature Monitoring'),
                             subtitle: Text('${sensorData['temperature']}°C'),
                           ),
@@ -132,7 +141,8 @@ class DashboardPage extends StatelessWidget {
                         Card(
                           elevation: 4,
                           child: ListTile(
-                            leading: Icon(Icons.science_outlined, color: Colors.deepPurple),
+                            leading: Icon(Icons.science_outlined,
+                                color: Colors.deepPurple),
                             title: Text('pH Level 2'),
                             subtitle: Text('${sensorData['ph_level2']}'),
                           ),
@@ -150,10 +160,40 @@ class DashboardPage extends StatelessWidget {
                         Card(
                           elevation: 4,
                           child: ListTile(
-                            leading: Icon(Icons.access_time, color: Colors.grey),
+                            leading:
+                                Icon(Icons.access_time, color: Colors.grey),
                             title: Text('Timestamp'),
                             subtitle: Text('${sensorData['timestamp']}'),
                           ),
+                        ),
+                        SizedBox(height: 20),
+
+                        // 📌 Notes Section
+                        Text(
+                          'Notes',
+                          style: TextStyle(
+                              fontSize: 20, fontWeight: FontWeight.bold),
+                        ),
+                        SizedBox(height: 10),
+                        TextField(
+                          controller: _notesController,
+                          maxLines: 3,
+                          decoration: InputDecoration(
+                            hintText: 'Enter your notes here...',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                        SizedBox(height: 10),
+                        ElevatedButton(
+                          onPressed: () {
+                            String notes = _notesController.text;
+                            print("Notes saved: $notes");
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                  content: Text('Notes saved successfully!')),
+                            );
+                          },
+                          child: Text('Save Notes'),
                         ),
                       ],
                     );
@@ -201,20 +241,26 @@ class ContainerPage extends StatelessWidget {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Center(child: CircularProgressIndicator());
         } else if (snapshot.hasError) {
-          return Center(child: Text('Error fetching containers: ${snapshot.error}'));
+          return Center(
+              child: Text('Error fetching containers: ${snapshot.error}'));
         } else {
           final containers = snapshot.data as List<Map<String, dynamic>>;
           return ListView.builder(
             itemCount: containers.length,
             itemBuilder: (context, index) {
               final container = containers[index];
-              final isSelected = container['container_id'] == containerState.selectedContainerId;
+              final isSelected = container['container_id'] ==
+                  containerState.selectedContainerId;
               return Card(
-                color: isSelected ? Colors.green[100] : null, // Highlight selected container
+                color: isSelected
+                    ? Colors.green[100]
+                    : null, // Highlight selected container
                 child: ListTile(
                   title: Text('Container ${container['container_id']}'),
                   subtitle: Text('Hardware ID: ${container['hardware_id']}'),
-                  trailing: isSelected ? Icon(Icons.check_circle, color: Colors.green) : null,
+                  trailing: isSelected
+                      ? Icon(Icons.check_circle, color: Colors.green)
+                      : null,
                   onTap: () {
                     containerState.selectContainer(container['container_id']);
                   },
@@ -228,18 +274,17 @@ class ContainerPage extends StatelessWidget {
   }
 }
 
-  Future<List<Map<String, dynamic>>> fetchContainers() async {
-    final supabase = Supabase.instance.client;
-    try {
+Future<List<Map<String, dynamic>>> fetchContainers() async {
+  final supabase = Supabase.instance.client;
+  try {
     final response = await supabase.from('Containers_test').select('*');
-      print ('Supabase Response: $response');
+    print('Supabase Response: $response');
     return List<Map<String, dynamic>>.from(response);
-    } catch (error) {
-      print('Error fetching containers: $error');
-      throw Exception('Error fetching containers: $error');
-    }
+  } catch (error) {
+    print('Error fetching containers: $error');
+    throw Exception('Error fetching containers: $error');
   }
-
+}
 
 // Others Page: Displays options like Account Management, ESP Connection, App Guide, and Log Out
 class OthersPage extends StatelessWidget {
