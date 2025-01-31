@@ -78,7 +78,9 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage> {
   Future<Map<String, dynamic>>? _sensorDataFuture;
+  Future<List<Map<String, dynamic>>>? _notesFuture;
   int? selectedContainerId;
+  TextEditingController _notesController = TextEditingController();
 
   @override
   void didChangeDependencies() {
@@ -87,6 +89,7 @@ class _DashboardPageState extends State<DashboardPage> {
     selectedContainerId = containerState.selectedContainerId;
     if (selectedContainerId != null) {
       _sensorDataFuture = fetchSensorData(selectedContainerId!);
+      _notesFuture = fetchNotes(selectedContainerId!);
     }
   }
 
@@ -94,6 +97,17 @@ class _DashboardPageState extends State<DashboardPage> {
     if (selectedContainerId != null) {
       setState(() {
         _sensorDataFuture = fetchSensorData(selectedContainerId!);
+        _notesFuture = fetchNotes(selectedContainerId!);
+      });
+    }
+  }
+
+  Future<void> _addNote() async {
+    if (selectedContainerId != null && _notesController.text.isNotEmpty) {
+      await addNoteToDatabase(selectedContainerId!, _notesController.text);
+      _notesController.clear();
+      setState(() {
+        _notesFuture = fetchNotes(selectedContainerId!);
       });
     }
   }
@@ -112,11 +126,10 @@ class _DashboardPageState extends State<DashboardPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Dashboard',
-                      style:
-                          TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                    ),
+                    // Dashboard Section
+                    Text('Dashboard',
+                        style: TextStyle(
+                            fontSize: 24, fontWeight: FontWeight.bold)),
                     SizedBox(height: 20),
                     Text('Selected Container: $selectedContainerId',
                         style: TextStyle(
@@ -129,7 +142,7 @@ class _DashboardPageState extends State<DashboardPage> {
                             ConnectionState.waiting) {
                           return Center(child: CircularProgressIndicator());
                         } else if (snapshot.hasError) {
-                          return Text('');
+                          return Text('Error fetching data');
                         } else {
                           final sensorData =
                               snapshot.data as Map<String, dynamic>;
@@ -161,24 +174,80 @@ class _DashboardPageState extends State<DashboardPage> {
                         }
                       },
                     ),
+
+                    // Notes Section (placed below dashboard)
+                    SizedBox(height: 30),
+                    Divider(thickness: 2), // Adds a separator line
+                    SizedBox(height: 10),
+                    Text('Notes',
+                        style: TextStyle(
+                            fontSize: 24, fontWeight: FontWeight.bold)),
+                    TextField(
+                      controller: _notesController,
+                      decoration: InputDecoration(
+                          hintText: 'Enter a note',
+                          suffixIcon: IconButton(
+                              icon: Icon(Icons.add), onPressed: _addNote)),
+                    ),
+                    SizedBox(height: 10),
+                    FutureBuilder(
+                      future: _notesFuture,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return Center(child: CircularProgressIndicator());
+                        } else if (snapshot.hasError) {
+                          return Text('Error fetching notes');
+                        } else {
+                          final notes =
+                              snapshot.data as List<Map<String, dynamic>>;
+                          return Column(
+                            children: notes
+                                .map((note) => Card(
+                                    child: ListTile(
+                                        title: Text(note['note']),
+                                        subtitle: Text(note['timestamp']))))
+                                .toList(),
+                          );
+                        }
+                      },
+                    ),
                   ],
                 ),
               ),
             ),
           );
   }
+}
 
-  Widget buildSensorCard(
-      IconData icon, String title, String value, Color color) {
-    return Card(
-      elevation: 4,
-      child: ListTile(
-        leading: Icon(icon, color: color),
-        title: Text(title),
-        subtitle: Text(value),
-      ),
-    );
-  }
+Future<void> addNoteToDatabase(int containerId, String note) async {
+  final supabase = Supabase.instance.client;
+  await supabase.from('Notes_test').insert({
+    'container_id': containerId,
+    'note': note,
+    'created_date': DateTime.now().toString()
+  });
+}
+
+Future<List<Map<String, dynamic>>> fetchNotes(int containerId) async {
+  final supabase = Supabase.instance.client;
+  final response = await supabase
+      .from('Container_Notes')
+      .select('*')
+      .eq('container_id', containerId)
+      .order('timestamp', ascending: false);
+  return List<Map<String, dynamic>>.from(response);
+}
+
+Widget buildSensorCard(IconData icon, String title, String value, Color color) {
+  return Card(
+    elevation: 4,
+    child: ListTile(
+      leading: Icon(icon, color: color),
+      title: Text(title),
+      subtitle: Text(value),
+    ),
+  );
 }
 
 //Database Fetching: Fetch sensor data for a specific container
