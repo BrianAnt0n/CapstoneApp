@@ -191,22 +191,27 @@ class _DashboardPageState extends State<DashboardPage> {
                     ),
                     SizedBox(height: 10),
                     FutureBuilder(
+                      //dito yung sa notes
                       future: _notesFuture,
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {
                           return Center(child: CircularProgressIndicator());
-                        } else if (snapshot.hasError) {
-                          return Text('Error fetching notes');
+                        } else if (snapshot.hasError || snapshot.data == null) {
+                          return Text('No notes found.');
                         } else {
                           final notes =
                               snapshot.data as List<Map<String, dynamic>>;
                           return Column(
                             children: notes
                                 .map((note) => Card(
-                                    child: ListTile(
-                                        title: Text(note['note']),
-                                        subtitle: Text(note['timestamp']))))
+                                      child: ListTile(
+                                        title: Text(note['note'] ??
+                                            'No note available'),
+                                        subtitle: Text(note['created_date'] ??
+                                            'Unknown date'), // ✅ Correct key
+                                      ),
+                                    ))
                                 .toList(),
                           );
                         }
@@ -220,23 +225,43 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 }
 
+//notes database
 Future<void> addNoteToDatabase(int containerId, String note) async {
   final supabase = Supabase.instance.client;
-  await supabase.from('Notes_test').insert({
+  await supabase.from('Notes_test_test').insert({
     'container_id': containerId,
     'note': note,
-    'created_date': DateTime.now().toString()
+    'created_date': DateTime.now().toIso8601String(), // ✅ Use ISO format
   });
 }
 
 Future<List<Map<String, dynamic>>> fetchNotes(int containerId) async {
   final supabase = Supabase.instance.client;
-  final response = await supabase
-      .from('Container_Notes')
-      .select('*')
-      .eq('container_id', containerId)
-      .order('timestamp', ascending: false);
-  return List<Map<String, dynamic>>.from(response);
+
+  try {
+    final response = await supabase
+        .from('Notes_test_test')
+        .select('note_id, container_id, note, created_date')
+        .eq('container_id', containerId)
+        .order('created_date', ascending: false);
+
+    if (response == null || response.isEmpty) {
+      print("No notes found for container $containerId");
+      return [];
+    }
+
+    return response.map((note) {
+      return {
+        'note_id': note['note_id'] ?? 0,
+        'container_id': note['container_id'] ?? 0,
+        'note': note['note']?.toString() ?? 'No note available',
+        'created_date': note['created_date']?.toString() ?? 'Unknown date',
+      };
+    }).toList();
+  } catch (error) {
+    print("Error fetching notes: $error");
+    return [];
+  }
 }
 
 Widget buildSensorCard(IconData icon, String title, String value, Color color) {
