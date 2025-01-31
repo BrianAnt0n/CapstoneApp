@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 import 'login_page.dart';
 import 'Others tab/account_management_page.dart';
 import 'Others tab/esp_connection_page.dart';
@@ -42,8 +43,12 @@ class _HomePageState extends State<HomePage> {
           title: Text('E-ComposThink Home'), // AppBar title
         ),
         body: _pages[_currentIndex], // Show the selected page
+
+        // Updated Bottom Navigation Bar with green theme
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: _currentIndex,
+          selectedItemColor: Colors.green, // Change selected icon color to green
+          unselectedItemColor: Colors.green[300], // Light green for unselected icons
           onTap: (index) {
             setState(() {
               _currentIndex = index; // Update the selected tab
@@ -68,7 +73,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 }
-
 // Dashboard Page: Displays sensor data for the selected container
 // Dashboard Page with pull-to-refresh functionality
 class DashboardPage extends StatefulWidget {
@@ -78,7 +82,9 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage> {
   Future<Map<String, dynamic>>? _sensorDataFuture;
+  Future<List<Map<String, dynamic>>>? _notesFuture;
   int? selectedContainerId;
+  TextEditingController _notesController = TextEditingController();
 
   @override
   void didChangeDependencies() {
@@ -87,6 +93,7 @@ class _DashboardPageState extends State<DashboardPage> {
     selectedContainerId = containerState.selectedContainerId;
     if (selectedContainerId != null) {
       _sensorDataFuture = fetchSensorData(selectedContainerId!);
+      _notesFuture = fetchNotes(selectedContainerId!);
     }
   }
 
@@ -94,9 +101,30 @@ class _DashboardPageState extends State<DashboardPage> {
     if (selectedContainerId != null) {
       setState(() {
         _sensorDataFuture = fetchSensorData(selectedContainerId!);
+        _notesFuture = fetchNotes(selectedContainerId!);
       });
     }
   }
+
+  Future<void> _addNote() async {
+    if (selectedContainerId != null && _notesController.text.isNotEmpty) {
+      await addNoteToDatabase(selectedContainerId!, _notesController.text);
+      _notesController.clear();
+      setState(() {
+        _notesFuture = fetchNotes(selectedContainerId!);
+      });
+    }
+  }
+
+  String formatTimestamp(String timestamp) {
+  try {
+    DateTime parsedDate = DateTime.parse(timestamp);
+    return DateFormat('yyyy-MM-dd hh:mm a').format(parsedDate);
+  } catch (e) {
+    return 'Invalid Date';
+  }
+}
+
 
   @override
   Widget build(BuildContext context) {
@@ -112,11 +140,10 @@ class _DashboardPageState extends State<DashboardPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Dashboard',
-                      style:
-                          TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                    ),
+                    // Dashboard Section
+                    Text('Dashboard',
+                        style: TextStyle(
+                            fontSize: 24, fontWeight: FontWeight.bold)),
                     SizedBox(height: 20),
                     Text('Selected Container: $selectedContainerId',
                         style: TextStyle(
@@ -129,7 +156,7 @@ class _DashboardPageState extends State<DashboardPage> {
                             ConnectionState.waiting) {
                           return Center(child: CircularProgressIndicator());
                         } else if (snapshot.hasError) {
-                          return Text('');
+                          return Text('Error fetching data');
                         } else {
                           final sensorData =
                               snapshot.data as Map<String, dynamic>;
@@ -155,8 +182,53 @@ class _DashboardPageState extends State<DashboardPage> {
                               buildSensorCard(Icons.cloud, 'Humidity',
                                   '${sensorData['humidity']}%', Colors.orange),
                               buildSensorCard(Icons.access_time, 'Timestamp',
-                                  '${sensorData['timestamp']}', Colors.grey),
+                                  formatTimestamp(sensorData['timestamp']),
+                                  Colors.grey),
                             ],
+                          );
+                        }
+                      },
+                    ),
+
+                    // Notes Section (placed below dashboard)
+                    SizedBox(height: 30),
+                    Divider(thickness: 2), // Adds a separator line
+                    SizedBox(height: 10),
+                    Text('Notes',
+                        style: TextStyle(
+                            fontSize: 24, fontWeight: FontWeight.bold)),
+                    TextField(
+                      controller: _notesController,
+                      decoration: InputDecoration(
+                          hintText: 'Enter a note',
+                          suffixIcon: IconButton(
+                              icon: Icon(Icons.add), onPressed: _addNote)),
+                    ),
+                    SizedBox(height: 10),
+                    FutureBuilder(
+                      future: _notesFuture,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return Center(child: CircularProgressIndicator());
+                        } else if (snapshot.hasError || snapshot.data == null) {
+                          return Text('No notes found.');
+                        } else {
+                          final notes =
+                              snapshot.data as List<Map<String, dynamic>>;
+                          return Column(
+                            children: notes
+                                .map(
+                                  (note) => Card(
+                                    child: ListTile(
+                                      title: Text(
+                                          note['note'] ?? 'No note available'),
+                                      subtitle: Text(
+                                          formatTimestamp(note['created_date'])),
+                                    ),
+                                  ),
+                                )
+                                .toList(),
                           );
                         }
                       },
@@ -167,18 +239,80 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
           );
   }
+}
 
-  Widget buildSensorCard(
-      IconData icon, String title, String value, Color color) {
-    return Card(
-      elevation: 4,
-      child: ListTile(
-        leading: Icon(icon, color: color),
-        title: Text(title),
-        subtitle: Text(value),
-      ),
-    );
+Future<void> updateNoteInDatabase(int noteId, String updatedNote) async {
+  final supabase = Supabase.instance.client;
+
+  try {
+    await supabase
+        .from('Notes_test_test')
+        .update({'note': updatedNote}).eq('note_id', noteId);
+    print('Note updated successfully');
+  } catch (error) {
+    print('Error updating note: $error');
   }
+}
+
+Future<void> deleteNoteFromDatabase(int noteId) async {
+  final supabase = Supabase.instance.client;
+
+  try {
+    await supabase.from('Notes_test_test').delete().eq('note_id', noteId);
+    print('Note deleted successfully');
+  } catch (error) {
+    print('Error deleting note: $error');
+  }
+}
+
+//notes database
+Future<void> addNoteToDatabase(int containerId, String note) async {
+  final supabase = Supabase.instance.client;
+  await supabase.from('Notes_test_test').insert({
+    'container_id': containerId,
+    'note': note,
+    'created_date': DateTime.now().toIso8601String(), // ✅ Use ISO format
+  });
+}
+
+Future<List<Map<String, dynamic>>> fetchNotes(int containerId) async {
+  final supabase = Supabase.instance.client;
+
+  try {
+    final response = await supabase
+        .from('Notes_test_test')
+        .select('note_id, container_id, note, created_date')
+        .eq('container_id', containerId)
+        .order('created_date', ascending: false);
+
+    if (response == null || response.isEmpty) {
+      print("No notes found for container $containerId");
+      return [];
+    }
+
+    return response.map((note) {
+      return {
+        'note_id': note['note_id'] ?? 0,
+        'container_id': note['container_id'] ?? 0,
+        'note': note['note']?.toString() ?? 'No note available',
+        'created_date': note['created_date']?.toString() ?? 'Unknown date',
+      };
+    }).toList();
+  } catch (error) {
+    print("Error fetching notes: $error");
+    return [];
+  }
+}
+
+Widget buildSensorCard(IconData icon, String title, String value, Color color) {
+  return Card(
+    elevation: 4,
+    child: ListTile(
+      leading: Icon(icon, color: color),
+      title: Text(title),
+      subtitle: Text(value),
+    ),
+  );
 }
 
 //Database Fetching: Fetch sensor data for a specific container
