@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 import 'login_page.dart';
 import 'Others tab/account_management_page.dart';
 import 'Others tab/esp_connection_page.dart';
@@ -42,8 +43,12 @@ class _HomePageState extends State<HomePage> {
           title: Text('E-ComposThink Home'), // AppBar title
         ),
         body: _pages[_currentIndex], // Show the selected page
+
+        // Updated Bottom Navigation Bar with green theme
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: _currentIndex,
+          selectedItemColor: Colors.green, // Change selected icon color to green
+          unselectedItemColor: Colors.green[300], // Light green for unselected icons
           onTap: (index) {
             setState(() {
               _currentIndex = index; // Update the selected tab
@@ -68,7 +73,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 }
-
 // Dashboard Page: Displays sensor data for the selected container
 // Dashboard Page with pull-to-refresh functionality
 class DashboardPage extends StatefulWidget {
@@ -112,79 +116,15 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  void _showDeleteConfirmationDialog(int noteId) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Delete Note'),
-          content: Text('Are you sure you want to delete this note?'),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context); // Close dialog without deleting
-              },
-              child: Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () async {
-                await deleteNoteFromDatabase(noteId);
-                Navigator.pop(context); // Close dialog after deleting
-
-                // Refresh the notes after deletion
-                if (mounted) {
-                  setState(() {
-                    _notesFuture = fetchNotes(selectedContainerId!);
-                  });
-                }
-              },
-              child: Text('Delete', style: TextStyle(color: Colors.red)),
-            ),
-          ],
-        );
-      },
-    );
+  String formatTimestamp(String timestamp) {
+  try {
+    DateTime parsedDate = DateTime.parse(timestamp);
+    return DateFormat('yyyy-MM-dd hh:mm a').format(parsedDate);
+  } catch (e) {
+    return 'Invalid Date';
   }
+}
 
-  void _showEditDialog(int noteId, String currentNote) {
-    TextEditingController _editController =
-        TextEditingController(text: currentNote);
-
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text('Edit Note'),
-          content: TextField(
-            controller: _editController,
-            decoration: InputDecoration(hintText: "Enter new note"),
-          ),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context); // Close the dialog
-              },
-              child: Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () async {
-                await updateNoteInDatabase(noteId, _editController.text);
-                Navigator.pop(context); // Close the dialog
-
-                // Refresh notes after updating
-                if (mounted) {
-                  setState(() {
-                    _notesFuture = fetchNotes(selectedContainerId!);
-                  });
-                }
-              },
-              child: Text('Save', style: TextStyle(color: Colors.blue)),
-            ),
-          ],
-        );
-      },
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -242,7 +182,8 @@ class _DashboardPageState extends State<DashboardPage> {
                               buildSensorCard(Icons.cloud, 'Humidity',
                                   '${sensorData['humidity']}%', Colors.orange),
                               buildSensorCard(Icons.access_time, 'Timestamp',
-                                  '${sensorData['timestamp']}', Colors.grey),
+                                  formatTimestamp(sensorData['timestamp']),
+                                  Colors.grey),
                             ],
                           );
                         }
@@ -282,31 +223,8 @@ class _DashboardPageState extends State<DashboardPage> {
                                     child: ListTile(
                                       title: Text(
                                           note['note'] ?? 'No note available'),
-                                      subtitle: Text(note['created_date'] ??
-                                          'Unknown date'),
-                                      trailing: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          // Edit Button
-                                          IconButton(
-                                            icon: Icon(Icons.edit,
-                                                color: Colors.blue),
-                                            onPressed: () {
-                                              _showEditDialog(note['note_id'],
-                                                  note['note']);
-                                            },
-                                          ),
-                                          // Delete Button with Confirmation
-                                          IconButton(
-                                            icon: Icon(Icons.delete,
-                                                color: Colors.red),
-                                            onPressed: () {
-                                              _showDeleteConfirmationDialog(
-                                                  note['note_id']);
-                                            },
-                                          ),
-                                        ],
-                                      ),
+                                      subtitle: Text(
+                                          formatTimestamp(note['created_date'])),
                                     ),
                                   ),
                                 )
