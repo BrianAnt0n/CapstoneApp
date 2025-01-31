@@ -39,7 +39,7 @@ class _HomePageState extends State<HomePage> {
       create: (_) => ContainerState(),
       child: Scaffold(
         appBar: AppBar(
-          title: Text('E-ComposThink Home - Welcome Admin!'), // AppBar title
+          title: Text('E-ComposThink Home'), // AppBar title
         ),
         body: _pages[_currentIndex], // Show the selected page
         bottomNavigationBar: BottomNavigationBar(
@@ -69,6 +69,7 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
+// Dashboard Page: Displays sensor data for the selected container
 // Dashboard Page with pull-to-refresh functionality
 class DashboardPage extends StatefulWidget {
   @override
@@ -100,7 +101,8 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   Widget build(BuildContext context) {
     return selectedContainerId == null
-        ? Center(child: Text('Please select a container from the Container tab.'))
+        ? Center(
+            child: Text('Please select a container from the Container tab.'))
         : RefreshIndicator(
             onRefresh: _refreshData,
             child: SingleChildScrollView(
@@ -112,29 +114,48 @@ class _DashboardPageState extends State<DashboardPage> {
                   children: [
                     Text(
                       'Dashboard',
-                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                      style:
+                          TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                     ),
                     SizedBox(height: 20),
                     Text('Selected Container: $selectedContainerId',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.w500)),
                     SizedBox(height: 10),
                     FutureBuilder(
                       future: _sensorDataFuture,
                       builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
                           return Center(child: CircularProgressIndicator());
                         } else if (snapshot.hasError) {
-                          return Text('Error fetching data');
+                          return Text('');
                         } else {
-                          final sensorData = snapshot.data as Map<String, dynamic>;
+                          final sensorData =
+                              snapshot.data as Map<String, dynamic>;
                           return Column(
                             children: [
-                              buildSensorCard(Icons.thermostat, 'Temperature Monitoring', '${sensorData['temperature']}°C', Colors.green),
-                              buildSensorCard(Icons.water_drop, 'Moisture Level', '${sensorData['moisture']}%', Colors.blue),
-                              buildSensorCard(Icons.science, 'pH Level 1', '${sensorData['ph_level']}', Colors.purple),
-                              buildSensorCard(Icons.science_outlined, 'pH Level 2', '${sensorData['ph_level2']}', Colors.deepPurple),
-                              buildSensorCard(Icons.cloud, 'Humidity', '${sensorData['humidity']}%', Colors.orange),
-                              buildSensorCard(Icons.access_time, 'Timestamp', '${sensorData['timestamp']}', Colors.grey),
+                              buildSensorCard(
+                                  Icons.thermostat,
+                                  'Temperature Monitoring',
+                                  '${sensorData['temperature']}°C',
+                                  Colors.green),
+                              buildSensorCard(
+                                  Icons.water_drop,
+                                  'Moisture Level',
+                                  '${sensorData['moisture']}%',
+                                  Colors.blue),
+                              buildSensorCard(Icons.science, 'pH Level 1',
+                                  '${sensorData['ph_level']}', Colors.purple),
+                              buildSensorCard(
+                                  Icons.science_outlined,
+                                  'pH Level 2',
+                                  '${sensorData['ph_level2']}',
+                                  Colors.deepPurple),
+                              buildSensorCard(Icons.cloud, 'Humidity',
+                                  '${sensorData['humidity']}%', Colors.orange),
+                              buildSensorCard(Icons.access_time, 'Timestamp',
+                                  '${sensorData['timestamp']}', Colors.grey),
                             ],
                           );
                         }
@@ -147,7 +168,8 @@ class _DashboardPageState extends State<DashboardPage> {
           );
   }
 
-  Widget buildSensorCard(IconData icon, String title, String value, Color color) {
+  Widget buildSensorCard(
+      IconData icon, String title, String value, Color color) {
     return Card(
       elevation: 4,
       child: ListTile(
@@ -158,7 +180,6 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 }
-
 
 //Database Fetching: Fetch sensor data for a specific container
 Future<Map<String, dynamic>> fetchSensorData(int containerId) async {
@@ -182,55 +203,227 @@ Future<Map<String, dynamic>> fetchSensorData(int containerId) async {
 }
 
 // Container Page: Displays a list of available containers
-class ContainerPage extends StatelessWidget {
+
+class ContainerPage extends StatefulWidget {
+  @override
+  _ContainerPageState createState() => _ContainerPageState();
+}
+
+class _ContainerPageState extends State<ContainerPage> {
+  late Future<List<Map<String, dynamic>>> _containersFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchContainers();
+  }
+
+  void _fetchContainers() {
+    setState(() {
+      _containersFuture = fetchContainers();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final containerState = Provider.of<ContainerState>(context);
+
     return FutureBuilder(
-      future: fetchContainers(),
+      future: _containersFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Center(child: CircularProgressIndicator());
         } else if (snapshot.hasError) {
-          return Center(child: Text('Error fetching containers: ${snapshot.error}'));
+          return Center(
+              child: Text('Error fetching containers: ${snapshot.error}'));
         } else {
           final containers = snapshot.data as List<Map<String, dynamic>>;
-          return ListView.builder(
-            itemCount: containers.length,
-            itemBuilder: (context, index) {
-              final container = containers[index];
-              final isSelected = container['container_id'] == containerState.selectedContainerId;
-              return Card(
-                color: isSelected ? Colors.green[100] : null, // Highlight selected container
-                child: ListTile(
-                  title: Text('Container ${container['container_id']}'),
-                  subtitle: Text('Hardware ID: ${container['hardware_id']}'),
-                  trailing: isSelected ? Icon(Icons.check_circle, color: Colors.green) : null,
-                  onTap: () {
-                    containerState.selectContainer(container['container_id']);
+
+          return Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              children: [
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    minimumSize: Size(double.infinity, 50),
+                  ),
+                  onPressed: () {
+                    _showAddContainerDialog(context);
                   },
+                  icon: Icon(Icons.add, color: Colors.white),
+                  label: Text('New container',
+                      style: TextStyle(color: Colors.white)),
                 ),
-              );
-            },
+                SizedBox(height: 16),
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: containers.length,
+                    itemBuilder: (context, index) {
+                      final container = containers[index];
+                      final isSelected = container['container_id'] ==
+                          containerState.selectedContainerId;
+
+                      return Card(
+                        color: isSelected ? Colors.green[100] : null,
+                        child: ListTile(
+                          title: Text('${container['container_name']}'),
+                          subtitle:
+                              Text('Date Added: ${container['date_added']}'),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (isSelected)
+                                Icon(Icons.check_circle, color: Colors.green),
+                              IconButton(
+                                icon: Icon(Icons.edit, color: Colors.blue),
+                                onPressed: () {
+                                  _showRenameContainerDialog(
+                                      context, container['container_id']);
+                                },
+                              ),
+                              IconButton(
+                                icon: Icon(Icons.delete, color: Colors.red),
+                                onPressed: () {
+                                  _showDeleteConfirmationDialog(
+                                      context, container['container_id']);
+                                },
+                              ),
+                            ],
+                          ),
+                          onTap: () {
+                            if (isSelected) {
+                              containerState.selectContainer(0);
+                            } else {
+                              containerState
+                                  .selectContainer(container['container_id']);
+                            }
+                          },
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
           );
         }
       },
     );
   }
-}
 
-  Future<List<Map<String, dynamic>>> fetchContainers() async {
-    final supabase = Supabase.instance.client;
-    try {
-    final response = await supabase.from('Containers_test').select('*');
-      print ('Supabase Response: $response');
-    return List<Map<String, dynamic>>.from(response);
-    } catch (error) {
-      print('Error fetching containers: $error');
-      throw Exception('Error fetching containers: $error');
-    }
+  void _showAddContainerDialog(BuildContext context) {
+    TextEditingController _nameController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text("Add New Container"),
+        content: TextField(
+          controller: _nameController,
+          decoration: InputDecoration(hintText: "Enter container name"),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () {
+              addContainer(_nameController.text);
+              Navigator.pop(context);
+            },
+            child: Text("Add"),
+          ),
+        ],
+      ),
+    );
   }
 
+  void _showRenameContainerDialog(BuildContext context, int containerId) {
+    TextEditingController _renameController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text("Rename Container"),
+        content: TextField(
+          controller: _renameController,
+          decoration: InputDecoration(hintText: "Enter new container name"),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () async {
+              await renameContainer(containerId, _renameController.text);
+              Navigator.pop(context);
+              _fetchContainers(); // 🔄 Refresh UI after renaming
+            },
+            child: Text("Rename"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteConfirmationDialog(BuildContext context, int containerId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text("Delete Container"),
+        content: Text("Are you sure you want to delete this container?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () {
+              deleteContainer(containerId);
+              Navigator.pop(context);
+            },
+            child: Text("Delete"),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+Future<void> addContainer(String name) async {
+  final supabase = Supabase.instance.client;
+  await supabase.from('Containers_test').insert({'container_name': name});
+}
+
+Future<void> renameContainer(int containerId, String newName) async {
+  final supabase = Supabase.instance.client;
+  await supabase
+      .from('Containers_test')
+      .update({'container_name': newName}).eq('container_id', containerId);
+}
+
+Future<void> deleteContainer(int containerId) async {
+  final supabase = Supabase.instance.client;
+  await supabase
+      .from('Containers_test')
+      .delete()
+      .eq('container_id', containerId);
+}
+
+Future<List<Map<String, dynamic>>> fetchContainers() async {
+  final supabase = Supabase.instance.client;
+  try {
+    final response = await supabase.from('Containers_test').select('*');
+    print('Supabase Response: $response');
+    return List<Map<String, dynamic>>.from(response);
+  } catch (error) {
+    print('Error fetching containers: $error');
+    throw Exception('Error fetching containers: $error');
+  }
+}
 
 // Others Page: Displays options like Account Management, ESP Connection, App Guide, and Log Out
 class OthersPage extends StatelessWidget {
