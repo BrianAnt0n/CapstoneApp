@@ -204,14 +204,28 @@ class _DashboardPageState extends State<DashboardPage> {
                               snapshot.data as List<Map<String, dynamic>>;
                           return Column(
                             children: notes
-                                .map((note) => Card(
-                                      child: ListTile(
-                                        title: Text(note['note'] ??
-                                            'No note available'),
-                                        subtitle: Text(note['created_date'] ??
-                                            'Unknown date'), // ✅ Correct key
+                                .map(
+                                  (note) => Card(
+                                    child: ListTile(
+                                      title: Text(
+                                          note['note'] ?? 'No note available'),
+                                      subtitle: Text(note['created_date'] ??
+                                          'Unknown date'),
+                                      trailing: IconButton(
+                                        icon: Icon(Icons.delete,
+                                            color: Colors.red),
+                                        onPressed: () async {
+                                          await deleteNoteFromDatabase(
+                                              note['note_id']);
+                                          setState(() {
+                                            _notesFuture = fetchNotes(
+                                                selectedContainerId!); // ✅ Corrected variable
+                                          });
+                                        },
                                       ),
-                                    ))
+                                    ),
+                                  ),
+                                )
                                 .toList(),
                           );
                         }
@@ -222,6 +236,17 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
             ),
           );
+  }
+}
+
+Future<void> deleteNoteFromDatabase(int noteId) async {
+  final supabase = Supabase.instance.client;
+
+  try {
+    await supabase.from('Notes_test_test').delete().eq('note_id', noteId);
+    print('Note deleted successfully');
+  } catch (error) {
+    print('Error deleting note: $error');
   }
 }
 
