@@ -112,6 +112,80 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
+  void _showDeleteConfirmationDialog(int noteId) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Delete Note'),
+          content: Text('Are you sure you want to delete this note?'),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context); // Close dialog without deleting
+              },
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                await deleteNoteFromDatabase(noteId);
+                Navigator.pop(context); // Close dialog after deleting
+
+                // Refresh the notes after deletion
+                if (mounted) {
+                  setState(() {
+                    _notesFuture = fetchNotes(selectedContainerId!);
+                  });
+                }
+              },
+              child: Text('Delete', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showEditDialog(int noteId, String currentNote) {
+    TextEditingController _editController =
+        TextEditingController(text: currentNote);
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Edit Note'),
+          content: TextField(
+            controller: _editController,
+            decoration: InputDecoration(hintText: "Enter new note"),
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context); // Close the dialog
+              },
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                await updateNoteInDatabase(noteId, _editController.text);
+                Navigator.pop(context); // Close the dialog
+
+                // Refresh notes after updating
+                if (mounted) {
+                  setState(() {
+                    _notesFuture = fetchNotes(selectedContainerId!);
+                  });
+                }
+              },
+              child: Text('Save', style: TextStyle(color: Colors.blue)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return selectedContainerId == null
@@ -191,7 +265,6 @@ class _DashboardPageState extends State<DashboardPage> {
                     ),
                     SizedBox(height: 10),
                     FutureBuilder(
-                      //dito yung sa notes
                       future: _notesFuture,
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
@@ -211,17 +284,28 @@ class _DashboardPageState extends State<DashboardPage> {
                                           note['note'] ?? 'No note available'),
                                       subtitle: Text(note['created_date'] ??
                                           'Unknown date'),
-                                      trailing: IconButton(
-                                        icon: Icon(Icons.delete,
-                                            color: Colors.red),
-                                        onPressed: () async {
-                                          await deleteNoteFromDatabase(
-                                              note['note_id']);
-                                          setState(() {
-                                            _notesFuture = fetchNotes(
-                                                selectedContainerId!); // ✅ Corrected variable
-                                          });
-                                        },
+                                      trailing: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          // Edit Button
+                                          IconButton(
+                                            icon: Icon(Icons.edit,
+                                                color: Colors.blue),
+                                            onPressed: () {
+                                              _showEditDialog(note['note_id'],
+                                                  note['note']);
+                                            },
+                                          ),
+                                          // Delete Button with Confirmation
+                                          IconButton(
+                                            icon: Icon(Icons.delete,
+                                                color: Colors.red),
+                                            onPressed: () {
+                                              _showDeleteConfirmationDialog(
+                                                  note['note_id']);
+                                            },
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   ),
@@ -236,6 +320,19 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
             ),
           );
+  }
+}
+
+Future<void> updateNoteInDatabase(int noteId, String updatedNote) async {
+  final supabase = Supabase.instance.client;
+
+  try {
+    await supabase
+        .from('Notes_test_test')
+        .update({'note': updatedNote}).eq('note_id', noteId);
+    print('Note updated successfully');
+  } catch (error) {
+    print('Error updating note: $error');
   }
 }
 
