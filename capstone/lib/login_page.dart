@@ -4,6 +4,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'constants.dart';
 
 class LoginPage extends StatefulWidget {
+  const LoginPage({super.key});
+
   @override
   _LoginPageState createState() => _LoginPageState();
 }
@@ -85,7 +87,7 @@ class _LoginPageState extends State<LoginPage> {
           // Foreground Content
           Center(
             child: SingleChildScrollView(
-              padding: EdgeInsets.all(16.0),
+              padding: const EdgeInsets.all(16.0),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -106,31 +108,31 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
 
-                  SizedBox(height: 40), // Spacing between logo and text fields
+                  const SizedBox(height: 40), // Spacing between logo and text fields
 
                   // Email Field
                   TextField(
                     controller: _emailController,
-                    decoration: InputDecoration(
+                    decoration: const InputDecoration(
                       labelText: 'Email',
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.email),
                     ),
                     keyboardType: TextInputType.emailAddress,
                   ),
-                  SizedBox(height: 20),
+                  const SizedBox(height: 20),
 
                   // Password Field
                   TextField(
                     controller: _passwordController,
-                    decoration: InputDecoration(
+                    decoration: const InputDecoration(
                       labelText: 'Password',
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.lock),
                     ),
                     obscureText: true,
                   ),
-                  SizedBox(height: 20),
+                  const SizedBox(height: 20),
                   // Login Button (Green Theme)
                   GestureDetector(
                     onTap:
@@ -145,7 +147,7 @@ class _LoginPageState extends State<LoginPage> {
                             BorderRadius.circular(8), // Rounded corners
                       ),
                       alignment: Alignment.center,
-                      child: Text(
+                      child: const Text(
                         'Login',
                         style: TextStyle(
                           color: Colors.white, // Text color
@@ -156,19 +158,19 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
 
-                  SizedBox(height: 20),
+                  const SizedBox(height: 20),
 
                   // Signup link
                   GestureDetector(
                     onTap: () {
                       // Navigate to signup page or perform an action
                     },
-                    child: Text(
+                    child: const Text(
                       'Don’t have an account? Sign up',
                       style: TextStyle(color: Colors.blue),
                     ),
                   ),
-                  SizedBox(
+                  const SizedBox(
                       height: 40), // Add some spacing before the guest button
 
                   // Continue as Guest Button (Yellow Theme)
@@ -193,7 +195,7 @@ class _LoginPageState extends State<LoginPage> {
                             BorderRadius.circular(8), // Rounded corners
                       ),
                       alignment: Alignment.center,
-                      child: Text(
+                      child: const Text(
                         'Continue as Guest',
                         style: TextStyle(
                           color: Colors.white, // Text color
