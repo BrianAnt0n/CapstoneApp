@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'login_page.dart';
+import 'scanner_page.dart';
 import 'Others tab/account_management_page.dart';
 import 'Others tab/esp_connection_page.dart';
 import 'Others tab/app_guide_page.dart';
@@ -40,7 +41,7 @@ class _HomePageState extends State<HomePage> {
       create: (_) => ContainerState(),
       child: Scaffold(
         appBar: AppBar(
-          title: Text('E-ComposThink Home'), // AppBar title
+          title: Text('E-ComposThink Home - Admin'), // AppBar title
         ),
         body: _pages[_currentIndex], // Show the selected page
 
@@ -383,11 +384,13 @@ class _ContainerPageState extends State<ContainerPage> {
                     minimumSize: Size(double.infinity, 50),
                   ),
                   onPressed: () {
-                    _showAddContainerDialog(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => ScannerPage()), // Navigate to ScannerPage
+                    );
                   },
                   icon: Icon(Icons.add, color: Colors.white),
-                  label: Text('New container',
-                      style: TextStyle(color: Colors.white)),
+                  label: Text('New container', style: TextStyle(color: Colors.white)),
                 ),
                 SizedBox(height: 16),
                 Expanded(
@@ -446,34 +449,6 @@ class _ContainerPageState extends State<ContainerPage> {
     );
   }
 
-  void _showAddContainerDialog(BuildContext context) {
-    TextEditingController _nameController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text("Add New Container"),
-        content: TextField(
-          controller: _nameController,
-          decoration: InputDecoration(hintText: "Enter container name"),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text("Cancel"),
-          ),
-          TextButton(
-            onPressed: () {
-              addContainer(_nameController.text);
-              Navigator.pop(context);
-            },
-            child: Text("Add"),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _showRenameContainerDialog(BuildContext context, int containerId) {
     TextEditingController _renameController = TextEditingController();
 
@@ -527,11 +502,6 @@ class _ContainerPageState extends State<ContainerPage> {
   }
 }
 
-Future<void> addContainer(String name) async {
-  final supabase = Supabase.instance.client;
-  await supabase.from('Containers_test').insert({'container_name': name});
-}
-
 Future<void> renameContainer(int containerId, String newName) async {
   final supabase = Supabase.instance.client;
   await supabase
@@ -558,6 +528,7 @@ Future<List<Map<String, dynamic>>> fetchContainers() async {
     throw Exception('Error fetching containers: $error');
   }
 }
+
 
 // Others Page: Displays options like Account Management, ESP Connection, App Guide, and Log Out
 class OthersPage extends StatelessWidget {
