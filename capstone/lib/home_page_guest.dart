@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
 import 'login_page.dart';
-import 'scanner_page.dart';
-import 'container_details.dart';
 import 'Others tab/account_management_page.dart';
 import 'Others tab/esp_connection_page.dart';
 import 'Others tab/app_guide_page.dart';
@@ -21,12 +18,18 @@ class ContainerState extends ChangeNotifier {
   }
 }
 
+<<<<<<< Updated upstream
+class HomePage extends StatefulWidget {
+=======
 class HomePageGuest extends StatefulWidget {
+  const HomePageGuest({super.key});
+
+>>>>>>> Stashed changes
   @override
-  _HomePageGuestState createState() => _HomePageGuestState();
+  _HomePageState createState() => _HomePageState();
 }
 
-class _HomePageGuestState extends State<HomePageGuest> {
+class _HomePageState extends State<HomePage> {
   int _currentIndex = 0; // Tracks the selected tab index
 
   // Pages for bottom navigation
@@ -42,21 +45,21 @@ class _HomePageGuestState extends State<HomePageGuest> {
       create: (_) => ContainerState(),
       child: Scaffold(
         appBar: AppBar(
-          title: Text('E-ComposThink Home - Guest'), // AppBar title
+<<<<<<< Updated upstream
+          title: Text('E-ComposThink Home - Welcome Guest!'), // AppBar title
+=======
+          title: const Text('E-ComposThink Home - Guest'), // AppBar title
+>>>>>>> Stashed changes
         ),
         body: _pages[_currentIndex], // Show the selected page
-
-        // Updated Bottom Navigation Bar with green theme
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: _currentIndex,
-          selectedItemColor: Colors.green, // Change selected icon color to green
-          unselectedItemColor: Colors.green[300], // Light green for unselected icons
           onTap: (index) {
             setState(() {
               _currentIndex = index; // Update the selected tab
             });
           },
-          items: [
+          items: const [
             BottomNavigationBarItem(
               icon: Icon(Icons.dashboard),
               label: 'Dashboard',
@@ -75,18 +78,22 @@ class _HomePageGuestState extends State<HomePageGuest> {
     );
   }
 }
-// Dashboard Page: Displays sensor data for the selected container
+
 // Dashboard Page with pull-to-refresh functionality
 class DashboardPage extends StatefulWidget {
+  const DashboardPage({super.key});
+
   @override
   _DashboardPageState createState() => _DashboardPageState();
 }
 
 class _DashboardPageState extends State<DashboardPage> {
   Future<Map<String, dynamic>>? _sensorDataFuture;
-  Future<List<Map<String, dynamic>>>? _notesFuture;
   int? selectedContainerId;
-  TextEditingController _notesController = TextEditingController();
+<<<<<<< Updated upstream
+=======
+  final TextEditingController _notesController = TextEditingController();
+>>>>>>> Stashed changes
 
   @override
   void didChangeDependencies() {
@@ -95,7 +102,6 @@ class _DashboardPageState extends State<DashboardPage> {
     selectedContainerId = containerState.selectedContainerId;
     if (selectedContainerId != null) {
       _sensorDataFuture = fetchSensorData(selectedContainerId!);
-      _notesFuture = fetchNotes(selectedContainerId!);
     }
   }
 
@@ -103,11 +109,16 @@ class _DashboardPageState extends State<DashboardPage> {
     if (selectedContainerId != null) {
       setState(() {
         _sensorDataFuture = fetchSensorData(selectedContainerId!);
-        _notesFuture = fetchNotes(selectedContainerId!);
       });
     }
   }
 
+<<<<<<< Updated upstream
+  @override
+  Widget build(BuildContext context) {
+    return selectedContainerId == null
+        ? Center(child: Text('Please select a container from the Container tab.'))
+=======
   Future<void> _addNote() async {
     if (selectedContainerId != null && _notesController.text.isNotEmpty) {
       await addNoteToDatabase(selectedContainerId!, _notesController.text);
@@ -123,14 +134,14 @@ class _DashboardPageState extends State<DashboardPage> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Delete Note'),
-          content: Text('Are you sure you want to delete this note?'),
+          title: const Text('Delete Note'),
+          content: const Text('Are you sure you want to delete this note?'),
           actions: <Widget>[
             TextButton(
               onPressed: () {
                 Navigator.pop(context); // Close dialog without deleting
               },
-              child: Text('Cancel'),
+              child: const Text('Cancel'),
             ),
             TextButton(
               onPressed: () async {
@@ -144,7 +155,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   });
                 }
               },
-              child: Text('Delete', style: TextStyle(color: Colors.red)),
+              child: const Text('Delete', style: TextStyle(color: Colors.red)),
             ),
           ],
         );
@@ -153,28 +164,28 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _showEditDialog(int noteId, String currentNote) {
-    TextEditingController _editController =
+    TextEditingController editController =
         TextEditingController(text: currentNote);
 
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Edit Note'),
+          title: const Text('Edit Note'),
           content: TextField(
-            controller: _editController,
-            decoration: InputDecoration(hintText: "Enter new note"),
+            controller: editController,
+            decoration: const InputDecoration(hintText: "Enter new note"),
           ),
           actions: <Widget>[
             TextButton(
               onPressed: () {
                 Navigator.pop(context); // Close the dialog
               },
-              child: Text('Cancel'),
+              child: const Text('Cancel'),
             ),
             TextButton(
               onPressed: () async {
-                await updateNoteInDatabase(noteId, _editController.text);
+                await updateNoteInDatabase(noteId, editController.text);
                 Navigator.pop(context); // Close the dialog
 
                 // Refresh notes after updating
@@ -184,7 +195,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   });
                 }
               },
-              child: Text('Save', style: TextStyle(color: Colors.blue)),
+              child: const Text('Save', style: TextStyle(color: Colors.blue)),
             ),
           ],
         );
@@ -206,72 +217,74 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   Widget build(BuildContext context) {
     return selectedContainerId == null
-        ? Center(
+        ? const Center(
             child: Text('Please select a container from the Container tab.'))
+>>>>>>> Stashed changes
         : RefreshIndicator(
             onRefresh: _refreshData,
             child: SingleChildScrollView(
-              physics: AlwaysScrollableScrollPhysics(),
+              physics: const AlwaysScrollableScrollPhysics(),
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Dashboard Section
-                    Text('Dashboard',
-                        style: TextStyle(
-                            fontSize: 24, fontWeight: FontWeight.bold)),
+<<<<<<< Updated upstream
+                    Text(
+                      'Dashboard',
+                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                    ),
                     SizedBox(height: 20),
                     Text('Selected Container: $selectedContainerId',
-                        style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.w500)),
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
                     SizedBox(height: 10),
+                    FutureBuilder(
+                      future: _sensorDataFuture,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return Center(child: CircularProgressIndicator());
+=======
+                    // Dashboard Section
+                    const Text('Dashboard',
+                        style: TextStyle(
+                            fontSize: 24, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 20),
+                    Text('Selected Container: $selectedContainerId',
+                        style: const TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 10),
                     FutureBuilder(
                       future: _sensorDataFuture,
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {
-                          return Center(child: CircularProgressIndicator());
+                          return const Center(child: CircularProgressIndicator());
+>>>>>>> Stashed changes
                         } else if (snapshot.hasError) {
-                          return Text('Error fetching data');
+                          return const Text('Error fetching data');
                         } else {
-                          final sensorData =
-                              snapshot.data as Map<String, dynamic>;
+                          final sensorData = snapshot.data as Map<String, dynamic>;
                           return Column(
                             children: [
-                              buildSensorCard(
-                                  Icons.thermostat,
-                                  'Temperature Monitoring',
-                                  '${sensorData['temperature']}°C',
-                                  Colors.green),
-                              buildSensorCard(
-                                  Icons.water_drop,
-                                  'Moisture Level',
-                                  '${sensorData['moisture']}%',
-                                  Colors.blue),
-                              buildSensorCard(Icons.science, 'pH Level 1',
-                                  '${sensorData['ph_level']}', Colors.purple),
-                              buildSensorCard(
-                                  Icons.science_outlined,
-                                  'pH Level 2',
-                                  '${sensorData['ph_level2']}',
-                                  Colors.deepPurple),
-                              buildSensorCard(Icons.cloud, 'Humidity',
-                                  '${sensorData['humidity']}%', Colors.orange),
-                              buildSensorCard(Icons.access_time, 'Timestamp',
-                                  formatTimestamp(sensorData['timestamp']),
-                                  Colors.grey),
+                              buildSensorCard(Icons.thermostat, 'Temperature Monitoring', '${sensorData['temperature']}°C', Colors.green),
+                              buildSensorCard(Icons.water_drop, 'Moisture Level', '${sensorData['moisture']}%', Colors.blue),
+                              buildSensorCard(Icons.science, 'pH Level 1', '${sensorData['ph_level']}', Colors.purple),
+                              buildSensorCard(Icons.science_outlined, 'pH Level 2', '${sensorData['ph_level2']}', Colors.deepPurple),
+                              buildSensorCard(Icons.cloud, 'Humidity', '${sensorData['humidity']}%', Colors.orange),
+                              buildSensorCard(Icons.access_time, 'Timestamp', '${sensorData['timestamp']}', Colors.grey),
                             ],
                           );
                         }
                       },
                     ),
+<<<<<<< Updated upstream
+=======
 
                         // Notes Section (placed below dashboard)
-                    SizedBox(height: 30),
-                    Divider(thickness: 2), // Adds a separator line
-                    SizedBox(height: 10),
-                    Text('Notes',
+                    const SizedBox(height: 30),
+                    const Divider(thickness: 2), // Adds a separator line
+                    const SizedBox(height: 10),
+                    const Text('Notes',
                         style: TextStyle(
                             fontSize: 24, fontWeight: FontWeight.bold)),
                     TextField(
@@ -279,17 +292,17 @@ class _DashboardPageState extends State<DashboardPage> {
                       decoration: InputDecoration(
                           hintText: 'Enter a note',
                           suffixIcon: IconButton(
-                              icon: Icon(Icons.add), onPressed: _addNote)),
+                              icon: const Icon(Icons.add), onPressed: _addNote)),
                     ),
-                    SizedBox(height: 10),
+                    const SizedBox(height: 10),
                     FutureBuilder(
                       future: _notesFuture,
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {
-                          return Center(child: CircularProgressIndicator());
+                          return const Center(child: CircularProgressIndicator());
                         } else if (snapshot.hasError || snapshot.data == null) {
-                          return Text('No notes found.');
+                          return const Text('No notes found.');
                         } else {
                           final notes =
                               snapshot.data as List<Map<String, dynamic>>;
@@ -306,7 +319,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
                                           // Edit Button
                                           IconButton(
-                                            icon: Icon(Icons.edit,
+                                            icon: const Icon(Icons.edit,
                                                 color: Colors.blue),
                                             onPressed: () {
                                               _showEditDialog(note['note_id'],
@@ -315,7 +328,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                           ),
                                           // Delete Button with Confirmation
                                           IconButton(
-                                            icon: Icon(Icons.delete,
+                                            icon: const Icon(Icons.delete,
                                                 color: Colors.red),
                                             onPressed: () {
                                               _showDeleteConfirmationDialog(
@@ -332,28 +345,28 @@ class _DashboardPageState extends State<DashboardPage> {
                         }
                       },
                     ),
+>>>>>>> Stashed changes
                   ],
                 ),
               ),
             ),
           );
   }
-}
 
-
-Future<void> updateNoteInDatabase(int noteId, String updatedNote) async {
-  final supabase = Supabase.instance.client;
-
-  try {
-    await supabase
-        .from('Notes_test_test')
-        .update({'note': updatedNote}).eq('note_id', noteId);
-    print('Note updated successfully');
-  } catch (error) {
-    print('Error updating note: $error');
+  Widget buildSensorCard(IconData icon, String title, String value, Color color) {
+    return Card(
+      elevation: 4,
+      child: ListTile(
+        leading: Icon(icon, color: color),
+        title: Text(title),
+        subtitle: Text(value),
+      ),
+    );
   }
 }
 
+<<<<<<< Updated upstream
+=======
 Future<void> deleteNoteFromDatabase(int noteId) async {
   final supabase = Supabase.instance.client;
 
@@ -385,7 +398,7 @@ Future<List<Map<String, dynamic>>> fetchNotes(int containerId) async {
         .eq('container_id', containerId)
         .order('created_date', ascending: false);
 
-    if (response == null || response.isEmpty) {
+    if (response.isEmpty) {
       print("No notes found for container $containerId");
       return [];
     }
@@ -415,6 +428,7 @@ Widget buildSensorCard(IconData icon, String title, String value, Color color) {
     ),
   );
 }
+>>>>>>> Stashed changes
 
 //Database Fetching: Fetch sensor data for a specific container
 Future<Map<String, dynamic>> fetchSensorData(int containerId) async {
@@ -436,9 +450,15 @@ Future<Map<String, dynamic>> fetchSensorData(int containerId) async {
 
   return sensorResponse;
 }
+
 // Container Page: Displays a list of available containers
+<<<<<<< Updated upstream
+class ContainerPage extends StatelessWidget {
+=======
 
 class ContainerPage extends StatefulWidget {
+  const ContainerPage({super.key});
+
   @override
   _ContainerPageState createState() => _ContainerPageState();
 }
@@ -458,20 +478,38 @@ class _ContainerPageState extends State<ContainerPage> {
     });
   }
 
+>>>>>>> Stashed changes
   @override
   Widget build(BuildContext context) {
     final containerState = Provider.of<ContainerState>(context);
-
     return FutureBuilder(
-      future: _containersFuture,
+      future: fetchContainers(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(child: CircularProgressIndicator());
+          return const Center(child: CircularProgressIndicator());
         } else if (snapshot.hasError) {
-          return Center(
-              child: Text('Error fetching containers: ${snapshot.error}'));
+          return Center(child: Text('Error fetching containers: ${snapshot.error}'));
         } else {
           final containers = snapshot.data as List<Map<String, dynamic>>;
+<<<<<<< Updated upstream
+          return ListView.builder(
+            itemCount: containers.length,
+            itemBuilder: (context, index) {
+              final container = containers[index];
+              final isSelected = container['container_id'] == containerState.selectedContainerId;
+              return Card(
+                color: isSelected ? Colors.green[100] : null, // Highlight selected container
+                child: ListTile(
+                  title: Text('Container ${container['container_id']}'),
+                  subtitle: Text('Hardware ID: ${container['hardware_id']}'),
+                  trailing: isSelected ? Icon(Icons.check_circle, color: Colors.green) : null,
+                  onTap: () {
+                    containerState.selectContainer(container['container_id']);
+                  },
+                ),
+              );
+            },
+=======
 
           return Padding(
             padding: const EdgeInsets.all(16.0),
@@ -480,7 +518,7 @@ class _ContainerPageState extends State<ContainerPage> {
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
-                    minimumSize: Size(double.infinity, 50),
+                    minimumSize: const Size(double.infinity, 50),
                   ),
                   onPressed: () {
                     Navigator.push(
@@ -488,10 +526,10 @@ class _ContainerPageState extends State<ContainerPage> {
                       MaterialPageRoute(builder: (context) => ScannerPage()), // Navigate to ScannerPage
                     );
                   },
-                  icon: Icon(Icons.add, color: Colors.white),
-                  label: Text('New container', style: TextStyle(color: Colors.white)),
+                  icon: const Icon(Icons.add, color: Colors.white),
+                  label: const Text('New container', style: TextStyle(color: Colors.white)),
                 ),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
                 Expanded(
                   child: ListView.builder(
                     itemCount: containers.length,
@@ -511,10 +549,10 @@ class _ContainerPageState extends State<ContainerPage> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               if (isSelected)
-                                Icon(Icons.check_circle, color: Colors.green),
+                                const Icon(Icons.check_circle, color: Colors.green),
                               // ✅ Added Info Button
                               IconButton(
-                                icon: Icon(Icons.info, color: Colors.blueAccent),
+                                icon: const Icon(Icons.info, color: Colors.blueAccent),
                                 onPressed: () {
                                   Navigator.push(
                                     context,
@@ -528,7 +566,7 @@ class _ContainerPageState extends State<ContainerPage> {
                               ),
                               // Edit Button
                               IconButton(
-                                icon: Icon(Icons.edit, color: Colors.blue),
+                                icon: const Icon(Icons.edit, color: Colors.blue),
                                 onPressed: () {
                                   _showRenameContainerDialog(
                                       context, container['container_id']);
@@ -536,7 +574,7 @@ class _ContainerPageState extends State<ContainerPage> {
                               ),
                               // Delete Button
                               IconButton(
-                                icon: Icon(Icons.delete, color: Colors.red),
+                                icon: const Icon(Icons.delete, color: Colors.red),
                                 onPressed: () {
                                   _showDeleteConfirmationDialog(
                                       context, container['container_id']);
@@ -559,45 +597,53 @@ class _ContainerPageState extends State<ContainerPage> {
                 ),
               ],
             ),
+>>>>>>> Stashed changes
           );
         }
       },
     );
   }
+}
 
-  // Function to format the date
-  String _formatDate(String dateString) {
+  Future<List<Map<String, dynamic>>> fetchContainers() async {
+    final supabase = Supabase.instance.client;
     try {
-      DateTime dateTime = DateTime.parse(dateString);
-      return DateFormat('yyyy-MM-dd hh:mm a').format(dateTime); // ✅ Format applied
-    } catch (e) {
-      return 'Invalid date';
+    final response = await supabase.from('Containers_test').select('*');
+      print ('Supabase Response: $response');
+    return List<Map<String, dynamic>>.from(response);
+    } catch (error) {
+      print('Error fetching containers: $error');
+      throw Exception('Error fetching containers: $error');
     }
   }
 
+<<<<<<< Updated upstream
+
+// Others Page: Displays options like Account Management, ESP Connection, App Guide, and Log Out
+=======
   void _showRenameContainerDialog(BuildContext context, int containerId) {
-    TextEditingController _renameController = TextEditingController();
+    TextEditingController renameController = TextEditingController();
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text("Rename Container"),
+        title: const Text("Rename Container"),
         content: TextField(
-          controller: _renameController,
-          decoration: InputDecoration(hintText: "Enter new container name"),
+          controller: renameController,
+          decoration: const InputDecoration(hintText: "Enter new container name"),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text("Cancel"),
+            child: const Text("Cancel"),
           ),
           TextButton(
             onPressed: () async {
-              await renameContainer(containerId, _renameController.text);
+              await renameContainer(containerId, renameController.text);
               Navigator.pop(context);
               _fetchContainers(); // 🔄 Refresh UI after renaming
             },
-            child: Text("Rename"),
+            child: const Text("Rename"),
           ),
         ],
       ),
@@ -608,19 +654,19 @@ class _ContainerPageState extends State<ContainerPage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text("Delete Container"),
-        content: Text("Are you sure you want to delete this container?"),
+        title: const Text("Delete Container"),
+        content: const Text("Are you sure you want to delete this container?"),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text("Cancel"),
+            child: const Text("Cancel"),
           ),
           TextButton(
             onPressed: () {
               deleteContainer(containerId);
               Navigator.pop(context);
             },
-            child: Text("Delete"),
+            child: const Text("Delete"),
           ),
         ],
       ),
@@ -657,7 +703,10 @@ Future<List<Map<String, dynamic>>> fetchContainers() async {
 
 
 // Others Page: Displays options like Sign In and App Guide
+>>>>>>> Stashed changes
 class OthersPage extends StatelessWidget {
+  const OthersPage({super.key});
+
   // Function to launch the URL for downloading the APK
   Future<void> _downloadApk() async {
     final Uri apkUri = Uri.parse(
@@ -673,10 +722,10 @@ class OthersPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView(
       children: [
-        // Sign In
+        // Account Management
         ListTile(
-          leading: Icon(Icons.person, color: Colors.green),
-          title: Text('Sign In'),
+          leading: const Icon(Icons.person, color: Colors.green),
+          title: const Text('Sign In'),
           onTap: () {
             Navigator.push(
               context,
@@ -684,18 +733,16 @@ class OthersPage extends StatelessWidget {
             );
           },
         ),
-        /*
-        // ESP Connection (Hidden for guests)
+        // ESP Connection
         ListTile(
           leading: Icon(Icons.wifi, color: Colors.blue),
           title: Text('ESP Connection'),
           onTap: _downloadApk, // Call the download function
         ),
-        */
         // App Guide
         ListTile(
-          leading: Icon(Icons.help_outline, color: Colors.orange),
-          title: Text('App Guide'),
+          leading: const Icon(Icons.help_outline, color: Colors.orange),
+          title: const Text('App Guide'),
           onTap: () {
             Navigator.push(
               context,
@@ -703,8 +750,7 @@ class OthersPage extends StatelessWidget {
             );
           },
         ),
-        /*
-        // Log Out (Hidden for guests)
+        // Log Out
         ListTile(
           leading: Icon(Icons.logout, color: Colors.red),
           title: Text('Log Out'),
@@ -737,7 +783,6 @@ class OthersPage extends StatelessWidget {
             );
           },
         ),
-        */
       ],
     );
   }

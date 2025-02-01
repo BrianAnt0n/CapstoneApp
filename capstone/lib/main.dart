@@ -32,7 +32,7 @@ void main() async {
 class MyApp extends StatelessWidget {
   final bool seenOnboarding;
 
-  MyApp({required this.seenOnboarding});
+  const MyApp({super.key, required this.seenOnboarding});
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +42,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.green,
       ),
-      home: seenOnboarding ? LoginPage() : OnboardingPage(),
+      home: seenOnboarding ? const LoginPage() : const OnboardingPage(),
     );
   }
 }
