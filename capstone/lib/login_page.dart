@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'home_page.dart';
+import 'home_page_members.dart';
+import 'home_page_guest.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'constants.dart';
 
@@ -180,7 +182,7 @@ class _LoginPageState extends State<LoginPage> {
 
                       Navigator.pushReplacement(
                         context,
-                        MaterialPageRoute(builder: (context) => HomePage()),
+                        MaterialPageRoute(builder: (context) => HomePageGuest()),
                       );
                     },
                     child: Container(
