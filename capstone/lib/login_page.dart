@@ -56,14 +56,12 @@ class _LoginPageState extends State<LoginPage> {
     if (result != null && result.startsWith("Login successful")) {
       // Navigate based on user level
       if (result.contains("User Level: Admin")) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => HomePage()),
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("You are an Admin")),
         );
       } else {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => HomePageMember()),
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("You are a Member")),
         );
       }
     } else {
@@ -184,8 +182,7 @@ class _LoginPageState extends State<LoginPage> {
 
                       Navigator.pushReplacement(
                         context,
-                        MaterialPageRoute(
-                            builder: (context) => HomePageGuest()),
+                        MaterialPageRoute(builder: (context) => HomePageGuest()),
                       );
                     },
                     child: Container(
