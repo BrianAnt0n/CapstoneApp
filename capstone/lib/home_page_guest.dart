@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'login_page.dart';
 import 'scanner_page.dart';
+import 'container_details.dart';
 import 'Others tab/account_management_page.dart';
 import 'Others tab/esp_connection_page.dart';
 import 'Others tab/app_guide_page.dart';
@@ -117,6 +118,81 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
+  void _showDeleteConfirmationDialog(int noteId) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Delete Note'),
+          content: Text('Are you sure you want to delete this note?'),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context); // Close dialog without deleting
+              },
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                await deleteNoteFromDatabase(noteId);
+                Navigator.pop(context); // Close dialog after deleting
+
+                // Refresh the notes after deletion
+                if (mounted) {
+                  setState(() {
+                    _notesFuture = fetchNotes(selectedContainerId!);
+                  });
+                }
+              },
+              child: Text('Delete', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showEditDialog(int noteId, String currentNote) {
+    TextEditingController _editController =
+        TextEditingController(text: currentNote);
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Edit Note'),
+          content: TextField(
+            controller: _editController,
+            decoration: InputDecoration(hintText: "Enter new note"),
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context); // Close the dialog
+              },
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                await updateNoteInDatabase(noteId, _editController.text);
+                Navigator.pop(context); // Close the dialog
+
+                // Refresh notes after updating
+                if (mounted) {
+                  setState(() {
+                    _notesFuture = fetchNotes(selectedContainerId!);
+                  });
+                }
+              },
+              child: Text('Save', style: TextStyle(color: Colors.blue)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+
   String formatTimestamp(String timestamp) {
   try {
     DateTime parsedDate = DateTime.parse(timestamp);
@@ -191,7 +267,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       },
                     ),
 
-                    // Notes Section (placed below dashboard)
+                        // Notes Section (placed below dashboard)
                     SizedBox(height: 30),
                     Divider(thickness: 2), // Adds a separator line
                     SizedBox(height: 10),
@@ -222,10 +298,32 @@ class _DashboardPageState extends State<DashboardPage> {
                                 .map(
                                   (note) => Card(
                                     child: ListTile(
-                                      title: Text(
-                                          note['note'] ?? 'No note available'),
-                                      subtitle: Text(
-                                          formatTimestamp(note['created_date'])),
+                                    title: Text(note['note'] ?? 'No note available'),
+                                    subtitle: Text(formatTimestamp(note['created_date'])),
+                                    trailing: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+
+                                          // Edit Button
+                                          IconButton(
+                                            icon: Icon(Icons.edit,
+                                                color: Colors.blue),
+                                            onPressed: () {
+                                              _showEditDialog(note['note_id'],
+                                                  note['note']);
+                                            },
+                                          ),
+                                          // Delete Button with Confirmation
+                                          IconButton(
+                                            icon: Icon(Icons.delete,
+                                                color: Colors.red),
+                                            onPressed: () {
+                                              _showDeleteConfirmationDialog(
+                                                  note['note_id']);
+                                            },
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 )
@@ -241,6 +339,7 @@ class _DashboardPageState extends State<DashboardPage> {
           );
   }
 }
+
 
 Future<void> updateNoteInDatabase(int noteId, String updatedNote) async {
   final supabase = Supabase.instance.client;
@@ -304,6 +403,7 @@ Future<List<Map<String, dynamic>>> fetchNotes(int containerId) async {
     return [];
   }
 }
+//ending of notes section
 
 Widget buildSensorCard(IconData icon, String title, String value, Color color) {
   return Card(
@@ -336,7 +436,6 @@ Future<Map<String, dynamic>> fetchSensorData(int containerId) async {
 
   return sensorResponse;
 }
-
 // Container Page: Displays a list of available containers
 
 class ContainerPage extends StatefulWidget {
@@ -405,13 +504,29 @@ class _ContainerPageState extends State<ContainerPage> {
                         color: isSelected ? Colors.green[100] : null,
                         child: ListTile(
                           title: Text('${container['container_name']}'),
-                          subtitle:
-                              Text('Date Added: ${container['date_added']}'),
+                          subtitle: Text(
+                            'Date Added: ${_formatDate(container['date_added'])}', // ✅ Updated date formatting
+                          ),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               if (isSelected)
                                 Icon(Icons.check_circle, color: Colors.green),
+                              // ✅ Added Info Button
+                              IconButton(
+                                icon: Icon(Icons.info, color: Colors.blueAccent),
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => ContainerDetails(
+                                        
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                              // Edit Button
                               IconButton(
                                 icon: Icon(Icons.edit, color: Colors.blue),
                                 onPressed: () {
@@ -419,6 +534,7 @@ class _ContainerPageState extends State<ContainerPage> {
                                       context, container['container_id']);
                                 },
                               ),
+                              // Delete Button
                               IconButton(
                                 icon: Icon(Icons.delete, color: Colors.red),
                                 onPressed: () {
@@ -447,6 +563,16 @@ class _ContainerPageState extends State<ContainerPage> {
         }
       },
     );
+  }
+
+  // Function to format the date
+  String _formatDate(String dateString) {
+    try {
+      DateTime dateTime = DateTime.parse(dateString);
+      return DateFormat('yyyy-MM-dd hh:mm a').format(dateTime); // ✅ Format applied
+    } catch (e) {
+      return 'Invalid date';
+    }
   }
 
   void _showRenameContainerDialog(BuildContext context, int containerId) {
