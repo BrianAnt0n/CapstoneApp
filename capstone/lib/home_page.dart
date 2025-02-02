@@ -49,8 +49,10 @@ class _HomePageState extends State<HomePage> {
         // Updated Bottom Navigation Bar with green theme
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: _currentIndex,
-          selectedItemColor: Colors.green, // Change selected icon color to green
-          unselectedItemColor: Colors.green[300], // Light green for unselected icons
+          selectedItemColor:
+              Colors.green, // Change selected icon color to green
+          unselectedItemColor:
+              Colors.green[300], // Light green for unselected icons
           onTap: (index) {
             setState(() {
               _currentIndex = index; // Update the selected tab
@@ -75,6 +77,7 @@ class _HomePageState extends State<HomePage> {
     );
   }
 }
+
 // Dashboard Page: Displays sensor data for the selected container
 // Dashboard Page with pull-to-refresh functionality
 class DashboardPage extends StatefulWidget {
@@ -192,16 +195,14 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-
   String formatTimestamp(String timestamp) {
-  try {
-    DateTime parsedDate = DateTime.parse(timestamp);
-    return DateFormat('yyyy-MM-dd hh:mm a').format(parsedDate);
-  } catch (e) {
-    return 'Invalid Date';
+    try {
+      DateTime parsedDate = DateTime.parse(timestamp);
+      return DateFormat('yyyy-MM-dd hh:mm a').format(parsedDate);
+    } catch (e) {
+      return 'Invalid Date';
+    }
   }
-}
-
 
   @override
   Widget build(BuildContext context) {
@@ -258,7 +259,9 @@ class _DashboardPageState extends State<DashboardPage> {
                                   Colors.deepPurple),
                               buildSensorCard(Icons.cloud, 'Humidity',
                                   '${sensorData['humidity']}%', Colors.orange),
-                              buildSensorCard(Icons.access_time, 'Timestamp',
+                              buildSensorCard(
+                                  Icons.access_time,
+                                  'Timestamp',
                                   formatTimestamp(sensorData['timestamp']),
                                   Colors.grey),
                             ],
@@ -267,7 +270,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       },
                     ),
 
-                        // Notes Section (placed below dashboard)
+                    // Notes Section (placed below dashboard)
                     SizedBox(height: 30),
                     Divider(thickness: 2), // Adds a separator line
                     SizedBox(height: 10),
@@ -298,12 +301,13 @@ class _DashboardPageState extends State<DashboardPage> {
                                 .map(
                                   (note) => Card(
                                     child: ListTile(
-                                    title: Text(note['note'] ?? 'No note available'),
-                                    subtitle: Text(formatTimestamp(note['created_date'])),
-                                    trailing: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-
+                                      title: Text(
+                                          note['note'] ?? 'No note available'),
+                                      subtitle: Text(formatTimestamp(
+                                          note['created_date'])),
+                                      trailing: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
                                           // Edit Button
                                           IconButton(
                                             icon: Icon(Icons.edit,
@@ -339,7 +343,6 @@ class _DashboardPageState extends State<DashboardPage> {
           );
   }
 }
-
 
 Future<void> updateNoteInDatabase(int noteId, String updatedNote) async {
   final supabase = Supabase.instance.client;
@@ -462,7 +465,6 @@ class _ContainerPageState extends State<ContainerPage> {
   @override
   Widget build(BuildContext context) {
     final containerState = Provider.of<ContainerState>(context);
-
     return FutureBuilder(
       future: _containersFuture,
       builder: (context, snapshot) {
@@ -483,14 +485,28 @@ class _ContainerPageState extends State<ContainerPage> {
                     backgroundColor: Colors.green,
                     minimumSize: Size(double.infinity, 50),
                   ),
-                  onPressed: () {
-                    Navigator.push(
+                  onPressed: () async {
+                    String scannedResult = "No QR scanned yet";
+                    final result = await Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => ScannerPage()), // Navigate to ScannerPage
+                      MaterialPageRoute(
+                          builder: (context) =>
+                              ScannerPage()), // Navigate to ScannerPage
                     );
+                    if (result != null) {
+                      setState(() {
+                        scannedResult = result; // Update scanned QR code value
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(result),
+                      ),
+                    );
+                    }
                   },
                   icon: Icon(Icons.add, color: Colors.white),
-                  label: Text('New container', style: TextStyle(color: Colors.white)),
+                  label: Text('New container',
+                      style: TextStyle(color: Colors.white)),
                 ),
                 SizedBox(height: 16),
                 Expanded(
@@ -515,14 +531,13 @@ class _ContainerPageState extends State<ContainerPage> {
                                 Icon(Icons.check_circle, color: Colors.green),
                               // ✅ Added Info Button
                               IconButton(
-                                icon: Icon(Icons.info, color: Colors.blueAccent),
+                                icon:
+                                    Icon(Icons.info, color: Colors.blueAccent),
                                 onPressed: () {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (context) => ContainerDetails(
-                                        
-                                      ),
+                                      builder: (context) => ContainerDetails(),
                                     ),
                                   );
                                 },
@@ -570,7 +585,8 @@ class _ContainerPageState extends State<ContainerPage> {
   String _formatDate(String dateString) {
     try {
       DateTime dateTime = DateTime.parse(dateString);
-      return DateFormat('yyyy-MM-dd hh:mm a').format(dateTime); // ✅ Format applied
+      return DateFormat('yyyy-MM-dd hh:mm a')
+          .format(dateTime); // ✅ Format applied
     } catch (e) {
       return 'Invalid date';
     }
