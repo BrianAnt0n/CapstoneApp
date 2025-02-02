@@ -163,13 +163,13 @@ class _LoginPageState extends State<LoginPage> {
 
                   const SizedBox(height: 20),
 
-                  // Signup link
+                  // Forgot Password Link
                   GestureDetector(
                     onTap: () {
-                      // Navigate to signup page or perform an action
+                      // Navigate to Forgot Password page or perform an action
                     },
                     child: const Text(
-                      'Don’t have an account? Sign up',
+                      'Forgot Your Password? Click Here',
                       style: TextStyle(color: Colors.blue),
                     ),
                   ),
