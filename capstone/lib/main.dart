@@ -21,7 +21,7 @@ void main() async {
  //Android Init 
   final prefs = await SharedPreferences.getInstance();
   //for Testing, remove after
-  prefs.clear(); // Clears all saved preferences
+  //prefs.clear(); // Clears all saved preferences
   //For Testing^^
   final seenOnboarding = prefs.getBool('seenOnboarding') ?? false;
   
