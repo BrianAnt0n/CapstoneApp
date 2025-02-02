@@ -4,6 +4,8 @@ import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'login_page.dart';
 
 class OnboardingPage extends StatefulWidget {
+  const OnboardingPage({super.key});
+
   @override
   _OnboardingPageState createState() => _OnboardingPageState();
 }
@@ -19,17 +21,17 @@ class _OnboardingPageState extends State<OnboardingPage> {
           PageView(
             controller: _controller,
             children: [
-              OnboardingScreen(
+              const OnboardingScreen(
                 image: 'assets/onboard_1.png',
                 title: '',
                 description: '',
               ),
-              OnboardingScreen(
+              const OnboardingScreen(
                 image: 'assets/onboard_2.png',
                 title: '',
                 description: '',
               ),
-              OnboardingScreen(
+              const OnboardingScreen(
                 image: 'assets/onboard_3.png',
                 title: '',
                 description: '',
@@ -44,7 +46,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
                   Navigator.pushReplacement(
                     context,
-                    MaterialPageRoute(builder: (context) => LoginPage()),
+                    MaterialPageRoute(builder: (context) => const LoginPage()),
                   );
                 },
               ),
@@ -58,11 +60,11 @@ class _OnboardingPageState extends State<OnboardingPage> {
               child: SmoothPageIndicator(
                 controller: _controller, // PageController
                 count: 4, // Number of pages
-                effect: WormEffect(
+                effect: const WormEffect(
                   dotWidth: 10.0,
                   dotHeight: 10.0,
                   spacing: 16.0,
-                  activeDotColor: const Color.fromARGB(255, 81, 183, 2),
+                  activeDotColor: Color.fromARGB(255, 81, 183, 2),
                   dotColor: Colors.grey,
                 ),
               ),
@@ -79,7 +81,7 @@ class OnboardingScreen extends StatelessWidget {
   final String title;
   final String description;
 
-  OnboardingScreen({
+  const OnboardingScreen({super.key, 
     required this.image,
     required this.title,
     required this.description,
@@ -103,17 +105,17 @@ class OnboardingScreen extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                     ),
                   ),
-                  SizedBox(height: 10),
+                  const SizedBox(height: 10),
                   Text(
                     description,
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 16,
                       color: Colors.white70,
                     ),
@@ -135,7 +137,7 @@ class OnboardingScreenWithButton extends StatelessWidget {
   final String description;
   final VoidCallback onButtonPressed;
 
-  OnboardingScreenWithButton({
+  const OnboardingScreenWithButton({super.key, 
     required this.image,
     required this.title,
     required this.description,
@@ -160,33 +162,33 @@ class OnboardingScreenWithButton extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                     ),
                   ),
-                  SizedBox(height: 10),
+                  const SizedBox(height: 10),
                   Text(
                     description,
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 16,
-                      color: const Color.fromARGB(255, 255, 255, 255),
+                      color: Color.fromARGB(255, 255, 255, 255),
                     ),
                   ),
                   SizedBox(
   width: double.infinity, // Button stretches to screen width
   child: ElevatedButton(
     style: ElevatedButton.styleFrom(
-      padding: EdgeInsets.symmetric(vertical: 16.0), // Height of the button
+      padding: const EdgeInsets.symmetric(vertical: 16.0), // Height of the button
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8.0), // Slightly rounded corners
       ),
       backgroundColor: const Color.fromARGB(255, 9, 133, 0), // Button background color
     ),
     onPressed: onButtonPressed,
-    child: Text(
+    child: const Text(
       'Get Started',
       style: TextStyle(
         fontSize: 18,

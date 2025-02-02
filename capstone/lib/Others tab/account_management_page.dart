@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'add_account_page.dart'; // Import the new AddAccountPage
 
 class AccountManagementPage extends StatelessWidget {
+  const AccountManagementPage({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Account Management'),
+        title: const Text('Account Management'),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -16,16 +18,16 @@ class AccountManagementPage extends StatelessWidget {
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green,
-                minimumSize: Size(double.infinity, 50),
+                minimumSize: const Size(double.infinity, 50),
               ),
               onPressed: () {
                 // Navigate to Add Account Page
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => AddAccountPage()),
+                  MaterialPageRoute(builder: (context) => const AddAccountPage()),
                 );
               },
-              child: Row(
+              child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(Icons.add, color: Colors.white),
@@ -37,8 +39,8 @@ class AccountManagementPage extends StatelessWidget {
                 ],
               ),
             ),
-            SizedBox(height: 20),
-            Text(
+            const SizedBox(height: 20),
+            const Text(
               'Account list',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
