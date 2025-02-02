@@ -850,10 +850,12 @@ class OthersPage extends StatelessWidget {
           leading: const Icon(Icons.person, color: Colors.green),
           title: const Text('Sign In'),
           onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const LoginPage()),
-            );
+            Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => const LoginPage()),
+                              (Route<dynamic> route) => false,
+                          );
           },
         ),
         /*
