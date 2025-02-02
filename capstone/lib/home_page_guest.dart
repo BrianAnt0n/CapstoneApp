@@ -10,6 +10,7 @@ import 'Others tab/app_guide_page.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'constants.dart';
+import 'package:table_calendar/table_calendar.dart';
 
 // State Management: Tracks the selected container
 class ContainerState extends ChangeNotifier {
@@ -91,15 +92,22 @@ class _DashboardPageState extends State<DashboardPage> {
   Future<List<Map<String, dynamic>>>? _notesFuture;
   int? selectedContainerId;
   final TextEditingController _notesController = TextEditingController();
+  DateTime _selectedDate = DateTime.now(); // Track selected date
 
+  @override
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final containerState = Provider.of<ContainerState>(context);
     selectedContainerId = containerState.selectedContainerId;
+
     if (selectedContainerId != null) {
       _sensorDataFuture = fetchSensorData(selectedContainerId!);
-      _notesFuture = fetchNotes(selectedContainerId!);
+      _notesFuture = fetchNotes(selectedContainerId!, _selectedDate);
+
+      fetchContainerDetails(selectedContainerId!).then((_) {
+        setState(() {}); // ✅ Force calendar to update with container age
+      });
     }
   }
 
@@ -107,8 +115,50 @@ class _DashboardPageState extends State<DashboardPage> {
     if (selectedContainerId != null) {
       setState(() {
         _sensorDataFuture = fetchSensorData(selectedContainerId!);
-        _notesFuture = fetchNotes(selectedContainerId!);
+        _notesFuture = fetchNotes(selectedContainerId!, _selectedDate);
       });
+    }
+  }
+
+  DateTime? _containerAddedDate;
+  String _containerAge = "";
+
+  Future<void> fetchContainerDetails(int containerId) async {
+    final supabase = Supabase.instance.client;
+
+    try {
+      final response = await supabase
+          .from('Containers_test')
+          .select('date_added')
+          .eq('container_id', containerId)
+          .single();
+
+      if (response != null && response['date_added'] != null) {
+        _containerAddedDate = DateTime.parse(response['date_added']);
+
+        _calculateContainerAge();
+      } else {}
+    } catch (error) {}
+  }
+
+  void _calculateContainerAge() {
+    if (_containerAddedDate == null) {
+      return;
+    }
+
+    final now = DateTime.now();
+    final difference = now.difference(_containerAddedDate!);
+
+    if (difference.inDays < 7) {
+      _containerAge = "${difference.inDays} days";
+    } else if (difference.inDays < 30) {
+      _containerAge = "${(difference.inDays / 7).floor()} weeks";
+    } else {
+      _containerAge = "${(difference.inDays / 30).floor()} months";
+    }
+
+    if (mounted) {
+      setState(() {}); // compost age
     }
   }
 
@@ -117,9 +167,18 @@ class _DashboardPageState extends State<DashboardPage> {
       await addNoteToDatabase(selectedContainerId!, _notesController.text);
       _notesController.clear();
       setState(() {
-        _notesFuture = fetchNotes(selectedContainerId!);
+        _notesFuture = fetchNotes(selectedContainerId!, _selectedDate);
       });
     }
+  }
+
+  Future<void> _onDateSelected(DateTime selectedDate) async {
+    setState(() {
+      _selectedDate = selectedDate;
+    });
+
+    _notesFuture = fetchNotes(selectedContainerId!, _selectedDate);
+    setState(() {});
   }
 
   void _showDeleteConfirmationDialog(int noteId) {
@@ -131,20 +190,17 @@ class _DashboardPageState extends State<DashboardPage> {
           content: const Text('Are you sure you want to delete this note?'),
           actions: <Widget>[
             TextButton(
-              onPressed: () {
-                Navigator.pop(context); // Close dialog without deleting
-              },
+              onPressed: () => Navigator.pop(context),
               child: const Text('Cancel'),
             ),
             TextButton(
               onPressed: () async {
                 await deleteNoteFromDatabase(noteId);
-                Navigator.pop(context); // Close dialog after deleting
-
-                // Refresh the notes after deletion
+                Navigator.pop(context);
                 if (mounted) {
                   setState(() {
-                    _notesFuture = fetchNotes(selectedContainerId!);
+                    _notesFuture =
+                        fetchNotes(selectedContainerId!, _selectedDate);
                   });
                 }
               },
@@ -171,20 +227,17 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
           actions: <Widget>[
             TextButton(
-              onPressed: () {
-                Navigator.pop(context); // Close the dialog
-              },
+              onPressed: () => Navigator.pop(context),
               child: const Text('Cancel'),
             ),
             TextButton(
               onPressed: () async {
                 await updateNoteInDatabase(noteId, editController.text);
-                Navigator.pop(context); // Close the dialog
-
-                // Refresh notes after updating
+                Navigator.pop(context);
                 if (mounted) {
                   setState(() {
-                    _notesFuture = fetchNotes(selectedContainerId!);
+                    _notesFuture =
+                        fetchNotes(selectedContainerId!, _selectedDate);
                   });
                 }
               },
@@ -196,16 +249,40 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
+  Widget buildNoteCard(Map<String, dynamic> note) {
+    return Card(
+      child: ListTile(
+        title: Text(note['note'] ?? 'No note available'),
+        subtitle: Text(formatTimestamp(note['created_date'])),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: Icon(Icons.edit, color: Colors.blue),
+              onPressed: () {
+                _showEditDialog(note['note_id'], note['note']);
+              },
+            ),
+            IconButton(
+              icon: Icon(Icons.delete, color: Colors.red),
+              onPressed: () {
+                _showDeleteConfirmationDialog(note['note_id']);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   String formatTimestamp(String timestamp) {
-  try {
-    DateTime parsedDate = DateTime.parse(timestamp);
-    return DateFormat('yyyy-MM-dd hh:mm a').format(parsedDate);
-  } catch (e) {
-    return 'Invalid Date';
+    try {
+      DateTime parsedDate = DateTime.parse(timestamp);
+      return DateFormat('yyyy-MM-dd hh:mm a').format(parsedDate);
+    } catch (e) {
+      return 'Invalid Date';
+    }
   }
-}
-
 
   @override
   Widget build(BuildContext context) {
@@ -221,7 +298,6 @@ class _DashboardPageState extends State<DashboardPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Dashboard Section
                     const Text('Dashboard',
                         style: TextStyle(
                             fontSize: 24, fontWeight: FontWeight.bold)),
@@ -235,7 +311,8 @@ class _DashboardPageState extends State<DashboardPage> {
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {
-                          return const Center(child: CircularProgressIndicator());
+                          return const Center(
+                              child: CircularProgressIndicator());
                         } else if (snapshot.hasError) {
                           return const Text('Error fetching data');
                         } else {
@@ -262,7 +339,9 @@ class _DashboardPageState extends State<DashboardPage> {
                                   Colors.deepPurple),
                               buildSensorCard(Icons.cloud, 'Humidity',
                                   '${sensorData['humidity']}%', Colors.orange),
-                              buildSensorCard(Icons.access_time, 'Timestamp',
+                              buildSensorCard(
+                                  Icons.access_time,
+                                  'Timestamp',
                                   formatTimestamp(sensorData['timestamp']),
                                   Colors.grey),
                             ],
@@ -270,11 +349,34 @@ class _DashboardPageState extends State<DashboardPage> {
                         }
                       },
                     ),
-
-                        // Notes Section (placed below dashboard)
                     const SizedBox(height: 30),
-                    const Divider(thickness: 2), // Adds a separator line
+                    const Divider(thickness: 2),
                     const SizedBox(height: 10),
+                    TableCalendar(
+                      headerVisible: true,
+                      headerStyle: HeaderStyle(
+                        titleCentered: true,
+                        formatButtonVisible: false, // Hide format toggle
+                        titleTextFormatter: (date, locale) {
+                          String formattedDate =
+                              DateFormat.yMMMM(locale).format(date);
+                          String ageText = _containerAge.isNotEmpty
+                              ? "  (Age: $_containerAge)"
+                              : "";
+                          return "$formattedDate$ageText";
+                        },
+                      ),
+                      focusedDay: _selectedDate,
+                      firstDay: DateTime(2000),
+                      lastDay: DateTime(2100),
+                      calendarFormat: CalendarFormat.month,
+                      selectedDayPredicate: (day) =>
+                          isSameDay(_selectedDate, day),
+                      onDaySelected: (selectedDay, focusedDay) {
+                        _onDateSelected(selectedDay);
+                      },
+                    ),
+                    const SizedBox(height: 20),
                     const Text('Notes',
                         style: TextStyle(
                             fontSize: 24, fontWeight: FontWeight.bold)),
@@ -283,7 +385,8 @@ class _DashboardPageState extends State<DashboardPage> {
                       decoration: InputDecoration(
                           hintText: 'Enter a note',
                           suffixIcon: IconButton(
-                              icon: const Icon(Icons.add), onPressed: _addNote)),
+                              icon: const Icon(Icons.add),
+                              onPressed: _addNote)),
                     ),
                     const SizedBox(height: 10),
                     FutureBuilder(
@@ -291,7 +394,8 @@ class _DashboardPageState extends State<DashboardPage> {
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {
-                          return const Center(child: CircularProgressIndicator());
+                          return const Center(
+                              child: CircularProgressIndicator());
                         } else if (snapshot.hasError || snapshot.data == null) {
                           return const Text('No notes found.');
                         } else {
@@ -299,38 +403,7 @@ class _DashboardPageState extends State<DashboardPage> {
                               snapshot.data as List<Map<String, dynamic>>;
                           return Column(
                             children: notes
-                                .map(
-                                  (note) => Card(
-                                    child: ListTile(
-                                    title: Text(note['note'] ?? 'No note available'),
-                                    subtitle: Text(formatTimestamp(note['created_date'])),
-                                    trailing: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-
-                                          // Edit Button
-                                          IconButton(
-                                            icon: const Icon(Icons.edit,
-                                                color: Colors.blue),
-                                            onPressed: () {
-                                              _showEditDialog(note['note_id'],
-                                                  note['note']);
-                                            },
-                                          ),
-                                          // Delete Button with Confirmation
-                                          IconButton(
-                                            icon: const Icon(Icons.delete,
-                                                color: Colors.red),
-                                            onPressed: () {
-                                              _showDeleteConfirmationDialog(
-                                                  note['note_id']);
-                                            },
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                )
+                                .map((note) => buildNoteCard(note))
                                 .toList(),
                           );
                         }
@@ -343,7 +416,6 @@ class _DashboardPageState extends State<DashboardPage> {
           );
   }
 }
-
 
 Future<void> updateNoteInDatabase(int noteId, String updatedNote) async {
   final supabase = Supabase.instance.client;
@@ -379,34 +451,32 @@ Future<void> addNoteToDatabase(int containerId, String note) async {
   });
 }
 
-Future<List<Map<String, dynamic>>> fetchNotes(int containerId) async {
+Future<List<Map<String, dynamic>>> fetchNotes(
+    int containerId, DateTime date) async {
   final supabase = Supabase.instance.client;
 
+  // Format date to 'YYYY-MM-DD'
+  String formattedDate = DateFormat('yyyy-MM-dd').format(date);
+
   try {
-    final response = await supabase
+    final List<Map<String, dynamic>> response = await supabase
         .from('Notes_test_test')
-        .select('note_id, container_id, note, created_date')
+        .select()
         .eq('container_id', containerId)
-        .order('created_date', ascending: false);
+        .gte('created_date',
+            '$formattedDate 00:00:00') // Start of the selected date
+        .lt('created_date',
+            '$formattedDate 23:59:59'); // End of the selected date
 
-    if (response.isEmpty) {
-      print("No notes found for container $containerId");
-      return [];
-    }
+    print("Fetched notes for $formattedDate: $response"); // Debugging log
 
-    return response.map((note) {
-      return {
-        'note_id': note['note_id'] ?? 0,
-        'container_id': note['container_id'] ?? 0,
-        'note': note['note']?.toString() ?? 'No note available',
-        'created_date': note['created_date']?.toString() ?? 'Unknown date',
-      };
-    }).toList();
+    return response;
   } catch (error) {
     print("Error fetching notes: $error");
     return [];
   }
 }
+
 //ending of notes section
 
 Widget buildSensorCard(IconData icon, String title, String value, Color color) {
@@ -440,6 +510,7 @@ Future<Map<String, dynamic>> fetchSensorData(int containerId) async {
 
   return sensorResponse;
 }
+
 // Container Page: Displays a list of available containers
 
 class ContainerPage extends StatefulWidget {
