@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 
 class ESPConnectionPage extends StatelessWidget {
+  const ESPConnectionPage({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('ESP Connection'),
+        title: const Text('ESP Connection'),
       ),
-      body: Center(
+      body: const Center(
         child: Text('ESP Connection Settings Here'),
       ),
     );
