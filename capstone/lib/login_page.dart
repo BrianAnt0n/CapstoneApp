@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'home_page.dart';
+import 'home_page_members.dart';
+import 'home_page_guest.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'constants.dart';
 
@@ -56,12 +58,14 @@ class _LoginPageState extends State<LoginPage> {
     if (result != null && result.startsWith("Login successful")) {
       // Navigate based on user level
       if (result.contains("User Level: Admin")) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("You are an Admin")),
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => HomePage()),
         );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("You are a Member")),
+      } else if (result.contains("User Level: Member")) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => HomePageMember()),
         );
       }
     } else {
@@ -182,7 +186,7 @@ class _LoginPageState extends State<LoginPage> {
 
                       Navigator.pushReplacement(
                         context,
-                        MaterialPageRoute(builder: (context) => HomePage()),
+                        MaterialPageRoute(builder: (context) => HomePageGuest()),
                       );
                     },
                     child: Container(
