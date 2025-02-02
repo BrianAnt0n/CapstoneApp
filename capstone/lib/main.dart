@@ -1,3 +1,4 @@
+import 'package:capstone/splash_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'onboarding_page.dart';
@@ -19,20 +20,17 @@ void main() async {
   );
   
  //Android Init 
-  final prefs = await SharedPreferences.getInstance();
+  //final prefs = await SharedPreferences.getInstance();
   //for Testing, remove after
   //prefs.clear(); // Clears all saved preferences
   //For Testing^^
-  final seenOnboarding = prefs.getBool('seenOnboarding') ?? false;
+  //final seenOnboarding = prefs.getBool('seenOnboarding') ?? false;
   
-
-  runApp(MyApp(seenOnboarding: seenOnboarding));
+  //runApp(MyApp(seenOnboarding: seenOnboarding));
+  runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  final bool seenOnboarding;
-
-  const MyApp({super.key, required this.seenOnboarding});
 
   @override
   Widget build(BuildContext context) {
@@ -42,8 +40,8 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.green,
       ),
-      home: seenOnboarding ? const LoginPage() : const OnboardingPage(),
+      // home: seenOnboarding ? const LoginPage() : const OnboardingPage(),
+      home: SplashScreen(),
     );
   }
 }
-

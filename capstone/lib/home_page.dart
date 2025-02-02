@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'login_page.dart';
 import 'scanner_page.dart';
 import 'container_details.dart';
@@ -900,12 +901,22 @@ class OthersPage extends StatelessWidget {
                       child: const Text('Cancel'),
                     ),
                     TextButton(
-                      onPressed: () {
-                        Navigator.pushReplacement(
+                     onPressed: () async {
+                        Future<void> logoutUser() async {
+                        final SharedPreferences prefs = await SharedPreferences.getInstance();
+                        await prefs.remove('user_id_pref');
+                        await prefs.remove('user_level');
+                        await prefs.remove('fullname');
+                        await prefs.remove('email');
+                        await prefs.reload();
+                        Navigator.pushAndRemoveUntil(
                           context,
                           MaterialPageRoute(
                               builder: (context) => const LoginPage()),
-                        );
+                              (Route<dynamic> route) => false,
+                          );
+                        }
+                        await logoutUser();
                       },
                       child: const Text('Log Out'),
                     ),
