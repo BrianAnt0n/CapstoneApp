@@ -21,17 +21,17 @@ class _OnboardingPageState extends State<OnboardingPage> {
           PageView(
             controller: _controller,
             children: [
-              OnboardingScreen(
+              const OnboardingScreen(
                 image: 'assets/onboard_1.png',
                 title: '',
                 description: '',
               ),
-              OnboardingScreen(
+              const OnboardingScreen(
                 image: 'assets/onboard_2.png',
                 title: '',
                 description: '',
               ),
-              OnboardingScreen(
+              const OnboardingScreen(
                 image: 'assets/onboard_3.png',
                 title: '',
                 description: '',
@@ -46,7 +46,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
                   Navigator.pushReplacement(
                     context,
-                    MaterialPageRoute(builder: (context) => LoginPage()),
+                    MaterialPageRoute(builder: (context) => const LoginPage()),
                   );
                 },
               ),

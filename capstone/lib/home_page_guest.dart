@@ -22,6 +22,8 @@ class ContainerState extends ChangeNotifier {
 }
 
 class HomePageGuest extends StatefulWidget {
+  const HomePageGuest({super.key});
+
   @override
   _HomePageGuestState createState() => _HomePageGuestState();
 }
@@ -42,7 +44,7 @@ class _HomePageGuestState extends State<HomePageGuest> {
       create: (_) => ContainerState(),
       child: Scaffold(
         appBar: AppBar(
-          title: Text('E-ComposThink Home - Guest'), // AppBar title
+          title: const Text('E-ComposThink Home - Guest'), // AppBar title
         ),
         body: _pages[_currentIndex], // Show the selected page
 
@@ -56,7 +58,7 @@ class _HomePageGuestState extends State<HomePageGuest> {
               _currentIndex = index; // Update the selected tab
             });
           },
-          items: [
+          items: const [
             BottomNavigationBarItem(
               icon: Icon(Icons.dashboard),
               label: 'Dashboard',
@@ -78,6 +80,8 @@ class _HomePageGuestState extends State<HomePageGuest> {
 // Dashboard Page: Displays sensor data for the selected container
 // Dashboard Page with pull-to-refresh functionality
 class DashboardPage extends StatefulWidget {
+  const DashboardPage({super.key});
+
   @override
   _DashboardPageState createState() => _DashboardPageState();
 }
@@ -86,7 +90,7 @@ class _DashboardPageState extends State<DashboardPage> {
   Future<Map<String, dynamic>>? _sensorDataFuture;
   Future<List<Map<String, dynamic>>>? _notesFuture;
   int? selectedContainerId;
-  TextEditingController _notesController = TextEditingController();
+  final TextEditingController _notesController = TextEditingController();
 
   @override
   void didChangeDependencies() {
@@ -123,14 +127,14 @@ class _DashboardPageState extends State<DashboardPage> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Delete Note'),
-          content: Text('Are you sure you want to delete this note?'),
+          title: const Text('Delete Note'),
+          content: const Text('Are you sure you want to delete this note?'),
           actions: <Widget>[
             TextButton(
               onPressed: () {
                 Navigator.pop(context); // Close dialog without deleting
               },
-              child: Text('Cancel'),
+              child: const Text('Cancel'),
             ),
             TextButton(
               onPressed: () async {
@@ -144,7 +148,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   });
                 }
               },
-              child: Text('Delete', style: TextStyle(color: Colors.red)),
+              child: const Text('Delete', style: TextStyle(color: Colors.red)),
             ),
           ],
         );
@@ -153,28 +157,28 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _showEditDialog(int noteId, String currentNote) {
-    TextEditingController _editController =
+    TextEditingController editController =
         TextEditingController(text: currentNote);
 
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Edit Note'),
+          title: const Text('Edit Note'),
           content: TextField(
-            controller: _editController,
-            decoration: InputDecoration(hintText: "Enter new note"),
+            controller: editController,
+            decoration: const InputDecoration(hintText: "Enter new note"),
           ),
           actions: <Widget>[
             TextButton(
               onPressed: () {
                 Navigator.pop(context); // Close the dialog
               },
-              child: Text('Cancel'),
+              child: const Text('Cancel'),
             ),
             TextButton(
               onPressed: () async {
-                await updateNoteInDatabase(noteId, _editController.text);
+                await updateNoteInDatabase(noteId, editController.text);
                 Navigator.pop(context); // Close the dialog
 
                 // Refresh notes after updating
@@ -184,7 +188,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   });
                 }
               },
-              child: Text('Save', style: TextStyle(color: Colors.blue)),
+              child: const Text('Save', style: TextStyle(color: Colors.blue)),
             ),
           ],
         );
@@ -206,34 +210,34 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   Widget build(BuildContext context) {
     return selectedContainerId == null
-        ? Center(
+        ? const Center(
             child: Text('Please select a container from the Container tab.'))
         : RefreshIndicator(
             onRefresh: _refreshData,
             child: SingleChildScrollView(
-              physics: AlwaysScrollableScrollPhysics(),
+              physics: const AlwaysScrollableScrollPhysics(),
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Dashboard Section
-                    Text('Dashboard',
+                    const Text('Dashboard',
                         style: TextStyle(
                             fontSize: 24, fontWeight: FontWeight.bold)),
-                    SizedBox(height: 20),
+                    const SizedBox(height: 20),
                     Text('Selected Container: $selectedContainerId',
-                        style: TextStyle(
+                        style: const TextStyle(
                             fontSize: 18, fontWeight: FontWeight.w500)),
-                    SizedBox(height: 10),
+                    const SizedBox(height: 10),
                     FutureBuilder(
                       future: _sensorDataFuture,
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {
-                          return Center(child: CircularProgressIndicator());
+                          return const Center(child: CircularProgressIndicator());
                         } else if (snapshot.hasError) {
-                          return Text('Error fetching data');
+                          return const Text('Error fetching data');
                         } else {
                           final sensorData =
                               snapshot.data as Map<String, dynamic>;
@@ -268,10 +272,10 @@ class _DashboardPageState extends State<DashboardPage> {
                     ),
 
                         // Notes Section (placed below dashboard)
-                    SizedBox(height: 30),
-                    Divider(thickness: 2), // Adds a separator line
-                    SizedBox(height: 10),
-                    Text('Notes',
+                    const SizedBox(height: 30),
+                    const Divider(thickness: 2), // Adds a separator line
+                    const SizedBox(height: 10),
+                    const Text('Notes',
                         style: TextStyle(
                             fontSize: 24, fontWeight: FontWeight.bold)),
                     TextField(
@@ -279,17 +283,17 @@ class _DashboardPageState extends State<DashboardPage> {
                       decoration: InputDecoration(
                           hintText: 'Enter a note',
                           suffixIcon: IconButton(
-                              icon: Icon(Icons.add), onPressed: _addNote)),
+                              icon: const Icon(Icons.add), onPressed: _addNote)),
                     ),
-                    SizedBox(height: 10),
+                    const SizedBox(height: 10),
                     FutureBuilder(
                       future: _notesFuture,
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {
-                          return Center(child: CircularProgressIndicator());
+                          return const Center(child: CircularProgressIndicator());
                         } else if (snapshot.hasError || snapshot.data == null) {
-                          return Text('No notes found.');
+                          return const Text('No notes found.');
                         } else {
                           final notes =
                               snapshot.data as List<Map<String, dynamic>>;
@@ -306,7 +310,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
                                           // Edit Button
                                           IconButton(
-                                            icon: Icon(Icons.edit,
+                                            icon: const Icon(Icons.edit,
                                                 color: Colors.blue),
                                             onPressed: () {
                                               _showEditDialog(note['note_id'],
@@ -315,7 +319,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                           ),
                                           // Delete Button with Confirmation
                                           IconButton(
-                                            icon: Icon(Icons.delete,
+                                            icon: const Icon(Icons.delete,
                                                 color: Colors.red),
                                             onPressed: () {
                                               _showDeleteConfirmationDialog(
@@ -385,7 +389,7 @@ Future<List<Map<String, dynamic>>> fetchNotes(int containerId) async {
         .eq('container_id', containerId)
         .order('created_date', ascending: false);
 
-    if (response == null || response.isEmpty) {
+    if (response.isEmpty) {
       print("No notes found for container $containerId");
       return [];
     }
@@ -439,6 +443,8 @@ Future<Map<String, dynamic>> fetchSensorData(int containerId) async {
 // Container Page: Displays a list of available containers
 
 class ContainerPage extends StatefulWidget {
+  const ContainerPage({super.key});
+
   @override
   _ContainerPageState createState() => _ContainerPageState();
 }
@@ -466,7 +472,7 @@ class _ContainerPageState extends State<ContainerPage> {
       future: _containersFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(child: CircularProgressIndicator());
+          return const Center(child: CircularProgressIndicator());
         } else if (snapshot.hasError) {
           return Center(
               child: Text('Error fetching containers: ${snapshot.error}'));
@@ -480,7 +486,7 @@ class _ContainerPageState extends State<ContainerPage> {
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
-                    minimumSize: Size(double.infinity, 50),
+                    minimumSize: const Size(double.infinity, 50),
                   ),
                   onPressed: () {
                     Navigator.push(
@@ -488,10 +494,10 @@ class _ContainerPageState extends State<ContainerPage> {
                       MaterialPageRoute(builder: (context) => ScannerPage()), // Navigate to ScannerPage
                     );
                   },
-                  icon: Icon(Icons.add, color: Colors.white),
-                  label: Text('New container', style: TextStyle(color: Colors.white)),
+                  icon: const Icon(Icons.add, color: Colors.white),
+                  label: const Text('New container', style: TextStyle(color: Colors.white)),
                 ),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
                 Expanded(
                   child: ListView.builder(
                     itemCount: containers.length,
@@ -511,10 +517,10 @@ class _ContainerPageState extends State<ContainerPage> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               if (isSelected)
-                                Icon(Icons.check_circle, color: Colors.green),
+                                const Icon(Icons.check_circle, color: Colors.green),
                               // ✅ Added Info Button
                               IconButton(
-                                icon: Icon(Icons.info, color: Colors.blueAccent),
+                                icon: const Icon(Icons.info, color: Colors.blueAccent),
                                 onPressed: () {
                                   Navigator.push(
                                     context,
@@ -528,7 +534,7 @@ class _ContainerPageState extends State<ContainerPage> {
                               ),
                               // Edit Button
                               IconButton(
-                                icon: Icon(Icons.edit, color: Colors.blue),
+                                icon: const Icon(Icons.edit, color: Colors.blue),
                                 onPressed: () {
                                   _showRenameContainerDialog(
                                       context, container['container_id']);
@@ -536,7 +542,7 @@ class _ContainerPageState extends State<ContainerPage> {
                               ),
                               // Delete Button
                               IconButton(
-                                icon: Icon(Icons.delete, color: Colors.red),
+                                icon: const Icon(Icons.delete, color: Colors.red),
                                 onPressed: () {
                                   _showDeleteConfirmationDialog(
                                       context, container['container_id']);
@@ -576,28 +582,28 @@ class _ContainerPageState extends State<ContainerPage> {
   }
 
   void _showRenameContainerDialog(BuildContext context, int containerId) {
-    TextEditingController _renameController = TextEditingController();
+    TextEditingController renameController = TextEditingController();
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text("Rename Container"),
+        title: const Text("Rename Container"),
         content: TextField(
-          controller: _renameController,
-          decoration: InputDecoration(hintText: "Enter new container name"),
+          controller: renameController,
+          decoration: const InputDecoration(hintText: "Enter new container name"),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text("Cancel"),
+            child: const Text("Cancel"),
           ),
           TextButton(
             onPressed: () async {
-              await renameContainer(containerId, _renameController.text);
+              await renameContainer(containerId, renameController.text);
               Navigator.pop(context);
               _fetchContainers(); // 🔄 Refresh UI after renaming
             },
-            child: Text("Rename"),
+            child: const Text("Rename"),
           ),
         ],
       ),
@@ -608,19 +614,19 @@ class _ContainerPageState extends State<ContainerPage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text("Delete Container"),
-        content: Text("Are you sure you want to delete this container?"),
+        title: const Text("Delete Container"),
+        content: const Text("Are you sure you want to delete this container?"),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text("Cancel"),
+            child: const Text("Cancel"),
           ),
           TextButton(
             onPressed: () {
               deleteContainer(containerId);
               Navigator.pop(context);
             },
-            child: Text("Delete"),
+            child: const Text("Delete"),
           ),
         ],
       ),
@@ -658,6 +664,8 @@ Future<List<Map<String, dynamic>>> fetchContainers() async {
 
 // Others Page: Displays options like Sign In and App Guide
 class OthersPage extends StatelessWidget {
+  const OthersPage({super.key});
+
   // Function to launch the URL for downloading the APK
   Future<void> _downloadApk() async {
     final Uri apkUri = Uri.parse(
@@ -675,12 +683,12 @@ class OthersPage extends StatelessWidget {
       children: [
         // Sign In
         ListTile(
-          leading: Icon(Icons.person, color: Colors.green),
-          title: Text('Sign In'),
+          leading: const Icon(Icons.person, color: Colors.green),
+          title: const Text('Sign In'),
           onTap: () {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => LoginPage()),
+              MaterialPageRoute(builder: (context) => const LoginPage()),
             );
           },
         ),
@@ -694,12 +702,12 @@ class OthersPage extends StatelessWidget {
         */
         // App Guide
         ListTile(
-          leading: Icon(Icons.help_outline, color: Colors.orange),
-          title: Text('App Guide'),
+          leading: const Icon(Icons.help_outline, color: Colors.orange),
+          title: const Text('App Guide'),
           onTap: () {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => AppGuidePage()),
+              MaterialPageRoute(builder: (context) => const AppGuidePage()),
             );
           },
         ),

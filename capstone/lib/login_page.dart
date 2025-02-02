@@ -3,7 +3,6 @@ import 'home_page.dart';
 import 'home_page_members.dart';
 import 'home_page_guest.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'constants.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});

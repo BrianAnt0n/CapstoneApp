@@ -19,7 +19,7 @@ class AppGuidePage extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => ApplicationDashboardPage(),
+                  builder: (context) => const ApplicationDashboardPage(),
                 ),
               );
             },
@@ -32,7 +32,7 @@ class AppGuidePage extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => ContainerManagementPage(),
+                  builder: (context) => const ContainerManagementPage(),
                 ),
               );
             },
@@ -45,7 +45,7 @@ class AppGuidePage extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => ESP32ConnectionPage(),
+                  builder: (context) => const ESP32ConnectionPage(),
                 ),
               );
             },
@@ -58,7 +58,7 @@ class AppGuidePage extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => QRCodeScanPage(),
+                  builder: (context) => const QRCodeScanPage(),
                 ),
               );
             },

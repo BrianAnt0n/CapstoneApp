@@ -24,7 +24,7 @@ class AccountManagementPage extends StatelessWidget {
                 // Navigate to Add Account Page
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => AddAccountPage()),
+                  MaterialPageRoute(builder: (context) => const AddAccountPage()),
                 );
               },
               child: const Row(

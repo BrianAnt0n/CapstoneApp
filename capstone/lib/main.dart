@@ -42,7 +42,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.green,
       ),
-      home: seenOnboarding ? LoginPage() : OnboardingPage(),
+      home: seenOnboarding ? const LoginPage() : const OnboardingPage(),
     );
   }
 }

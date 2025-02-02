@@ -10,6 +10,7 @@ import 'Others tab/app_guide_page.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'constants.dart';
+import 'package:table_calendar/table_calendar.dart';
 
 // State Management: Tracks the selected container
 class ContainerState extends ChangeNotifier {
@@ -22,6 +23,8 @@ class ContainerState extends ChangeNotifier {
 }
 
 class HomePage extends StatefulWidget {
+  const HomePage({super.key});
+
   @override
   _HomePageState createState() => _HomePageState();
 }
@@ -36,27 +39,38 @@ class _HomePageState extends State<HomePage> {
     OthersPage(),
   ];
 
+  String formatTimestamp(String timestamp) {
+    try {
+      DateTime parsedDate = DateTime.parse(timestamp);
+      return DateFormat('yyyy-MM-dd hh:mm a').format(parsedDate);
+    } catch (e) {
+      return 'Invalid Date';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
       create: (_) => ContainerState(),
       child: Scaffold(
         appBar: AppBar(
-          title: Text('E-ComposThink Home - Admin'), // AppBar title
+          title: const Text('E-ComposThink Home - Admin'), // AppBar title
         ),
         body: _pages[_currentIndex], // Show the selected page
 
         // Updated Bottom Navigation Bar with green theme
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: _currentIndex,
-          selectedItemColor: Colors.green, // Change selected icon color to green
-          unselectedItemColor: Colors.green[300], // Light green for unselected icons
+          selectedItemColor:
+              Colors.green, // Change selected icon color to green
+          unselectedItemColor:
+              Colors.green[300], // Light green for unselected icons
           onTap: (index) {
             setState(() {
               _currentIndex = index; // Update the selected tab
             });
           },
-          items: [
+          items: const [
             BottomNavigationBarItem(
               icon: Icon(Icons.dashboard),
               label: 'Dashboard',
@@ -75,9 +89,12 @@ class _HomePageState extends State<HomePage> {
     );
   }
 }
+
 // Dashboard Page: Displays sensor data for the selected container
 // Dashboard Page with pull-to-refresh functionality
 class DashboardPage extends StatefulWidget {
+  const DashboardPage({super.key});
+
   @override
   _DashboardPageState createState() => _DashboardPageState();
 }
@@ -86,7 +103,8 @@ class _DashboardPageState extends State<DashboardPage> {
   Future<Map<String, dynamic>>? _sensorDataFuture;
   Future<List<Map<String, dynamic>>>? _notesFuture;
   int? selectedContainerId;
-  TextEditingController _notesController = TextEditingController();
+  final TextEditingController _notesController = TextEditingController();
+  DateTime _selectedDate = DateTime.now(); // Track selected date
 
   @override
   void didChangeDependencies() {
@@ -95,7 +113,7 @@ class _DashboardPageState extends State<DashboardPage> {
     selectedContainerId = containerState.selectedContainerId;
     if (selectedContainerId != null) {
       _sensorDataFuture = fetchSensorData(selectedContainerId!);
-      _notesFuture = fetchNotes(selectedContainerId!);
+      _notesFuture = fetchNotes(selectedContainerId!, _selectedDate);
     }
   }
 
@@ -103,7 +121,7 @@ class _DashboardPageState extends State<DashboardPage> {
     if (selectedContainerId != null) {
       setState(() {
         _sensorDataFuture = fetchSensorData(selectedContainerId!);
-        _notesFuture = fetchNotes(selectedContainerId!);
+        _notesFuture = fetchNotes(selectedContainerId!, _selectedDate);
       });
     }
   }
@@ -113,38 +131,45 @@ class _DashboardPageState extends State<DashboardPage> {
       await addNoteToDatabase(selectedContainerId!, _notesController.text);
       _notesController.clear();
       setState(() {
-        _notesFuture = fetchNotes(selectedContainerId!);
+        _notesFuture = fetchNotes(selectedContainerId!, _selectedDate);
       });
     }
   }
+
+Future<void> _onDateSelected(DateTime selectedDate) async {
+    setState(() {
+      _selectedDate = selectedDate;
+    });
+
+    _notesFuture = fetchNotes(selectedContainerId!, _selectedDate);
+    setState(() {}); 
+  }
+
 
   void _showDeleteConfirmationDialog(int noteId) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Delete Note'),
-          content: Text('Are you sure you want to delete this note?'),
+          title: const Text('Delete Note'),
+          content: const Text('Are you sure you want to delete this note?'),
           actions: <Widget>[
             TextButton(
-              onPressed: () {
-                Navigator.pop(context); // Close dialog without deleting
-              },
-              child: Text('Cancel'),
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
             ),
             TextButton(
               onPressed: () async {
                 await deleteNoteFromDatabase(noteId);
-                Navigator.pop(context); // Close dialog after deleting
-
-                // Refresh the notes after deletion
+                Navigator.pop(context);
                 if (mounted) {
                   setState(() {
-                    _notesFuture = fetchNotes(selectedContainerId!);
+                    _notesFuture =
+                        fetchNotes(selectedContainerId!, _selectedDate);
                   });
                 }
               },
-              child: Text('Delete', style: TextStyle(color: Colors.red)),
+              child: const Text('Delete', style: TextStyle(color: Colors.red)),
             ),
           ],
         );
@@ -153,38 +178,35 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _showEditDialog(int noteId, String currentNote) {
-    TextEditingController _editController =
+    TextEditingController editController =
         TextEditingController(text: currentNote);
 
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text('Edit Note'),
+          title: const Text('Edit Note'),
           content: TextField(
-            controller: _editController,
-            decoration: InputDecoration(hintText: "Enter new note"),
+            controller: editController,
+            decoration: const InputDecoration(hintText: "Enter new note"),
           ),
           actions: <Widget>[
             TextButton(
-              onPressed: () {
-                Navigator.pop(context); // Close the dialog
-              },
-              child: Text('Cancel'),
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
             ),
             TextButton(
               onPressed: () async {
-                await updateNoteInDatabase(noteId, _editController.text);
-                Navigator.pop(context); // Close the dialog
-
-                // Refresh notes after updating
+                await updateNoteInDatabase(noteId, editController.text);
+                Navigator.pop(context);
                 if (mounted) {
                   setState(() {
-                    _notesFuture = fetchNotes(selectedContainerId!);
+                    _notesFuture =
+                        fetchNotes(selectedContainerId!, _selectedDate);
                   });
                 }
               },
-              child: Text('Save', style: TextStyle(color: Colors.blue)),
+              child: const Text('Save', style: TextStyle(color: Colors.blue)),
             ),
           ],
         );
@@ -192,48 +214,72 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
+  Widget buildNoteCard(Map<String, dynamic> note) {
+    return Card(
+      child: ListTile(
+        title: Text(note['note'] ?? 'No note available'),
+        subtitle: Text(formatTimestamp(note['created_date'])),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: Icon(Icons.edit, color: Colors.blue),
+              onPressed: () {
+                _showEditDialog(note['note_id'], note['note']);
+              },
+            ),
+            IconButton(
+              icon: Icon(Icons.delete, color: Colors.red),
+              onPressed: () {
+                _showDeleteConfirmationDialog(note['note_id']);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   String formatTimestamp(String timestamp) {
-  try {
-    DateTime parsedDate = DateTime.parse(timestamp);
-    return DateFormat('yyyy-MM-dd hh:mm a').format(parsedDate);
-  } catch (e) {
-    return 'Invalid Date';
+    try {
+      DateTime parsedDate = DateTime.parse(timestamp);
+      return DateFormat('yyyy-MM-dd hh:mm a').format(parsedDate);
+    } catch (e) {
+      return 'Invalid Date';
+    }
   }
-}
-
 
   @override
   Widget build(BuildContext context) {
     return selectedContainerId == null
-        ? Center(
+        ? const Center(
             child: Text('Please select a container from the Container tab.'))
         : RefreshIndicator(
             onRefresh: _refreshData,
             child: SingleChildScrollView(
-              physics: AlwaysScrollableScrollPhysics(),
+              physics: const AlwaysScrollableScrollPhysics(),
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Dashboard Section
-                    Text('Dashboard',
+                    const Text('Dashboard',
                         style: TextStyle(
                             fontSize: 24, fontWeight: FontWeight.bold)),
-                    SizedBox(height: 20),
+                    const SizedBox(height: 20),
                     Text('Selected Container: $selectedContainerId',
-                        style: TextStyle(
+                        style: const TextStyle(
                             fontSize: 18, fontWeight: FontWeight.w500)),
-                    SizedBox(height: 10),
+                    const SizedBox(height: 10),
                     FutureBuilder(
                       future: _sensorDataFuture,
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {
-                          return Center(child: CircularProgressIndicator());
+                          return const Center(
+                              child: CircularProgressIndicator());
                         } else if (snapshot.hasError) {
-                          return Text('Error fetching data');
+                          return const Text('Error fetching data');
                         } else {
                           final sensorData =
                               snapshot.data as Map<String, dynamic>;
@@ -258,7 +304,9 @@ class _DashboardPageState extends State<DashboardPage> {
                                   Colors.deepPurple),
                               buildSensorCard(Icons.cloud, 'Humidity',
                                   '${sensorData['humidity']}%', Colors.orange),
-                              buildSensorCard(Icons.access_time, 'Timestamp',
+                              buildSensorCard(
+                                  Icons.access_time,
+                                  'Timestamp',
                                   formatTimestamp(sensorData['timestamp']),
                                   Colors.grey),
                             ],
@@ -266,12 +314,22 @@ class _DashboardPageState extends State<DashboardPage> {
                         }
                       },
                     ),
-
-                        // Notes Section (placed below dashboard)
-                    SizedBox(height: 30),
-                    Divider(thickness: 2), // Adds a separator line
-                    SizedBox(height: 10),
-                    Text('Notes',
+                    const SizedBox(height: 30),
+                    const Divider(thickness: 2),
+                    const SizedBox(height: 10),
+                    TableCalendar(
+                      focusedDay: _selectedDate,
+                      firstDay: DateTime(2000),
+                      lastDay: DateTime(2100),
+                      calendarFormat: CalendarFormat.month,
+                      selectedDayPredicate: (day) =>
+                          isSameDay(_selectedDate, day),
+                      onDaySelected: (selectedDay, focusedDay) {
+                        _onDateSelected(selectedDay);
+                      },
+                    ),
+                    const SizedBox(height: 20),
+                    const Text('Notes',
                         style: TextStyle(
                             fontSize: 24, fontWeight: FontWeight.bold)),
                     TextField(
@@ -279,54 +337,25 @@ class _DashboardPageState extends State<DashboardPage> {
                       decoration: InputDecoration(
                           hintText: 'Enter a note',
                           suffixIcon: IconButton(
-                              icon: Icon(Icons.add), onPressed: _addNote)),
+                              icon: const Icon(Icons.add),
+                              onPressed: _addNote)),
                     ),
-                    SizedBox(height: 10),
+                    const SizedBox(height: 10),
                     FutureBuilder(
                       future: _notesFuture,
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {
-                          return Center(child: CircularProgressIndicator());
+                          return const Center(
+                              child: CircularProgressIndicator());
                         } else if (snapshot.hasError || snapshot.data == null) {
-                          return Text('No notes found.');
+                          return const Text('No notes found.');
                         } else {
                           final notes =
                               snapshot.data as List<Map<String, dynamic>>;
                           return Column(
                             children: notes
-                                .map(
-                                  (note) => Card(
-                                    child: ListTile(
-                                    title: Text(note['note'] ?? 'No note available'),
-                                    subtitle: Text(formatTimestamp(note['created_date'])),
-                                    trailing: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-
-                                          // Edit Button
-                                          IconButton(
-                                            icon: Icon(Icons.edit,
-                                                color: Colors.blue),
-                                            onPressed: () {
-                                              _showEditDialog(note['note_id'],
-                                                  note['note']);
-                                            },
-                                          ),
-                                          // Delete Button with Confirmation
-                                          IconButton(
-                                            icon: Icon(Icons.delete,
-                                                color: Colors.red),
-                                            onPressed: () {
-                                              _showDeleteConfirmationDialog(
-                                                  note['note_id']);
-                                            },
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                )
+                                .map((note) => buildNoteCard(note))
                                 .toList(),
                           );
                         }
@@ -339,7 +368,6 @@ class _DashboardPageState extends State<DashboardPage> {
           );
   }
 }
-
 
 Future<void> updateNoteInDatabase(int noteId, String updatedNote) async {
   final supabase = Supabase.instance.client;
@@ -375,34 +403,32 @@ Future<void> addNoteToDatabase(int containerId, String note) async {
   });
 }
 
-Future<List<Map<String, dynamic>>> fetchNotes(int containerId) async {
+Future<List<Map<String, dynamic>>> fetchNotes(
+    int containerId, DateTime date) async {
   final supabase = Supabase.instance.client;
 
+  // Format date to 'YYYY-MM-DD'
+  String formattedDate = DateFormat('yyyy-MM-dd').format(date);
+
   try {
-    final response = await supabase
+    final List<Map<String, dynamic>> response = await supabase
         .from('Notes_test_test')
-        .select('note_id, container_id, note, created_date')
+        .select()
         .eq('container_id', containerId)
-        .order('created_date', ascending: false);
+        .gte('created_date',
+            '$formattedDate 00:00:00') // Start of the selected date
+        .lt('created_date',
+            '$formattedDate 23:59:59'); // End of the selected date
 
-    if (response == null || response.isEmpty) {
-      print("No notes found for container $containerId");
-      return [];
-    }
+    print("Fetched notes for $formattedDate: $response"); // Debugging log
 
-    return response.map((note) {
-      return {
-        'note_id': note['note_id'] ?? 0,
-        'container_id': note['container_id'] ?? 0,
-        'note': note['note']?.toString() ?? 'No note available',
-        'created_date': note['created_date']?.toString() ?? 'Unknown date',
-      };
-    }).toList();
+    return response;
   } catch (error) {
     print("Error fetching notes: $error");
     return [];
   }
 }
+
 //ending of notes section
 
 Widget buildSensorCard(IconData icon, String title, String value, Color color) {
@@ -440,6 +466,8 @@ Future<Map<String, dynamic>> fetchSensorData(int containerId) async {
 // Container Page: Displays a list of available containers
 
 class ContainerPage extends StatefulWidget {
+  const ContainerPage({super.key});
+
   @override
   _ContainerPageState createState() => _ContainerPageState();
 }
@@ -467,7 +495,7 @@ class _ContainerPageState extends State<ContainerPage> {
       future: _containersFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(child: CircularProgressIndicator());
+          return const Center(child: CircularProgressIndicator());
         } else if (snapshot.hasError) {
           return Center(
               child: Text('Error fetching containers: ${snapshot.error}'));
@@ -481,18 +509,21 @@ class _ContainerPageState extends State<ContainerPage> {
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
-                    minimumSize: Size(double.infinity, 50),
+                    minimumSize: const Size(double.infinity, 50),
                   ),
                   onPressed: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => ScannerPage()), // Navigate to ScannerPage
+                      MaterialPageRoute(
+                          builder: (context) =>
+                              ScannerPage()), // Navigate to ScannerPage
                     );
                   },
-                  icon: Icon(Icons.add, color: Colors.white),
-                  label: Text('New container', style: TextStyle(color: Colors.white)),
+                  icon: const Icon(Icons.add, color: Colors.white),
+                  label: const Text('New container',
+                      style: TextStyle(color: Colors.white)),
                 ),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
                 Expanded(
                   child: ListView.builder(
                     itemCount: containers.length,
@@ -512,24 +543,25 @@ class _ContainerPageState extends State<ContainerPage> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               if (isSelected)
-                                Icon(Icons.check_circle, color: Colors.green),
+                                const Icon(Icons.check_circle,
+                                    color: Colors.green),
                               // ✅ Added Info Button
                               IconButton(
-                                icon: Icon(Icons.info, color: Colors.blueAccent),
+                                icon: const Icon(Icons.info,
+                                    color: Colors.blueAccent),
                                 onPressed: () {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (context) => ContainerDetails(
-                                        
-                                      ),
+                                      builder: (context) => ContainerDetails(),
                                     ),
                                   );
                                 },
                               ),
                               // Edit Button
                               IconButton(
-                                icon: Icon(Icons.edit, color: Colors.blue),
+                                icon:
+                                    const Icon(Icons.edit, color: Colors.blue),
                                 onPressed: () {
                                   _showRenameContainerDialog(
                                       context, container['container_id']);
@@ -537,7 +569,8 @@ class _ContainerPageState extends State<ContainerPage> {
                               ),
                               // Delete Button
                               IconButton(
-                                icon: Icon(Icons.delete, color: Colors.red),
+                                icon:
+                                    const Icon(Icons.delete, color: Colors.red),
                                 onPressed: () {
                                   _showDeleteConfirmationDialog(
                                       context, container['container_id']);
@@ -570,35 +603,37 @@ class _ContainerPageState extends State<ContainerPage> {
   String _formatDate(String dateString) {
     try {
       DateTime dateTime = DateTime.parse(dateString);
-      return DateFormat('yyyy-MM-dd hh:mm a').format(dateTime); // ✅ Format applied
+      return DateFormat('yyyy-MM-dd hh:mm a')
+          .format(dateTime); // ✅ Format applied
     } catch (e) {
       return 'Invalid date';
     }
   }
 
   void _showRenameContainerDialog(BuildContext context, int containerId) {
-    TextEditingController _renameController = TextEditingController();
+    TextEditingController renameController = TextEditingController();
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text("Rename Container"),
+        title: const Text("Rename Container"),
         content: TextField(
-          controller: _renameController,
-          decoration: InputDecoration(hintText: "Enter new container name"),
+          controller: renameController,
+          decoration:
+              const InputDecoration(hintText: "Enter new container name"),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text("Cancel"),
+            child: const Text("Cancel"),
           ),
           TextButton(
             onPressed: () async {
-              await renameContainer(containerId, _renameController.text);
+              await renameContainer(containerId, renameController.text);
               Navigator.pop(context);
               _fetchContainers(); // 🔄 Refresh UI after renaming
             },
-            child: Text("Rename"),
+            child: const Text("Rename"),
           ),
         ],
       ),
@@ -609,19 +644,19 @@ class _ContainerPageState extends State<ContainerPage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text("Delete Container"),
-        content: Text("Are you sure you want to delete this container?"),
+        title: const Text("Delete Container"),
+        content: const Text("Are you sure you want to delete this container?"),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text("Cancel"),
+            child: const Text("Cancel"),
           ),
           TextButton(
             onPressed: () {
               deleteContainer(containerId);
               Navigator.pop(context);
             },
-            child: Text("Delete"),
+            child: const Text("Delete"),
           ),
         ],
       ),
@@ -658,6 +693,8 @@ Future<List<Map<String, dynamic>>> fetchContainers() async {
 
 // Others Page: Displays options like Account Management, ESP Connection, App Guide, and Log Out
 class OthersPage extends StatelessWidget {
+  const OthersPage({super.key});
+
   // Function to launch the URL for downloading the APK
   Future<void> _downloadApk() async {
     final Uri apkUri = Uri.parse(
@@ -675,58 +712,60 @@ class OthersPage extends StatelessWidget {
       children: [
         // Account Management
         ListTile(
-          leading: Icon(Icons.person, color: Colors.green),
-          title: Text('Account Management'),
+          leading: const Icon(Icons.person, color: Colors.green),
+          title: const Text('Account Management'),
           onTap: () {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => AccountManagementPage()),
+              MaterialPageRoute(
+                  builder: (context) => const AccountManagementPage()),
             );
           },
         ),
         // ESP Connection
         ListTile(
-          leading: Icon(Icons.wifi, color: Colors.blue),
-          title: Text('ESP Connection'),
+          leading: const Icon(Icons.wifi, color: Colors.blue),
+          title: const Text('ESP Connection'),
           onTap: _downloadApk, // Call the download function
         ),
         // App Guide
         ListTile(
-          leading: Icon(Icons.help_outline, color: Colors.orange),
-          title: Text('App Guide'),
+          leading: const Icon(Icons.help_outline, color: Colors.orange),
+          title: const Text('App Guide'),
           onTap: () {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => AppGuidePage()),
+              MaterialPageRoute(builder: (context) => const AppGuidePage()),
             );
           },
         ),
         // Log Out
         ListTile(
-          leading: Icon(Icons.logout, color: Colors.red),
-          title: Text('Log Out'),
+          leading: const Icon(Icons.logout, color: Colors.red),
+          title: const Text('Log Out'),
           onTap: () {
             showDialog(
               context: context,
               builder: (BuildContext context) {
                 return AlertDialog(
-                  title: Text('Log Out'),
-                  content: Text('Are you sure you want to log out?'),
+                  title: const Text('Log Out'),
+                  content: const Text('Are you sure you want to log out?'),
                   actions: [
                     TextButton(
                       onPressed: () {
                         Navigator.of(context).pop(); // Close dialog
                       },
-                      child: Text('Cancel'),
+                      child: const Text('Cancel'),
                     ),
                     TextButton(
                       onPressed: () {
                         Navigator.pushReplacement(
                           context,
-                          MaterialPageRoute(builder: (context) => LoginPage()),
+                          MaterialPageRoute(
+                              builder: (context) => const LoginPage()),
                         );
                       },
-                      child: Text('Log Out'),
+                      child: const Text('Log Out'),
                     ),
                   ],
                 );
