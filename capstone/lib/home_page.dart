@@ -107,13 +107,19 @@ class _DashboardPageState extends State<DashboardPage> {
   DateTime _selectedDate = DateTime.now(); // Track selected date
 
   @override
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final containerState = Provider.of<ContainerState>(context);
     selectedContainerId = containerState.selectedContainerId;
+
     if (selectedContainerId != null) {
       _sensorDataFuture = fetchSensorData(selectedContainerId!);
       _notesFuture = fetchNotes(selectedContainerId!, _selectedDate);
+
+      fetchContainerDetails(selectedContainerId!).then((_) {
+        setState(() {}); // ✅ Force calendar to update with container age
+      });
     }
   }
 
@@ -123,6 +129,48 @@ class _DashboardPageState extends State<DashboardPage> {
         _sensorDataFuture = fetchSensorData(selectedContainerId!);
         _notesFuture = fetchNotes(selectedContainerId!, _selectedDate);
       });
+    }
+  }
+
+  DateTime? _containerAddedDate;
+  String _containerAge = "";
+
+  Future<void> fetchContainerDetails(int containerId) async {
+    final supabase = Supabase.instance.client;
+
+    try {
+      final response = await supabase
+          .from('Containers_test')
+          .select('date_added')
+          .eq('container_id', containerId)
+          .single();
+
+      if (response != null && response['date_added'] != null) {
+        _containerAddedDate = DateTime.parse(response['date_added']);
+
+        _calculateContainerAge();
+      } else {}
+    } catch (error) {}
+  }
+
+  void _calculateContainerAge() {
+    if (_containerAddedDate == null) {
+      return;
+    }
+
+    final now = DateTime.now();
+    final difference = now.difference(_containerAddedDate!);
+
+    if (difference.inDays < 7) {
+      _containerAge = "${difference.inDays} days";
+    } else if (difference.inDays < 30) {
+      _containerAge = "${(difference.inDays / 7).floor()} weeks";
+    } else {
+      _containerAge = "${(difference.inDays / 30).floor()} months";
+    }
+
+    if (mounted) {
+      setState(() {}); // compost age
     }
   }
 
@@ -136,15 +184,14 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
-Future<void> _onDateSelected(DateTime selectedDate) async {
+  Future<void> _onDateSelected(DateTime selectedDate) async {
     setState(() {
       _selectedDate = selectedDate;
     });
 
     _notesFuture = fetchNotes(selectedContainerId!, _selectedDate);
-    setState(() {}); 
+    setState(() {});
   }
-
 
   void _showDeleteConfirmationDialog(int noteId) {
     showDialog(
@@ -318,6 +365,19 @@ Future<void> _onDateSelected(DateTime selectedDate) async {
                     const Divider(thickness: 2),
                     const SizedBox(height: 10),
                     TableCalendar(
+                      headerVisible: true,
+                      headerStyle: HeaderStyle(
+                        titleCentered: true,
+                        formatButtonVisible: false, // Hide format toggle
+                        titleTextFormatter: (date, locale) {
+                          String formattedDate =
+                              DateFormat.yMMMM(locale).format(date);
+                          String ageText = _containerAge.isNotEmpty
+                              ? "  (Age: $_containerAge)"
+                              : "";
+                          return "$formattedDate$ageText";
+                        },
+                      ),
                       focusedDay: _selectedDate,
                       firstDay: DateTime(2000),
                       lastDay: DateTime(2100),
