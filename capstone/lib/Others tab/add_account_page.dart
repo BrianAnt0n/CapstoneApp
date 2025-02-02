@@ -14,13 +14,28 @@ class _AddAccountPageState extends State<AddAccountPage> {
   final TextEditingController _fullnameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _confirmPasswordController = TextEditingController();
   String _selectedUserLevel = 'Admin';
+  String? _passwordError; // To store password mismatch error
 
   Future<void> _addAccount() async {
     final String fullname = _fullnameController.text.trim();
     final String email = _emailController.text.trim();
     final String password = _passwordController.text.trim();
+    final String confirmPassword = _confirmPasswordController.text.trim();
     final String userLevel = _selectedUserLevel;
+
+    // Check if passwords match
+    if (password != confirmPassword) {
+      setState(() {
+        _passwordError = "Passwords do not match!";
+      });
+      return;
+    } else {
+      setState(() {
+        _passwordError = null; // Clear error if matched
+      });
+    }
 
     if (fullname.isEmpty || email.isEmpty || password.isEmpty || userLevel.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -48,7 +63,12 @@ class _AddAccountPageState extends State<AddAccountPage> {
     }
   }
 
-  Widget _buildTextField({required String label, required TextEditingController controller, bool isPassword = false}) {
+  Widget _buildTextField({
+    required String label,
+    required TextEditingController controller,
+    bool isPassword = false,
+    String? errorText,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -61,6 +81,7 @@ class _AddAccountPageState extends State<AddAccountPage> {
             hintText: 'Enter $label',
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
             contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+            errorText: errorText, // Shows error below the text field
           ),
         ),
         const SizedBox(height: 15),
@@ -87,6 +108,12 @@ class _AddAccountPageState extends State<AddAccountPage> {
                     _buildTextField(label: 'Fullname', controller: _fullnameController),
                     _buildTextField(label: 'Email', controller: _emailController),
                     _buildTextField(label: 'Password', controller: _passwordController, isPassword: true),
+                    _buildTextField(
+                      label: 'Confirm Password',
+                      controller: _confirmPasswordController,
+                      isPassword: true,
+                      errorText: _passwordError,
+                    ),
                     
                     const SizedBox(height: 10),
                     const Text('User Level', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
