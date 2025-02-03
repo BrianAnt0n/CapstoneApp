@@ -653,7 +653,7 @@ class _ContainerPageState extends State<ContainerPage> {
                       context,
                       MaterialPageRoute(
                           builder: (context) =>
-                              const ScannerPage()), // Navigate to ScannerPage
+                             ScannerPage()), // Navigate to ScannerPage
                     );
                   },
                   icon: const Icon(Icons.add, color: Colors.white),
