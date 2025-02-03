@@ -7,10 +7,10 @@ class AccountSettingsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Account Management'),
+        title: const Text('Account Settings'),
       ),
       body: const Center(
-        child: Text('Account Management Content Here'),
+        child: Text('Account Settings Content Here'),
       ),
     );
   }
