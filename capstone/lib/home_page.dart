@@ -35,9 +35,9 @@ class _HomePageState extends State<HomePage> {
 
   // Pages for bottom navigation
   final List<Widget> _pages = [
-    DashboardPage(),
-    ContainerPage(),
-    OthersPage(),
+    const DashboardPage(),
+    const ContainerPage(),
+    const OthersPage(),
   ];
 
   String formatTimestamp(String timestamp) {
@@ -119,7 +119,7 @@ class _DashboardPageState extends State<DashboardPage> {
       _notesFuture = fetchNotes(selectedContainerId!, _selectedDate);
 
       fetchContainerDetails(selectedContainerId!).then((_) {
-        setState(() {}); // ✅ Force calendar to update with container age
+        setState(() {}); // Force calendar to update with container age
       });
     }
   }
@@ -146,7 +146,7 @@ class _DashboardPageState extends State<DashboardPage> {
           .eq('container_id', containerId)
           .single();
 
-      if (response != null && response['date_added'] != null) {
+      if (response['date_added'] != null) {
         _containerAddedDate = DateTime.parse(response['date_added']);
 
         _calculateContainerAge();
@@ -281,13 +281,13 @@ class _DashboardPageState extends State<DashboardPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
-              icon: Icon(Icons.edit, color: Colors.blue),
+              icon: const Icon(Icons.edit, color: Colors.blue),
               onPressed: () {
                 _showEditDialog(note['note_id'], note['note']);
               },
             ),
             IconButton(
-              icon: Icon(Icons.delete, color: Colors.red),
+              icon: const Icon(Icons.delete, color: Colors.red),
               onPressed: () {
                 _showDeleteConfirmationDialog(note['note_id']);
               },
@@ -427,7 +427,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                           horizontal: 10, vertical: 4),
                                       decoration: BoxDecoration(
                                         color:
-                                            ageColor, // 🔥 Apply the correct color
+                                            ageColor, 
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                       child: Text(
@@ -480,7 +480,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       decoration: InputDecoration(
                           hintText: 'Enter a note',
                           suffixIcon: IconButton(
-                              icon: const Icon(Icons.add),
+                              icon: const Icon(Icons.add_comment_outlined),
                               onPressed: _addNote)),
                     ),
                     const SizedBox(height: 10),
@@ -542,7 +542,7 @@ Future<void> addNoteToDatabase(int containerId, String note) async {
   await supabase.from('Notes_test_test').insert({
     'container_id': containerId,
     'note': note,
-    'created_date': DateTime.now().toIso8601String(), // ✅ Use ISO format
+    'created_date': DateTime.now().toIso8601String(), 
   });
 }
 
@@ -624,7 +624,8 @@ class _ContainerPageState extends State<ContainerPage> {
     _fetchContainers();
   }
 
-  Future<void> _fetchContainers() async { // ✅ Updated for Pull-to-Refresh
+  Future<void> _fetchContainers() async {
+    // ✅ Updated for Pull-to-Refresh
     setState(() {
       _containersFuture = fetchContainers();
     });
@@ -659,7 +660,7 @@ class _ContainerPageState extends State<ContainerPage> {
                       context,
                       MaterialPageRoute(
                           builder: (context) =>
-                              ScannerPage()), // Navigate to ScannerPage
+                              const ScannerPage()), // Navigate to ScannerPage
                     );
                   },
                   icon: const Icon(Icons.add, color: Colors.white),
@@ -668,7 +669,7 @@ class _ContainerPageState extends State<ContainerPage> {
                 ),
                 const SizedBox(height: 16),
 
-                // ✅ Added Pull-to-Refresh
+             
                 Expanded(
                   child: RefreshIndicator(
                     onRefresh: _fetchContainers,
@@ -700,22 +701,22 @@ class _ContainerPageState extends State<ContainerPage> {
                                       context,
                                       MaterialPageRoute(
                                         builder: (context) =>
-                                            ContainerDetails(),
+                                            const ContainerDetails(),
                                       ),
                                     );
                                   },
                                 ),
                                 IconButton(
-                                  icon:
-                                      const Icon(Icons.edit, color: Colors.blue),
+                                  icon: const Icon(Icons.edit,
+                                      color: Colors.blue),
                                   onPressed: () {
                                     _showRenameContainerDialog(
                                         context, container['container_id']);
                                   },
                                 ),
                                 IconButton(
-                                  icon:
-                                      const Icon(Icons.delete, color: Colors.red),
+                                  icon: const Icon(Icons.delete,
+                                      color: Colors.red),
                                   onPressed: () {
                                     _showDeleteConfirmationDialog(
                                         context, container['container_id']);
@@ -775,7 +776,7 @@ class _ContainerPageState extends State<ContainerPage> {
             onPressed: () async {
               await renameContainer(containerId, renameController.text);
               Navigator.pop(context);
-              _fetchContainers(); // 🔄 Refresh UI after renaming
+              _fetchContainers(); 
             },
             child: const Text("Rename"),
           ),
@@ -834,7 +835,6 @@ Future<List<Map<String, dynamic>>> fetchContainers() async {
     throw Exception('Error fetching containers: $error');
   }
 }
-
 
 // Others Page: Displays options like Account Management, ESP Connection, App Guide, and Log Out
 class OthersPage extends StatelessWidget {
@@ -903,21 +903,23 @@ class OthersPage extends StatelessWidget {
                       child: const Text('Cancel'),
                     ),
                     TextButton(
-                     onPressed: () async {
+                      onPressed: () async {
                         Future<void> logoutUser() async {
-                        final SharedPreferences prefs = await SharedPreferences.getInstance();
-                        await prefs.remove('user_id_pref');
-                        await prefs.remove('user_level');
-                        await prefs.remove('fullname');
-                        await prefs.remove('email');
-                        await prefs.reload();
-                        Navigator.pushAndRemoveUntil(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => const LoginPage()),
-                              (Route<dynamic> route) => false,
+                          final SharedPreferences prefs =
+                              await SharedPreferences.getInstance();
+                          await prefs.remove('user_id_pref');
+                          await prefs.remove('user_level');
+                          await prefs.remove('fullname');
+                          await prefs.remove('email');
+                          await prefs.reload();
+                          Navigator.pushAndRemoveUntil(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => const LoginPage()),
+                            (Route<dynamic> route) => false,
                           );
                         }
+
                         await logoutUser();
                       },
                       child: const Text('Log Out'),

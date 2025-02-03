@@ -56,14 +56,14 @@ class _AccountManagementPageState extends State<AccountManagementPage> {
   }
 
   void _showEditDialog(BuildContext context, int userId, String currentName) {
-    TextEditingController _nameController = TextEditingController(text: currentName);
+    TextEditingController nameController = TextEditingController(text: currentName);
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text("Edit Account"),
         content: TextField(
-          controller: _nameController,
+          controller: nameController,
           decoration: const InputDecoration(hintText: "Enter new name"),
         ),
         actions: [
@@ -73,7 +73,7 @@ class _AccountManagementPageState extends State<AccountManagementPage> {
           ),
           TextButton(
             onPressed: () async {
-              await editAccount(userId, _nameController.text);
+              await editAccount(userId, nameController.text);
               Navigator.pop(context);
             },
             child: const Text("Save"),

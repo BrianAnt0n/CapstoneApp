@@ -87,12 +87,6 @@ class _LoginPageState extends State<LoginPage> {
           .eq('email', email)
           .single();
 
-      if (response == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("User not found. Please try again.")));
-        return;
-      }
-
       String storedPassword = response['password'];
       int storedUserId = response['user_id'];
       String storedUserLevel = response['user_level'];
@@ -105,18 +99,18 @@ class _LoginPageState extends State<LoginPage> {
         await SharedPrefsHelper.saveUserLogin(userIdString, storedUserLevel, storedEmail, storedFullName);
         if (storedUserLevel == "Admin") {
           Navigator.pushReplacement(
-              context, MaterialPageRoute(builder: (context) => HomePage()));
+              context, MaterialPageRoute(builder: (context) => const HomePage()));
         } else {
           Navigator.pushReplacement(
-              context, MaterialPageRoute(builder: (context) => HomePageMember()));
+              context, MaterialPageRoute(builder: (context) => const HomePageMember()));
         }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Incorrect password. Please try again.")));
+            const SnackBar(content: Text("Incorrect password. Please try again.")));
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Login failed. Please try again.")));
+          const SnackBar(content: Text("Login failed. Please try again.")));
     }
   }
 
@@ -230,7 +224,7 @@ class _LoginPageState extends State<LoginPage> {
 
                       Navigator.pushReplacement(
                         context,
-                        MaterialPageRoute(builder: (context) => HomePageGuest()),
+                        MaterialPageRoute(builder: (context) => const HomePageGuest()),
                       );
                     },
                     child: Container(

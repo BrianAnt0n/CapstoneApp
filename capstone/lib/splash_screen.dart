@@ -6,6 +6,8 @@ import 'login_page.dart';
 import 'onboarding_page.dart';
 
 class SplashScreen extends StatefulWidget {
+  const SplashScreen({super.key});
+
   @override
   _SplashScreenState createState() => _SplashScreenState();
 }
@@ -23,7 +25,7 @@ class _SplashScreenState extends State<SplashScreen> {
     if (!hasSeenOnboarding) {
       // Navigate to onboarding screen
       Navigator.pushReplacement(
-          context, MaterialPageRoute(builder: (context) => OnboardingPage()));
+          context, MaterialPageRoute(builder: (context) => const OnboardingPage()));
       return;
     }
 
@@ -36,21 +38,21 @@ class _SplashScreenState extends State<SplashScreen> {
       // Navigate based on user level
       if (userLevel == "Admin") {
         Navigator.pushReplacement(
-            context, MaterialPageRoute(builder: (context) => HomePage()));
+            context, MaterialPageRoute(builder: (context) => const HomePage()));
       } else {
         Navigator.pushReplacement(
-            context, MaterialPageRoute(builder: (context) => HomePageMember()));
+            context, MaterialPageRoute(builder: (context) => const HomePageMember()));
       }
     } else {
       // Navigate to login page
       Navigator.pushReplacement(
-          context, MaterialPageRoute(builder: (context) => LoginPage()));
+          context, MaterialPageRoute(builder: (context) => const LoginPage()));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return const Scaffold(
       body: Center(child: CircularProgressIndicator()),
     );
   }
