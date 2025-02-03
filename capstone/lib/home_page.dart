@@ -606,6 +606,8 @@ Future<Map<String, dynamic>> fetchSensorData(int containerId) async {
   return sensorResponse;
 }
 
+//Container Page : Displays a list of available containers
+
 class ContainerPage extends StatefulWidget {
   const ContainerPage({super.key});
 
