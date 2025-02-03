@@ -38,9 +38,9 @@ class _HomePageMemberState extends State<HomePageMember> {
 
   // Pages for bottom navigation
   final List<Widget> _pages = [
-    DashboardPage(),
-    ContainerPage(),
-    OthersPage(),
+    const DashboardPage(),
+    const ContainerPage(),
+    const OthersPage(),
   ];
 
   @override
@@ -140,7 +140,7 @@ class _DashboardPageState extends State<DashboardPage> {
           .eq('container_id', containerId)
           .single();
 
-      if (response != null && response['date_added'] != null) {
+      if (response['date_added'] != null) {
         _containerAddedDate = DateTime.parse(response['date_added']);
 
         _calculateContainerAge();
@@ -275,13 +275,13 @@ class _DashboardPageState extends State<DashboardPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
-              icon: Icon(Icons.edit, color: Colors.blue),
+              icon: const Icon(Icons.edit, color: Colors.blue),
               onPressed: () {
                 _showEditDialog(note['note_id'], note['note']);
               },
             ),
             IconButton(
-              icon: Icon(Icons.delete, color: Colors.red),
+              icon: const Icon(Icons.delete, color: Colors.red),
               onPressed: () {
                 _showDeleteConfirmationDialog(note['note_id']);
               },
@@ -653,7 +653,7 @@ class _ContainerPageState extends State<ContainerPage> {
                       context,
                       MaterialPageRoute(
                           builder: (context) =>
-                              ScannerPage()), // Navigate to ScannerPage
+                              const ScannerPage()), // Navigate to ScannerPage
                     );
                   },
                   icon: const Icon(Icons.add, color: Colors.white),
@@ -694,7 +694,7 @@ class _ContainerPageState extends State<ContainerPage> {
                                       context,
                                       MaterialPageRoute(
                                         builder: (context) =>
-                                            ContainerDetails(),
+                                            const ContainerDetails(),
                                       ),
                                     );
                                   },
