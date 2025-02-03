@@ -606,7 +606,7 @@ Future<Map<String, dynamic>> fetchSensorData(int containerId) async {
   return sensorResponse;
 }
 
-// Container Page: Displays a list of available containers
+//Container Page : Displays a list of available containers
 
 class ContainerPage extends StatefulWidget {
   const ContainerPage({super.key});
@@ -624,7 +624,7 @@ class _ContainerPageState extends State<ContainerPage> {
     _fetchContainers();
   }
 
-  void _fetchContainers() {
+  Future<void> _fetchContainers() async { // ✅ Updated for Pull-to-Refresh
     setState(() {
       _containersFuture = fetchContainers();
     });
@@ -667,71 +667,74 @@ class _ContainerPageState extends State<ContainerPage> {
                       style: TextStyle(color: Colors.white)),
                 ),
                 const SizedBox(height: 16),
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: containers.length,
-                    itemBuilder: (context, index) {
-                      final container = containers[index];
-                      final isSelected = container['container_id'] ==
-                          containerState.selectedContainerId;
 
-                      return Card(
-                        color: isSelected ? Colors.green[100] : null,
-                        child: ListTile(
-                          title: Text('${container['container_name']}'),
-                          subtitle: Text(
-                            'Date Added: ${_formatDate(container['date_added'])}', // ✅ Updated date formatting
+                // ✅ Added Pull-to-Refresh
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: _fetchContainers,
+                    child: ListView.builder(
+                      itemCount: containers.length,
+                      itemBuilder: (context, index) {
+                        final container = containers[index];
+                        final isSelected = container['container_id'] ==
+                            containerState.selectedContainerId;
+
+                        return Card(
+                          color: isSelected ? Colors.green[100] : null,
+                          child: ListTile(
+                            title: Text('${container['container_name']}'),
+                            subtitle: Text(
+                              'Date Added: ${_formatDate(container['date_added'])}',
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (isSelected)
+                                  const Icon(Icons.check_circle,
+                                      color: Colors.green),
+                                IconButton(
+                                  icon: const Icon(Icons.info,
+                                      color: Colors.blueAccent),
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            ContainerDetails(),
+                                      ),
+                                    );
+                                  },
+                                ),
+                                IconButton(
+                                  icon:
+                                      const Icon(Icons.edit, color: Colors.blue),
+                                  onPressed: () {
+                                    _showRenameContainerDialog(
+                                        context, container['container_id']);
+                                  },
+                                ),
+                                IconButton(
+                                  icon:
+                                      const Icon(Icons.delete, color: Colors.red),
+                                  onPressed: () {
+                                    _showDeleteConfirmationDialog(
+                                        context, container['container_id']);
+                                  },
+                                ),
+                              ],
+                            ),
+                            onTap: () {
+                              if (isSelected) {
+                                containerState.selectContainer(0);
+                              } else {
+                                containerState
+                                    .selectContainer(container['container_id']);
+                              }
+                            },
                           ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (isSelected)
-                                const Icon(Icons.check_circle,
-                                    color: Colors.green),
-                              // ✅ Added Info Button
-                              IconButton(
-                                icon: const Icon(Icons.info,
-                                    color: Colors.blueAccent),
-                                onPressed: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => ContainerDetails(),
-                                    ),
-                                  );
-                                },
-                              ),
-                              // Edit Button
-                              IconButton(
-                                icon:
-                                    const Icon(Icons.edit, color: Colors.blue),
-                                onPressed: () {
-                                  _showRenameContainerDialog(
-                                      context, container['container_id']);
-                                },
-                              ),
-                              // Delete Button
-                              IconButton(
-                                icon:
-                                    const Icon(Icons.delete, color: Colors.red),
-                                onPressed: () {
-                                  _showDeleteConfirmationDialog(
-                                      context, container['container_id']);
-                                },
-                              ),
-                            ],
-                          ),
-                          onTap: () {
-                            if (isSelected) {
-                              containerState.selectContainer(0);
-                            } else {
-                              containerState
-                                  .selectContainer(container['container_id']);
-                            }
-                          },
-                        ),
-                      );
-                    },
+                        );
+                      },
+                    ),
                   ),
                 ),
               ],
@@ -742,12 +745,10 @@ class _ContainerPageState extends State<ContainerPage> {
     );
   }
 
-  // Function to format the date
   String _formatDate(String dateString) {
     try {
       DateTime dateTime = DateTime.parse(dateString);
-      return DateFormat('yyyy-MM-dd hh:mm a')
-          .format(dateTime); // ✅ Format applied
+      return DateFormat('yyyy-MM-dd hh:mm a').format(dateTime);
     } catch (e) {
       return 'Invalid date';
     }
@@ -833,6 +834,7 @@ Future<List<Map<String, dynamic>>> fetchContainers() async {
     throw Exception('Error fetching containers: $error');
   }
 }
+
 
 // Others Page: Displays options like Account Management, ESP Connection, App Guide, and Log Out
 class OthersPage extends StatelessWidget {
