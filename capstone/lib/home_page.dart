@@ -479,7 +479,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       decoration: InputDecoration(
                           hintText: 'Enter a note',
                           suffixIcon: IconButton(
-                              icon: const Icon(Icons.add),
+                              icon: const Icon(Icons.add_comment_outlined),
                               onPressed: _addNote)),
                     ),
                     const SizedBox(height: 10),
@@ -541,7 +541,7 @@ Future<void> addNoteToDatabase(int containerId, String note) async {
   await supabase.from('Notes_test_test').insert({
     'container_id': containerId,
     'note': note,
-    'created_date': DateTime.now().toIso8601String(), // ✅ Use ISO format
+    'created_date': DateTime.now().toIso8601String(),
   });
 }
 
