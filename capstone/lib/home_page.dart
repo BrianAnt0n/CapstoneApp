@@ -119,7 +119,7 @@ class _DashboardPageState extends State<DashboardPage> {
       _notesFuture = fetchNotes(selectedContainerId!, _selectedDate);
 
       fetchContainerDetails(selectedContainerId!).then((_) {
-        setState(() {});
+        setState(() {}); // ✅ Force calendar to update with container age
       });
     }
   }
@@ -389,6 +389,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           String formattedDate =
                               DateFormat.yMMMM().format(date);
 
+                          // ✅ Determine color based on weeks
                           Color ageColor =
                               Colors.green; // Default: Green (1-6 weeks)
 
@@ -479,7 +480,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       decoration: InputDecoration(
                           hintText: 'Enter a note',
                           suffixIcon: IconButton(
-                              icon: const Icon(Icons.add_comment_outlined),
+                              icon: const Icon(Icons.add),
                               onPressed: _addNote)),
                     ),
                     const SizedBox(height: 10),
@@ -541,7 +542,7 @@ Future<void> addNoteToDatabase(int containerId, String note) async {
   await supabase.from('Notes_test_test').insert({
     'container_id': containerId,
     'note': note,
-    'created_date': DateTime.now().toIso8601String(),
+    'created_date': DateTime.now().toIso8601String(), // ✅ Use ISO format
   });
 }
 
@@ -605,7 +606,7 @@ Future<Map<String, dynamic>> fetchSensorData(int containerId) async {
   return sensorResponse;
 }
 
-// Container Page: Displays a list of available containers
+//Container Page : Displays a list of available containers
 
 class ContainerPage extends StatefulWidget {
   const ContainerPage({super.key});
@@ -623,7 +624,7 @@ class _ContainerPageState extends State<ContainerPage> {
     _fetchContainers();
   }
 
-  void _fetchContainers() {
+  Future<void> _fetchContainers() async { // ✅ Updated for Pull-to-Refresh
     setState(() {
       _containersFuture = fetchContainers();
     });
@@ -666,71 +667,74 @@ class _ContainerPageState extends State<ContainerPage> {
                       style: TextStyle(color: Colors.white)),
                 ),
                 const SizedBox(height: 16),
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: containers.length,
-                    itemBuilder: (context, index) {
-                      final container = containers[index];
-                      final isSelected = container['container_id'] ==
-                          containerState.selectedContainerId;
 
-                      return Card(
-                        color: isSelected ? Colors.green[100] : null,
-                        child: ListTile(
-                          title: Text('${container['container_name']}'),
-                          subtitle: Text(
-                            'Date Added: ${_formatDate(container['date_added'])}',
+                // ✅ Added Pull-to-Refresh
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: _fetchContainers,
+                    child: ListView.builder(
+                      itemCount: containers.length,
+                      itemBuilder: (context, index) {
+                        final container = containers[index];
+                        final isSelected = container['container_id'] ==
+                            containerState.selectedContainerId;
+
+                        return Card(
+                          color: isSelected ? Colors.green[100] : null,
+                          child: ListTile(
+                            title: Text('${container['container_name']}'),
+                            subtitle: Text(
+                              'Date Added: ${_formatDate(container['date_added'])}',
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (isSelected)
+                                  const Icon(Icons.check_circle,
+                                      color: Colors.green),
+                                IconButton(
+                                  icon: const Icon(Icons.info,
+                                      color: Colors.blueAccent),
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            ContainerDetails(),
+                                      ),
+                                    );
+                                  },
+                                ),
+                                IconButton(
+                                  icon:
+                                      const Icon(Icons.edit, color: Colors.blue),
+                                  onPressed: () {
+                                    _showRenameContainerDialog(
+                                        context, container['container_id']);
+                                  },
+                                ),
+                                IconButton(
+                                  icon:
+                                      const Icon(Icons.delete, color: Colors.red),
+                                  onPressed: () {
+                                    _showDeleteConfirmationDialog(
+                                        context, container['container_id']);
+                                  },
+                                ),
+                              ],
+                            ),
+                            onTap: () {
+                              if (isSelected) {
+                                containerState.selectContainer(0);
+                              } else {
+                                containerState
+                                    .selectContainer(container['container_id']);
+                              }
+                            },
                           ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (isSelected)
-                                const Icon(Icons.check_circle,
-                                    color: Colors.green),
-                              // ✅ Added Info Button
-                              IconButton(
-                                icon: const Icon(Icons.info,
-                                    color: Colors.blueAccent),
-                                onPressed: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => ContainerDetails(),
-                                    ),
-                                  );
-                                },
-                              ),
-                              // Edit Button
-                              IconButton(
-                                icon:
-                                    const Icon(Icons.edit, color: Colors.blue),
-                                onPressed: () {
-                                  _showRenameContainerDialog(
-                                      context, container['container_id']);
-                                },
-                              ),
-                              // Delete Button
-                              IconButton(
-                                icon:
-                                    const Icon(Icons.delete, color: Colors.red),
-                                onPressed: () {
-                                  _showDeleteConfirmationDialog(
-                                      context, container['container_id']);
-                                },
-                              ),
-                            ],
-                          ),
-                          onTap: () {
-                            if (isSelected) {
-                              containerState.selectContainer(0);
-                            } else {
-                              containerState
-                                  .selectContainer(container['container_id']);
-                            }
-                          },
-                        ),
-                      );
-                    },
+                        );
+                      },
+                    ),
                   ),
                 ),
               ],
@@ -741,7 +745,6 @@ class _ContainerPageState extends State<ContainerPage> {
     );
   }
 
-  // Function to format the date
   String _formatDate(String dateString) {
     try {
       DateTime dateTime = DateTime.parse(dateString);
@@ -832,6 +835,7 @@ Future<List<Map<String, dynamic>>> fetchContainers() async {
   }
 }
 
+
 // Others Page: Displays options like Account Management, ESP Connection, App Guide, and Log Out
 class OthersPage extends StatelessWidget {
   const OthersPage({super.key});
@@ -899,23 +903,21 @@ class OthersPage extends StatelessWidget {
                       child: const Text('Cancel'),
                     ),
                     TextButton(
-                      onPressed: () async {
+                     onPressed: () async {
                         Future<void> logoutUser() async {
-                          final SharedPreferences prefs =
-                              await SharedPreferences.getInstance();
-                          await prefs.remove('user_id_pref');
-                          await prefs.remove('user_level');
-                          await prefs.remove('fullname');
-                          await prefs.remove('email');
-                          await prefs.reload();
-                          Navigator.pushAndRemoveUntil(
-                            context,
-                            MaterialPageRoute(
-                                builder: (context) => const LoginPage()),
-                            (Route<dynamic> route) => false,
+                        final SharedPreferences prefs = await SharedPreferences.getInstance();
+                        await prefs.remove('user_id_pref');
+                        await prefs.remove('user_level');
+                        await prefs.remove('fullname');
+                        await prefs.remove('email');
+                        await prefs.reload();
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => const LoginPage()),
+                              (Route<dynamic> route) => false,
                           );
                         }
-
                         await logoutUser();
                       },
                       child: const Text('Log Out'),
