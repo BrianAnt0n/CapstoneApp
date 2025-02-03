@@ -119,7 +119,7 @@ class _DashboardPageState extends State<DashboardPage> {
       _notesFuture = fetchNotes(selectedContainerId!, _selectedDate);
 
       fetchContainerDetails(selectedContainerId!).then((_) {
-        setState(() {}); // ✅ Force calendar to update with container age
+        setState(() {});
       });
     }
   }
@@ -389,7 +389,6 @@ class _DashboardPageState extends State<DashboardPage> {
                           String formattedDate =
                               DateFormat.yMMMM().format(date);
 
-                          // ✅ Determine color based on weeks
                           Color ageColor =
                               Colors.green; // Default: Green (1-6 weeks)
 
@@ -680,7 +679,7 @@ class _ContainerPageState extends State<ContainerPage> {
                         child: ListTile(
                           title: Text('${container['container_name']}'),
                           subtitle: Text(
-                            'Date Added: ${_formatDate(container['date_added'])}', // ✅ Updated date formatting
+                            'Date Added: ${_formatDate(container['date_added'])}',
                           ),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -746,8 +745,7 @@ class _ContainerPageState extends State<ContainerPage> {
   String _formatDate(String dateString) {
     try {
       DateTime dateTime = DateTime.parse(dateString);
-      return DateFormat('yyyy-MM-dd hh:mm a')
-          .format(dateTime); // ✅ Format applied
+      return DateFormat('yyyy-MM-dd hh:mm a').format(dateTime);
     } catch (e) {
       return 'Invalid date';
     }
@@ -901,21 +899,23 @@ class OthersPage extends StatelessWidget {
                       child: const Text('Cancel'),
                     ),
                     TextButton(
-                     onPressed: () async {
+                      onPressed: () async {
                         Future<void> logoutUser() async {
-                        final SharedPreferences prefs = await SharedPreferences.getInstance();
-                        await prefs.remove('user_id_pref');
-                        await prefs.remove('user_level');
-                        await prefs.remove('fullname');
-                        await prefs.remove('email');
-                        await prefs.reload();
-                        Navigator.pushAndRemoveUntil(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => const LoginPage()),
-                              (Route<dynamic> route) => false,
+                          final SharedPreferences prefs =
+                              await SharedPreferences.getInstance();
+                          await prefs.remove('user_id_pref');
+                          await prefs.remove('user_level');
+                          await prefs.remove('fullname');
+                          await prefs.remove('email');
+                          await prefs.reload();
+                          Navigator.pushAndRemoveUntil(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => const LoginPage()),
+                            (Route<dynamic> route) => false,
                           );
                         }
+
                         await logoutUser();
                       },
                       child: const Text('Log Out'),
