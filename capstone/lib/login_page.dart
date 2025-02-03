@@ -1,3 +1,4 @@
+import 'package:capstone/shared_prefs_helper.dart';
 import 'package:flutter/material.dart';
 import 'home_page.dart';
 import 'home_page_members.dart';
@@ -16,62 +17,100 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController _passwordController = TextEditingController();
   final SupabaseClient supabase = Supabase.instance.client;
 
-  Future<String?> loginUser(String email, String password) async {
-    final SupabaseClient supabase = Supabase.instance.client;
+  // Future<String?> loginUser(String email, String password) async {
+  //   final SupabaseClient supabase = Supabase.instance.client;
 
-    try {
-      // Fetch user from Supabase based on email
-      final response = await supabase
-          .from('Users')
-          .select(
-              'user_id, email, password, user_level') // Select necessary fields
-          .eq('email', email)
-          .maybeSingle(); // Get a single record or null
+  //   try {
+  //     // Fetch user from Supabase based on email
+  //     final response = await supabase
+  //         .from('Users')
+  //         .select(
+  //             'user_id, email, password, user_level') // Select necessary fields
+  //         .eq('email', email)
+  //         .maybeSingle(); // Get a single record or null
 
-      // If no user is found
-      if (response == null) {
-        return "User not found";
-      }
+  //     // If no user is found
+  //     if (response == null) {
+  //       return "User not found";
+  //     }
 
-      // Compare passwords (⚠️ Should use **hashed passwords** in production)
-      if (response['password'] != password) {
-        return "Incorrect password";
-      }
+  //     // Compare passwords (⚠️ Should use **hashed passwords** in production)
+  //     if (response['password'] != password) {
+  //       return "Incorrect password";
+  //     }
 
-      // Retrieve user level
-      String userLevel = response['user_level'];
+  //     // Retrieve user level
+  //     String userLevel = response['user_level'];
 
-      // Return success message
-      return "Login successful, User Level: $userLevel";
-    } catch (error) {
-      return "Login failed: ${error.toString()}";
-    }
-  }
+  //     // Return success message
+  //     return "Login successful, User Level: $userLevel";
+  //   } catch (error) {
+  //     return "Login failed: ${error.toString()}";
+  //   }
+  // }
 
-  void handleLogin() async {
+  // void handleLogin() async {
+  //   String email = _emailController.text.trim();
+  //   String password = _passwordController.text.trim();
+
+  //   String? result = await loginUser(email, password);
+
+  //   if (result != null && result.startsWith("Login successful")) {
+  //     // Navigate based on user level
+  //     if (result.contains("User Level: Admin")) {
+  //       Navigator.pushReplacement(
+  //         context,
+  //         MaterialPageRoute(builder: (context) => HomePage()),
+  //       );
+  //     } else if (result.contains("User Level: Member")) {
+  //       Navigator.pushReplacement(
+  //         context,
+  //         MaterialPageRoute(builder: (context) => HomePageMember()),
+  //       );
+  //     }
+  //   } else {
+  //     // Show error message
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       SnackBar(content: Text(result ?? "Unknown error")),
+  //     );
+  //   }
+  // }
+
+  void _login() async {
     String email = _emailController.text.trim();
     String password = _passwordController.text.trim();
 
-    String? result = await loginUser(email, password);
+    try {
+      final response = await supabase
+          .from('Users')
+          .select('user_id, user_level, fullname, email, password')
+          .eq('email', email)
+          .single();
 
-    if (result != null && result.startsWith("Login successful")) {
-      // Navigate based on user level
-      if (result.contains("User Level: Admin")) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => HomePage()),
-        );
-      } else if (result.contains("User Level: Member")) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => HomePageMember()),
-        );
+      String storedPassword = response['password'];
+      int storedUserId = response['user_id'];
+      String storedUserLevel = response['user_level'];
+      String storedEmail = response['email'];
+      String storedFullName = response['fullname'];
+
+      String userIdString = storedUserId.toString();
+
+      if (storedPassword == password) {
+        await SharedPrefsHelper.saveUserLogin(userIdString, storedUserLevel, storedEmail, storedFullName);
+        if (storedUserLevel == "Admin") {
+          Navigator.pushReplacement(
+              context, MaterialPageRoute(builder: (context) => const HomePage()));
+        } else {
+          Navigator.pushReplacement(
+              context, MaterialPageRoute(builder: (context) => const HomePageMember()));
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Incorrect password. Please try again.")));
       }
-    } else {
-      // Show error message
+    } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result ?? "Unknown error")),
-      );
+          const SnackBar(content: Text("Login failed. Please try again.")));
     }
   }
 
@@ -140,7 +179,7 @@ class _LoginPageState extends State<LoginPage> {
                   GestureDetector(
                     onTap:
                         // Add login logic here later
-                        handleLogin,
+                        _login,
                     child: Container(
                       width: double.infinity, // Full-width button
                       height: 50, // Set the height of the button
@@ -163,13 +202,13 @@ class _LoginPageState extends State<LoginPage> {
 
                   const SizedBox(height: 20),
 
-                  // Signup link
+                  // Forgot Password Link
                   GestureDetector(
                     onTap: () {
-                      // Navigate to signup page or perform an action
+                      // Navigate to Forgot Password page or perform an action
                     },
                     child: const Text(
-                      'Don’t have an account? Sign up',
+                      'Forgot Your Password? Click Here',
                       style: TextStyle(color: Colors.blue),
                     ),
                   ),
@@ -185,7 +224,7 @@ class _LoginPageState extends State<LoginPage> {
 
                       Navigator.pushReplacement(
                         context,
-                        MaterialPageRoute(builder: (context) => HomePageGuest()),
+                        MaterialPageRoute(builder: (context) => const HomePageGuest()),
                       );
                     },
                     child: Container(

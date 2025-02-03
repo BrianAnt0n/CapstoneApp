@@ -34,9 +34,9 @@ class _HomePageGuestState extends State<HomePageGuest> {
 
   // Pages for bottom navigation
   final List<Widget> _pages = [
-    DashboardPage(),
-    ContainerPage(),
-    OthersPage(),
+    const DashboardPage(),
+    const ContainerPage(),
+    const OthersPage(),
   ];
 
   @override
@@ -52,8 +52,10 @@ class _HomePageGuestState extends State<HomePageGuest> {
         // Updated Bottom Navigation Bar with green theme
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: _currentIndex,
-          selectedItemColor: Colors.green, // Change selected icon color to green
-          unselectedItemColor: Colors.green[300], // Light green for unselected icons
+          selectedItemColor:
+              Colors.green, // Change selected icon color to green
+          unselectedItemColor:
+              Colors.green[300], // Light green for unselected icons
           onTap: (index) {
             setState(() {
               _currentIndex = index; // Update the selected tab
@@ -78,6 +80,7 @@ class _HomePageGuestState extends State<HomePageGuest> {
     );
   }
 }
+
 // Dashboard Page: Displays sensor data for the selected container
 // Dashboard Page with pull-to-refresh functionality
 class DashboardPage extends StatefulWidget {
@@ -133,13 +136,16 @@ class _DashboardPageState extends State<DashboardPage> {
           .eq('container_id', containerId)
           .single();
 
-      if (response != null && response['date_added'] != null) {
+      if (response['date_added'] != null) {
         _containerAddedDate = DateTime.parse(response['date_added']);
 
         _calculateContainerAge();
       } else {}
     } catch (error) {}
   }
+
+// Declare this in your class
+  Color _ageColor = Colors.green; // Default to green
 
   void _calculateContainerAge() {
     if (_containerAddedDate == null) {
@@ -148,17 +154,26 @@ class _DashboardPageState extends State<DashboardPage> {
 
     final now = DateTime.now();
     final difference = now.difference(_containerAddedDate!);
+    int days = difference.inDays;
+    int weeks = (days / 7).floor(); // Only use weeks, no months
 
-    if (difference.inDays < 7) {
-      _containerAge = "${difference.inDays} days";
-    } else if (difference.inDays < 30) {
-      _containerAge = "${(difference.inDays / 7).floor()} weeks";
+    if (days < 7) {
+      _containerAge = "$days ${days == 1 ? 'day' : 'days'}";
     } else {
-      _containerAge = "${(difference.inDays / 30).floor()} months";
+      _containerAge = "$weeks ${weeks == 1 ? 'week' : 'weeks'}";
+    }
+
+    // ✅ Update color based on weeks
+    if (weeks >= 12) {
+      _ageColor = Colors.red; // Critical (12+ weeks)
+    } else if (weeks >= 7) {
+      _ageColor = Colors.orange; // Warning (7-11 weeks)
+    } else {
+      _ageColor = Colors.green; // Safe (1-6 weeks)
     }
 
     if (mounted) {
-      setState(() {}); // compost age
+      setState(() {}); // Update UI
     }
   }
 
@@ -258,13 +273,13 @@ class _DashboardPageState extends State<DashboardPage> {
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
-              icon: Icon(Icons.edit, color: Colors.blue),
+              icon: const Icon(Icons.edit, color: Colors.blue),
               onPressed: () {
                 _showEditDialog(note['note_id'], note['note']);
               },
             ),
             IconButton(
-              icon: Icon(Icons.delete, color: Colors.red),
+              icon: const Icon(Icons.delete, color: Colors.red),
               onPressed: () {
                 _showDeleteConfirmationDialog(note['note_id']);
               },
@@ -358,12 +373,84 @@ class _DashboardPageState extends State<DashboardPage> {
                         titleCentered: true,
                         formatButtonVisible: false, // Hide format toggle
                         titleTextFormatter: (date, locale) {
+                          return DateFormat.yMMMM(locale).format(date);
+                        },
+                      ),
+                      calendarBuilders: CalendarBuilders(
+                        headerTitleBuilder: (context, date) {
                           String formattedDate =
-                              DateFormat.yMMMM(locale).format(date);
-                          String ageText = _containerAge.isNotEmpty
-                              ? "  (Age: $_containerAge)"
-                              : "";
-                          return "$formattedDate$ageText";
+                              DateFormat.yMMMM().format(date);
+
+                          // ✅ Determine color based on weeks
+                          Color ageColor =
+                              Colors.green; // Default: Green (1-6 weeks)
+
+                          if (_containerAge.contains("weeks")) {
+                            int? weeks =
+                                int.tryParse(_containerAge.split(" ")[0]);
+                            if (weeks != null) {
+                              if (weeks >= 7 && weeks <= 11) {
+                                ageColor = Colors.orange; // 7-11 weeks → Orange
+                              } else if (weeks >= 12) {
+                                ageColor = Colors.red; // 12+ weeks → Red
+                              }
+                            }
+                          }
+
+                          return Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Opacity(
+                                opacity: 0.0, // Makes the button invisible
+                                child: IconButton(
+                                  icon: const Icon(Icons.arrow_circle_left),
+                                  onPressed: () {
+                                    setState(() {});
+                                  },
+                                ),
+                              ),
+                              Column(
+                                children: [
+                                  if (_containerAge
+                                      .isNotEmpty) // Place age ABOVE the month name
+                                    Container(
+                                      margin: const EdgeInsets.only(bottom: 4),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color:
+                                            ageColor, // 🔥 Apply the correct color
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        _containerAge,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  Text(
+                                    formattedDate,
+                                    style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold),
+                                    overflow: TextOverflow
+                                        .ellipsis, // Prevents overflow issues
+                                  ),
+                                ],
+                              ),
+                              Opacity(
+                                opacity: 0.0, // Makes the button invisible
+                                child: IconButton(
+                                  icon: const Icon(Icons.arrow_circle_right),
+                                  onPressed: () {
+                                    setState(() {});
+                                  },
+                                ),
+                              )
+                            ],
+                          );
                         },
                       ),
                       focusedDay: _selectedDate,
@@ -511,7 +598,7 @@ Future<Map<String, dynamic>> fetchSensorData(int containerId) async {
   return sensorResponse;
 }
 
-// Container Page: Displays a list of available containers
+//Container Page : Displays a list of available containers
 
 class ContainerPage extends StatefulWidget {
   const ContainerPage({super.key});
@@ -529,7 +616,7 @@ class _ContainerPageState extends State<ContainerPage> {
     _fetchContainers();
   }
 
-  void _fetchContainers() {
+  Future<void> _fetchContainers() async { // ✅ Updated for Pull-to-Refresh
     setState(() {
       _containersFuture = fetchContainers();
     });
@@ -562,76 +649,84 @@ class _ContainerPageState extends State<ContainerPage> {
                   onPressed: () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => ScannerPage()), // Navigate to ScannerPage
+                      MaterialPageRoute(
+                          builder: (context) =>
+                              const ScannerPage()), // Navigate to ScannerPage
                     );
                   },
                   icon: const Icon(Icons.add, color: Colors.white),
-                  label: const Text('New container', style: TextStyle(color: Colors.white)),
+                  label: const Text('New container',
+                      style: TextStyle(color: Colors.white)),
                 ),
                 const SizedBox(height: 16),
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: containers.length,
-                    itemBuilder: (context, index) {
-                      final container = containers[index];
-                      final isSelected = container['container_id'] ==
-                          containerState.selectedContainerId;
 
-                      return Card(
-                        color: isSelected ? Colors.green[100] : null,
-                        child: ListTile(
-                          title: Text('${container['container_name']}'),
-                          subtitle: Text(
-                            'Date Added: ${_formatDate(container['date_added'])}', // ✅ Updated date formatting
-                          ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (isSelected)
-                                const Icon(Icons.check_circle, color: Colors.green),
-                              // ✅ Added Info Button
-                              IconButton(
-                                icon: const Icon(Icons.info, color: Colors.blueAccent),
-                                onPressed: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => ContainerDetails(
-                                        
+                // ✅ Added Pull-to-Refresh
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: _fetchContainers,
+                    child: ListView.builder(
+                      itemCount: containers.length,
+                      itemBuilder: (context, index) {
+                        final container = containers[index];
+                        final isSelected = container['container_id'] ==
+                            containerState.selectedContainerId;
+
+                        return Card(
+                          color: isSelected ? Colors.green[100] : null,
+                          child: ListTile(
+                            title: Text('${container['container_name']}'),
+                            subtitle: Text(
+                              'Date Added: ${_formatDate(container['date_added'])}',
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (isSelected)
+                                  const Icon(Icons.check_circle,
+                                      color: Colors.green),
+                                IconButton(
+                                  icon: const Icon(Icons.info,
+                                      color: Colors.blueAccent),
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            const ContainerDetails(),
                                       ),
-                                    ),
-                                  );
-                                },
-                              ),
-                              // Edit Button
-                              IconButton(
-                                icon: const Icon(Icons.edit, color: Colors.blue),
-                                onPressed: () {
-                                  _showRenameContainerDialog(
-                                      context, container['container_id']);
-                                },
-                              ),
-                              // Delete Button
-                              IconButton(
-                                icon: const Icon(Icons.delete, color: Colors.red),
-                                onPressed: () {
-                                  _showDeleteConfirmationDialog(
-                                      context, container['container_id']);
-                                },
-                              ),
-                            ],
+                                    );
+                                  },
+                                ),
+                                IconButton(
+                                  icon:
+                                      const Icon(Icons.edit, color: Colors.blue),
+                                  onPressed: () {
+                                    _showRenameContainerDialog(
+                                        context, container['container_id']);
+                                  },
+                                ),
+                                IconButton(
+                                  icon:
+                                      const Icon(Icons.delete, color: Colors.red),
+                                  onPressed: () {
+                                    _showDeleteConfirmationDialog(
+                                        context, container['container_id']);
+                                  },
+                                ),
+                              ],
+                            ),
+                            onTap: () {
+                              if (isSelected) {
+                                containerState.selectContainer(0);
+                              } else {
+                                containerState
+                                    .selectContainer(container['container_id']);
+                              }
+                            },
                           ),
-                          onTap: () {
-                            if (isSelected) {
-                              containerState.selectContainer(0);
-                            } else {
-                              containerState
-                                  .selectContainer(container['container_id']);
-                            }
-                          },
-                        ),
-                      );
-                    },
+                        );
+                      },
+                    ),
                   ),
                 ),
               ],
@@ -642,11 +737,10 @@ class _ContainerPageState extends State<ContainerPage> {
     );
   }
 
-  // Function to format the date
   String _formatDate(String dateString) {
     try {
       DateTime dateTime = DateTime.parse(dateString);
-      return DateFormat('yyyy-MM-dd hh:mm a').format(dateTime); // ✅ Format applied
+      return DateFormat('yyyy-MM-dd hh:mm a').format(dateTime);
     } catch (e) {
       return 'Invalid date';
     }
@@ -661,7 +755,8 @@ class _ContainerPageState extends State<ContainerPage> {
         title: const Text("Rename Container"),
         content: TextField(
           controller: renameController,
-          decoration: const InputDecoration(hintText: "Enter new container name"),
+          decoration:
+              const InputDecoration(hintText: "Enter new container name"),
         ),
         actions: [
           TextButton(
@@ -757,10 +852,12 @@ class OthersPage extends StatelessWidget {
           leading: const Icon(Icons.person, color: Colors.green),
           title: const Text('Sign In'),
           onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const LoginPage()),
-            );
+            Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => const LoginPage()),
+                              (Route<dynamic> route) => false,
+                          );
           },
         ),
         /*
