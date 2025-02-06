@@ -15,6 +15,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'constants.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 // State Management: Tracks the selected container
 class ContainerState extends ChangeNotifier {
@@ -97,11 +98,13 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   Future<Map<String, dynamic>>? _sensorDataFuture;
   Future<List<Map<String, dynamic>>>? _notesFuture;
+  Future<List<Map<String, dynamic>>>? _historyFuture;
   int? selectedContainerId;
   final TextEditingController _notesController = TextEditingController();
-  DateTime _selectedDate = DateTime.now(); // Track selected date
+  DateTime _selectedDate = DateTime.now();
+  String _containerAge = "";
+  Color _ageColor = Colors.green;
 
-  @override
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -111,72 +114,34 @@ class _DashboardPageState extends State<DashboardPage> {
     if (selectedContainerId != null) {
       _sensorDataFuture = fetchSensorData(selectedContainerId!);
       _notesFuture = fetchNotes(selectedContainerId!, _selectedDate);
-
-      fetchContainerDetails(selectedContainerId!).then((_) {
-        setState(() {}); // ✅ Force calendar to update with container age
-      });
+      _historyFuture = fetchHistoryData(selectedContainerId!);
+      fetchContainerDetails(selectedContainerId!);
     }
   }
 
-  Future<void> _refreshData() async {
-    if (selectedContainerId != null) {
-      setState(() {
-        _sensorDataFuture = fetchSensorData(selectedContainerId!);
-        _notesFuture = fetchNotes(selectedContainerId!, _selectedDate);
-      });
-    }
-  }
-
-  DateTime? _containerAddedDate;
-  String _containerAge = "";
-
-  Future<void> fetchContainerDetails(int containerId) async {
+  Future<List<Map<String, dynamic>>> fetchHistoryData(int containerId) async {
     final supabase = Supabase.instance.client;
-
     try {
-      final response = await supabase
-          .from('Containers_test')
-          .select('date_added')
+      return await supabase
+          .from('History_Test')
+          .select('*')
           .eq('container_id', containerId)
-          .single();
-
-      if (response['date_added'] != null) {
-        _containerAddedDate = DateTime.parse(response['date_added']);
-
-        _calculateContainerAge();
-      } else {}
-    } catch (error) {}
+          .order('timestamp', ascending: true);
+    } catch (error) {
+      return [];
+    }
   }
 
-  Color _ageColor = Colors.green; // Default color
-
-  void _calculateContainerAge() {
-    if (_containerAddedDate == null) {
-      return;
-    }
-
-    final now = DateTime.now();
-    final difference = now.difference(_containerAddedDate!);
-    int days = difference.inDays;
-    int weeks = (days / 7).floor(); // Only use weeks, no months
-
-    if (days < 7) {
-      _containerAge = "$days ${days == 1 ? 'day' : 'days'}";
-    } else {
-      _containerAge = "$weeks ${weeks == 1 ? 'week' : 'weeks'}";
-    }
-
-    if (weeks >= 12) {
-      _ageColor = Colors.red; // Critical (12+ weeks)
-    } else if (weeks >= 7) {
-      _ageColor = Colors.orange; // Warning (7-11 weeks)
-    } else {
-      _ageColor = Colors.green; // Safe (1-6 weeks)
-    }
-
-    if (mounted) {
-      setState(() {}); // Update UI
-    }
+  Widget buildSensorCard(
+      IconData icon, String title, String value, Color color) {
+    return Card(
+      child: ListTile(
+        leading: Icon(icon, color: color),
+        title: Text(title),
+        subtitle: Text(value,
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+      ),
+    );
   }
 
   Future<void> _addNote() async {
@@ -196,6 +161,171 @@ class _DashboardPageState extends State<DashboardPage> {
 
     _notesFuture = fetchNotes(selectedContainerId!, _selectedDate);
     setState(() {});
+  }
+
+  Widget buildNoteCard(Map<String, dynamic> note) {
+    return Card(
+      child: ListTile(
+        title: Text(note['note'] ?? 'No note available'),
+        subtitle: Text(formatTimestamp(note['created_date'])),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.edit, color: Colors.blue),
+              onPressed: () {
+                _showEditDialog(note['note_id'], note['note']);
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete, color: Colors.red),
+              onPressed: () {
+                _showDeleteConfirmationDialog(note['note_id']);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String formatTimestamp(String timestamp) {
+    try {
+      DateTime parsedDate = DateTime.parse(timestamp);
+      return DateFormat('yyyy-MM-dd hh:mm a').format(parsedDate);
+    } catch (e) {
+      return 'Invalid Date';
+    }
+  }
+
+  Widget buildBarChart(
+      List<Map<String, dynamic>> data, String title, String key, Color color) {
+    // Set maxY based on data type
+    double fixedMaxY;
+    if (key.contains('temperature')) {
+      fixedMaxY = 100; // Temperature scale (0-100°C)
+    } else if (key.contains('moisture') || key.contains('humidity')) {
+      fixedMaxY = 100; // Moisture & Humidity scale (0-100%)
+    } else if (key.contains('ph')) {
+      fixedMaxY = 14; // pH Level scale (0-14)
+    } else {
+      fixedMaxY = 100; // Default if unknown
+    }
+
+    return Container(
+      height: 200,
+      width: data.length * 50.0, //Ensures proper spacing for many data points
+      padding:
+          const EdgeInsets.only(right: 30.0), // Adds right padding for labels
+      child: BarChart(
+        BarChartData(
+          maxY: fixedMaxY, //  Prevents auto-scaling and sets a proper limit
+          alignment: BarChartAlignment.spaceAround,
+          titlesData: FlTitlesData(
+            leftTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 40, //  Ensures enough space for Y-axis labels
+                getTitlesWidget: (value, meta) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 5.0),
+                    child: Text(
+                      value.toInt().toString(),
+                      style: const TextStyle(fontSize: 12, color: Colors.black),
+                    ),
+                  );
+                },
+              ),
+            ),
+            rightTitles: AxisTitles(
+              sideTitles: SideTitles(
+                  showTitles: false), // Hides right labels to avoid clutter
+            ),
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 20,
+                getTitlesWidget: (value, meta) {
+                  int index = value.toInt();
+                  if (index >= 0 && index < data.length) {
+                    DateTime date = DateTime.parse(data[index]['timestamp']);
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Text("${date.month}/${date.day}",
+                          style: const TextStyle(fontSize: 10)),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
+              ),
+            ),
+          ),
+          borderData: FlBorderData(show: false),
+          gridData: FlGridData(
+            show: true,
+            drawVerticalLine: false,
+            checkToShowHorizontalLine: (value) =>
+                value % 10 == 0, //  Keeps Y-axis grid clean
+          ),
+          barGroups: data.asMap().entries.map((entry) {
+            int index = entry.key;
+            double value = (entry.value[key] as num?)?.toDouble() ?? 0;
+            return BarChartGroupData(
+              x: index,
+              barsSpace: 10, //  Space sa bawat bar graph
+              barRods: [
+                BarChartRodData(
+                  toY: value,
+                  color: color,
+                  width: 24,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ],
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  Future<void> fetchContainerDetails(int containerId) async {
+    final supabase = Supabase.instance.client;
+    try {
+      final response = await supabase
+          .from('Containers_test')
+          .select('date_added')
+          .eq('container_id', containerId)
+          .single();
+      if (response['date_added'] != null) {
+        DateTime addedDate = DateTime.parse(response['date_added']);
+        _calculateContainerAge(addedDate);
+      }
+    } catch (error) {}
+  }
+
+  void _calculateContainerAge(DateTime addedDate) {
+    final now = DateTime.now();
+    final difference = now.difference(addedDate);
+    int days = difference.inDays;
+    int weeks = (days / 7).floor();
+
+    if (days < 7) {
+      _containerAge = "$days ${days == 1 ? 'day' : 'days'}";
+    } else {
+      _containerAge = "$weeks ${weeks == 1 ? 'week' : 'weeks'}";
+    }
+
+    if (weeks >= 12) {
+      _ageColor = Colors.red;
+    } else if (weeks >= 7) {
+      _ageColor = Colors.orange;
+    } else {
+      _ageColor = Colors.green;
+    }
+
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   void _showDeleteConfirmationDialog(int noteId) {
@@ -266,48 +396,19 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  Widget buildNoteCard(Map<String, dynamic> note) {
-    return Card(
-      child: ListTile(
-        title: Text(note['note'] ?? 'No note available'),
-        subtitle: Text(formatTimestamp(note['created_date'])),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.edit, color: Colors.blue),
-              onPressed: () {
-                _showEditDialog(note['note_id'], note['note']);
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.delete, color: Colors.red),
-              onPressed: () {
-                _showDeleteConfirmationDialog(note['note_id']);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String formatTimestamp(String timestamp) {
-    try {
-      DateTime parsedDate = DateTime.parse(timestamp);
-      return DateFormat('yyyy-MM-dd hh:mm a').format(parsedDate);
-    } catch (e) {
-      return 'Invalid Date';
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return selectedContainerId == null
         ? const Center(
             child: Text('Please select a container from the Container tab.'))
         : RefreshIndicator(
-            onRefresh: _refreshData,
+            onRefresh: () async {
+              setState(() {
+                _sensorDataFuture = fetchSensorData(selectedContainerId!);
+                _notesFuture = fetchNotes(selectedContainerId!, _selectedDate);
+                _historyFuture = fetchHistoryData(selectedContainerId!);
+              });
+            },
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               child: Padding(
@@ -319,10 +420,6 @@ class _DashboardPageState extends State<DashboardPage> {
                         style: TextStyle(
                             fontSize: 24, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 20),
-                    Text('Selected Container: $selectedContainerId',
-                        style: const TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.w500)),
-                    const SizedBox(height: 10),
                     FutureBuilder(
                       future: _sensorDataFuture,
                       builder: (context, snapshot) {
@@ -356,11 +453,6 @@ class _DashboardPageState extends State<DashboardPage> {
                                   Colors.deepPurple),
                               buildSensorCard(Icons.cloud, 'Humidity',
                                   '${sensorData['humidity']}%', Colors.orange),
-                              buildSensorCard(
-                                  Icons.access_time,
-                                  'Timestamp',
-                                  formatTimestamp(sensorData['timestamp']),
-                                  Colors.grey),
                             ],
                           );
                         }
@@ -369,24 +461,31 @@ class _DashboardPageState extends State<DashboardPage> {
                     const SizedBox(height: 30),
                     const Divider(thickness: 2),
                     const SizedBox(height: 10),
+
+// TableCalendar with Compost Age and Built-in Navigation
                     TableCalendar(
-                      headerVisible: true,
+                      focusedDay: _selectedDate, // Keep only one instance
+                      firstDay: DateTime(2000),
+                      lastDay: DateTime(2100),
                       headerStyle: HeaderStyle(
                         titleCentered: true,
-                        formatButtonVisible: false, // Hide format toggle
+                        formatButtonVisible: false, // Disable format toggle
                         titleTextFormatter: (date, locale) {
                           return DateFormat.yMMMM(locale).format(date);
                         },
+                        leftChevronIcon:
+                            const Icon(Icons.chevron_left), // Left arrow
+                        rightChevronIcon:
+                            const Icon(Icons.chevron_right), // Right arrow
                       ),
                       calendarBuilders: CalendarBuilders(
                         headerTitleBuilder: (context, date) {
                           String formattedDate =
                               DateFormat.yMMMM().format(date);
 
-                          // ✅ Determine color based on weeks
+                          // Determine color based on compost age
                           Color ageColor =
                               Colors.green; // Default: Green (1-6 weeks)
-
                           if (_containerAge.contains("weeks")) {
                             int? weeks =
                                 int.tryParse(_containerAge.split(" ")[0]);
@@ -399,72 +498,48 @@ class _DashboardPageState extends State<DashboardPage> {
                             }
                           }
 
-                          return Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          return Column(
                             children: [
-                              Opacity(
-                                opacity: 0.0, // Makes the button invisible
-                                child: IconButton(
-                                  icon: const Icon(Icons.arrow_circle_left),
-                                  onPressed: () {
-                                    setState(() {});
-                                  },
-                                ),
-                              ),
-                              Column(
-                                children: [
-                                  if (_containerAge
-                                      .isNotEmpty) // Place age ABOVE the month name
-                                    Container(
-                                      margin: const EdgeInsets.only(bottom: 4),
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 10, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color:
-                                            ageColor, // 🔥 Apply the correct color
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Text(
-                                        _containerAge,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                  Text(
-                                    formattedDate,
-                                    style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold),
-                                    overflow: TextOverflow
-                                        .ellipsis, // Prevents overflow issues
+                              if (_containerAge
+                                  .isNotEmpty) // Compost Age Indicator
+                                Container(
+                                  margin: const EdgeInsets.only(bottom: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: ageColor,
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
-                                ],
-                              ),
-                              Opacity(
-                                opacity: 0.0, // Makes the button invisible
-                                child: IconButton(
-                                  icon: const Icon(Icons.arrow_circle_right),
-                                  onPressed: () {
-                                    setState(() {});
-                                  },
+                                  child: Text(
+                                    _containerAge,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                                 ),
-                              )
+                              Text(
+                                formattedDate,
+                                style: const TextStyle(
+                                    fontSize: 18, fontWeight: FontWeight.bold),
+                                overflow: TextOverflow
+                                    .ellipsis, // Prevents overflow issues
+                              ),
                             ],
                           );
                         },
                       ),
-                      focusedDay: _selectedDate,
-                      firstDay: DateTime(2000),
-                      lastDay: DateTime(2100),
-                      calendarFormat: CalendarFormat.month,
                       selectedDayPredicate: (day) =>
                           isSameDay(_selectedDate, day),
                       onDaySelected: (selectedDay, focusedDay) {
-                        _onDateSelected(selectedDay);
+                        setState(() {
+                          _selectedDate = selectedDay;
+                          _notesFuture =
+                              fetchNotes(selectedContainerId!, _selectedDate);
+                        });
                       },
                     ),
+
                     const SizedBox(height: 20),
                     const Text('Notes',
                         style: TextStyle(
@@ -472,10 +547,14 @@ class _DashboardPageState extends State<DashboardPage> {
                     TextField(
                       controller: _notesController,
                       decoration: InputDecoration(
-                          hintText: 'Enter a note',
-                          suffixIcon: IconButton(
-                              icon: const Icon(Icons.add),
-                              onPressed: _addNote)),
+                        hintText: 'Enter a note',
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.add_comment_outlined),
+                          onPressed: () {
+                            _addNote();
+                          },
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 10),
                     FutureBuilder(
@@ -494,6 +573,130 @@ class _DashboardPageState extends State<DashboardPage> {
                             children: notes
                                 .map((note) => buildNoteCard(note))
                                 .toList(),
+                          );
+                        }
+                      },
+                    ),
+
+                    const SizedBox(height: 20),
+                    const Text('Historical Data Graph',
+                        style: TextStyle(
+                            fontSize: 24, fontWeight: FontWeight.bold)),
+                    const Text(
+                      'Data for the last 24 hours',
+                      style: TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.normal),
+                    ),
+
+                    Padding(
+                      padding: EdgeInsets.only(
+                          top: 10), // ✅ Adds two blank spaces (16 pixels)
+                      child: Text(
+                        '',
+                        style: TextStyle(
+                            fontSize: 20, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+
+                    FutureBuilder(
+                      future: _historyFuture,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                              child: CircularProgressIndicator());
+                        } else if (snapshot.hasError || snapshot.data == null) {
+                          return const Center(
+                              child: Text('No historical data available.'));
+                        } else {
+                          final historyData =
+                              snapshot.data as List<Map<String, dynamic>>;
+
+                          return SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Temperature Graph Section
+                                const Text(
+                                  'Temperature Monitoring',
+                                  style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                                const Text(
+                                  '• Safe: Below 50°C  |  Warning: 50-70°C  |  Critical: Above 70°C',
+                                  style: TextStyle(
+                                      fontSize: 14, color: Colors.grey),
+                                ),
+                                buildBarChart(historyData, 'Temperature',
+                                    'temperature', Colors.green),
+                                const SizedBox(height: 20),
+
+                                // Moisture Graph Section
+                                const Text(
+                                  'Moisture Level',
+                                  style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                                const Text(
+                                  '• Optimal: 40-60%  |  Dry: Below 40%  |  Too Wet: Above 60%',
+                                  style: TextStyle(
+                                      fontSize: 14, color: Colors.grey),
+                                ),
+                                buildBarChart(historyData, 'Moisture',
+                                    'moisture', Colors.blue),
+                                const SizedBox(height: 20),
+
+                                // pH Level 1 Graph Section
+                                const Text(
+                                  'pH Level 1',
+                                  style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                                const Text(
+                                  '• Ideal: 6.5 - 7.5  |  Too Acidic: Below 6.5  |  Too Basic: Above 7.5',
+                                  style: TextStyle(
+                                      fontSize: 14, color: Colors.grey),
+                                ),
+                                buildBarChart(historyData, 'pH Level 1',
+                                    'ph_level1', Colors.purple),
+                                const SizedBox(height: 20),
+
+                                // pH Level 2 Graph Section
+                                const Text(
+                                  'pH Level 2',
+                                  style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                                const Text(
+                                  '• Ideal: 6.5 - 7.5  |  Too Acidic: Below 6.5  |  Too Basic: Above 7.5',
+                                  style: TextStyle(
+                                      fontSize: 14, color: Colors.grey),
+                                ),
+                                buildBarChart(historyData, 'pH Level 2',
+                                    'ph_level2', Colors.deepPurple),
+                                const SizedBox(height: 20),
+
+                                // Humidity Graph Section
+                                const Text(
+                                  'Humidity Level',
+                                  style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                                const Text(
+                                  '• Optimal: 30-60%  |  Low: Below 30%  |  High: Above 60%',
+                                  style: TextStyle(
+                                      fontSize: 14, color: Colors.grey),
+                                ),
+                                buildBarChart(historyData, 'Humidity',
+                                    'humidity', Colors.orange),
+                              ],
+                            ),
                           );
                         }
                       },
@@ -618,7 +821,8 @@ class _ContainerPageState extends State<ContainerPage> {
     _fetchContainers();
   }
 
-  Future<void> _fetchContainers() async { // ✅ Updated for Pull-to-Refresh
+  Future<void> _fetchContainers() async {
+    // ✅ Updated for Pull-to-Refresh
     setState(() {
       _containersFuture = fetchContainers();
     });
@@ -653,7 +857,7 @@ class _ContainerPageState extends State<ContainerPage> {
                       context,
                       MaterialPageRoute(
                           builder: (context) =>
-                             ScannerPage()), // Navigate to ScannerPage
+                              ScannerPage()), // Navigate to ScannerPage
                     );
                   },
                   icon: const Icon(Icons.add, color: Colors.white),
@@ -700,16 +904,16 @@ class _ContainerPageState extends State<ContainerPage> {
                                   },
                                 ),
                                 IconButton(
-                                  icon:
-                                      const Icon(Icons.edit, color: Colors.blue),
+                                  icon: const Icon(Icons.edit,
+                                      color: Colors.blue),
                                   onPressed: () {
                                     _showRenameContainerDialog(
                                         context, container['container_id']);
                                   },
                                 ),
                                 IconButton(
-                                  icon:
-                                      const Icon(Icons.delete, color: Colors.red),
+                                  icon: const Icon(Icons.delete,
+                                      color: Colors.red),
                                   onPressed: () {
                                     _showDeleteConfirmationDialog(
                                         context, container['container_id']);
@@ -829,7 +1033,6 @@ Future<List<Map<String, dynamic>>> fetchContainers() async {
   }
 }
 
-
 // Others Page: Displays options like Account Management, ESP Connection, App Guide, and Log Out
 class OthersPage extends StatelessWidget {
   const OthersPage({super.key});
@@ -899,19 +1102,21 @@ class OthersPage extends StatelessWidget {
                     TextButton(
                       onPressed: () async {
                         Future<void> logoutUser() async {
-                        final SharedPreferences prefs = await SharedPreferences.getInstance();
-                        await prefs.remove('user_id_pref');
-                        await prefs.remove('user_level');
-                        await prefs.remove('fullname');
-                        await prefs.remove('email');
-                        await prefs.reload();
-                        Navigator.pushAndRemoveUntil(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => const LoginPage()),
-                              (Route<dynamic> route) => false,
+                          final SharedPreferences prefs =
+                              await SharedPreferences.getInstance();
+                          await prefs.remove('user_id_pref');
+                          await prefs.remove('user_level');
+                          await prefs.remove('fullname');
+                          await prefs.remove('email');
+                          await prefs.reload();
+                          Navigator.pushAndRemoveUntil(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => const LoginPage()),
+                            (Route<dynamic> route) => false,
                           );
                         }
+
                         await logoutUser();
                       },
                       child: const Text('Log Out'),

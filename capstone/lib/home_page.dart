@@ -204,52 +204,93 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  Widget buildBarChart(List<Map<String, dynamic>> historyData, String label,
-      String key, Color color) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
-          child:
-              Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
-        ),
-        SizedBox(
-          height: 300,
-          child: BarChart(
-            BarChartData(
-              alignment: BarChartAlignment.spaceAround,
-              titlesData: FlTitlesData(
-                leftTitles: AxisTitles(),
-                rightTitles: AxisTitles(),
-                topTitles: AxisTitles(),
-                bottomTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                      showTitles: true,
-                      getTitlesWidget: (value, meta) {
-                        int index = value.toInt();
-                        if (index >= 0 && index < historyData.length) {
-                          return Text(DateFormat('MM/dd').format(
-                              DateTime.parse(historyData[index]['timestamp'])));
-                        }
-                        return const SizedBox();
-                      }),
-                ),
+  Widget buildBarChart(
+      List<Map<String, dynamic>> data, String title, String key, Color color) {
+    // Set maxY based on data type
+    double fixedMaxY;
+    if (key.contains('temperature')) {
+      fixedMaxY = 100; // Temperature scale (0-100°C)
+    } else if (key.contains('moisture') || key.contains('humidity')) {
+      fixedMaxY = 100; // Moisture & Humidity scale (0-100%)
+    } else if (key.contains('ph')) {
+      fixedMaxY = 14; // pH Level scale (0-14)
+    } else {
+      fixedMaxY = 100; // Default if unknown
+    }
+
+    return Container(
+      height: 200,
+      width: data.length * 50.0, //Ensures proper spacing for many data points
+      padding:
+          const EdgeInsets.only(right: 30.0), // Adds right padding for labels
+      child: BarChart(
+        BarChartData(
+          maxY: fixedMaxY, //  Prevents auto-scaling and sets a proper limit
+          alignment: BarChartAlignment.spaceAround,
+          titlesData: FlTitlesData(
+            leftTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 40, //  Ensures enough space for Y-axis labels
+                getTitlesWidget: (value, meta) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 5.0),
+                    child: Text(
+                      value.toInt().toString(),
+                      style: const TextStyle(fontSize: 12, color: Colors.black),
+                    ),
+                  );
+                },
               ),
-              barGroups: historyData.asMap().entries.map((entry) {
-                int index = entry.key;
-                double value = (entry.value[key] as num).toDouble();
-                return BarChartGroupData(
-                  x: index,
-                  barRods: [
-                    BarChartRodData(toY: value, color: color, width: 16),
-                  ],
-                );
-              }).toList(),
+            ),
+            rightTitles: AxisTitles(
+              sideTitles: SideTitles(
+                  showTitles: false), // Hides right labels to avoid clutter
+            ),
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 20,
+                getTitlesWidget: (value, meta) {
+                  int index = value.toInt();
+                  if (index >= 0 && index < data.length) {
+                    DateTime date = DateTime.parse(data[index]['timestamp']);
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Text("${date.month}/${date.day}",
+                          style: const TextStyle(fontSize: 10)),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
+              ),
             ),
           ),
+          borderData: FlBorderData(show: false),
+          gridData: FlGridData(
+            show: true,
+            drawVerticalLine: false,
+            checkToShowHorizontalLine: (value) =>
+                value % 10 == 0, //  Keeps Y-axis grid clean
+          ),
+          barGroups: data.asMap().entries.map((entry) {
+            int index = entry.key;
+            double value = (entry.value[key] as num?)?.toDouble() ?? 0;
+            return BarChartGroupData(
+              x: index,
+              barsSpace: 10, //  Space sa bawat bar graph
+              barRods: [
+                BarChartRodData(
+                  toY: value,
+                  color: color,
+                  width: 24,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ],
+            );
+          }).toList(),
         ),
-      ],
+      ),
     );
   }
 
@@ -516,7 +557,7 @@ class _DashboardPageState extends State<DashboardPage> {
                         suffixIcon: IconButton(
                           icon: const Icon(Icons.add_comment_outlined),
                           onPressed: () {
-                            _addNote(); // ✅ Calls the method to add a note
+                            _addNote();
                           },
                         ),
                       ),
@@ -547,9 +588,22 @@ class _DashboardPageState extends State<DashboardPage> {
                     const Text('Historical Data Graph',
                         style: TextStyle(
                             fontSize: 24, fontWeight: FontWeight.bold)),
-                    const Text('Data for the last 24 hours',
+                    const Text(
+                      'Data for the last 24 hours',
+                      style: TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.normal),
+                    ),
+
+                    Padding(
+                      padding: EdgeInsets.only(
+                          top: 10), // ✅ Adds two blank spaces (16 pixels)
+                      child: Text(
+                        '',
                         style: TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.normal)),
+                            fontSize: 20, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+
                     FutureBuilder(
                       future: _historyFuture,
                       builder: (context, snapshot) {
@@ -558,23 +612,97 @@ class _DashboardPageState extends State<DashboardPage> {
                           return const Center(
                               child: CircularProgressIndicator());
                         } else if (snapshot.hasError || snapshot.data == null) {
-                          return const Text('No historical data available.');
+                          return const Center(
+                              child: Text('No historical data available.'));
                         } else {
                           final historyData =
                               snapshot.data as List<Map<String, dynamic>>;
-                          return Column(
-                            children: [
-                              buildBarChart(historyData, 'Temperature',
-                                  'temperature', Colors.green),
-                              buildBarChart(historyData, 'Moisture', 'moisture',
-                                  Colors.blue),
-                              buildBarChart(historyData, 'pH Level 1',
-                                  'ph_level1', Colors.purple),
-                              buildBarChart(historyData, 'pH Level 2',
-                                  'ph_level2', Colors.deepPurple),
-                              buildBarChart(historyData, 'Humidity', 'humidity',
-                                  Colors.orange),
-                            ],
+
+                          return SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Temperature Graph Section
+                                const Text(
+                                  'Temperature Monitoring',
+                                  style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                                const Text(
+                                  '• Safe: Below 50°C  |  Warning: 50-70°C  |  Critical: Above 70°C',
+                                  style: TextStyle(
+                                      fontSize: 14, color: Colors.grey),
+                                ),
+                                buildBarChart(historyData, 'Temperature',
+                                    'temperature', Colors.green),
+                                const SizedBox(height: 20),
+
+                                // Moisture Graph Section
+                                const Text(
+                                  'Moisture Level',
+                                  style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                                const Text(
+                                  '• Optimal: 40-60%  |  Dry: Below 40%  |  Too Wet: Above 60%',
+                                  style: TextStyle(
+                                      fontSize: 14, color: Colors.grey),
+                                ),
+                                buildBarChart(historyData, 'Moisture',
+                                    'moisture', Colors.blue),
+                                const SizedBox(height: 20),
+
+                                // pH Level 1 Graph Section
+                                const Text(
+                                  'pH Level 1',
+                                  style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                                const Text(
+                                  '• Ideal: 6.5 - 7.5  |  Too Acidic: Below 6.5  |  Too Basic: Above 7.5',
+                                  style: TextStyle(
+                                      fontSize: 14, color: Colors.grey),
+                                ),
+                                buildBarChart(historyData, 'pH Level 1',
+                                    'ph_level1', Colors.purple),
+                                const SizedBox(height: 20),
+
+                                // pH Level 2 Graph Section
+                                const Text(
+                                  'pH Level 2',
+                                  style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                                const Text(
+                                  '• Ideal: 6.5 - 7.5  |  Too Acidic: Below 6.5  |  Too Basic: Above 7.5',
+                                  style: TextStyle(
+                                      fontSize: 14, color: Colors.grey),
+                                ),
+                                buildBarChart(historyData, 'pH Level 2',
+                                    'ph_level2', Colors.deepPurple),
+                                const SizedBox(height: 20),
+
+                                // Humidity Graph Section
+                                const Text(
+                                  'Humidity Level',
+                                  style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                                const Text(
+                                  '• Optimal: 30-60%  |  Low: Below 30%  |  High: Above 60%',
+                                  style: TextStyle(
+                                      fontSize: 14, color: Colors.grey),
+                                ),
+                                buildBarChart(historyData, 'Humidity',
+                                    'humidity', Colors.orange),
+                              ],
+                            ),
                           );
                         }
                       },
@@ -700,7 +828,6 @@ class _ContainerPageState extends State<ContainerPage> {
   }
 
   Future<void> _fetchContainers() async {
-    // ✅ Updated for Pull-to-Refresh
     setState(() {
       _containersFuture = fetchContainers();
     });
