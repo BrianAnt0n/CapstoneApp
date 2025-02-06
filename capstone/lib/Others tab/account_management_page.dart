@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'add_account_page.dart';
-import 'account_settings_page.dart';
 
 class AccountManagementPage extends StatefulWidget {
   const AccountManagementPage({super.key});
@@ -121,27 +120,6 @@ class _AccountManagementPageState extends State<AccountManagementPage> {
             children: [
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  minimumSize: const Size(double.infinity, 50),
-                ),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const AccountSettingsPage()),
-                  );
-                },
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.settings, color: Colors.white),
-                    SizedBox(width: 8),
-                    Text('Account Settings', style: TextStyle(color: Colors.white)),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 10),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green,
                   minimumSize: const Size(double.infinity, 50),
                 ),
@@ -151,7 +129,7 @@ class _AccountManagementPageState extends State<AccountManagementPage> {
                     MaterialPageRoute(builder: (context) => const AddAccountPage()),
                   );
                   if (result == true) {
-                    _fetchAccounts(); // Refresh the account list when returning
+                  _fetchAccounts(); // Refresh the account list when returning
                   }
                 },
                 child: const Row(
