@@ -5,9 +5,14 @@ on:
     branches: [Project_Releases]
   workflow_dispatch:
 
+permissions:  
+  contents: write  # To create releases
+  pull-requests: write # Required for release-drafter
+
 jobs:
   build:
     runs-on: ubuntu-latest
+
 
     steps:
       - uses: actions/checkout@v3
