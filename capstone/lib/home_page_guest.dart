@@ -350,6 +350,10 @@ class _DashboardPageState extends State<DashboardPage> {
                     const Divider(thickness: 2),
                     const SizedBox(height: 10),
 
+
+
+                    
+
 // TableCalendar with Compost Age and Built-in Navigation
                     TableCalendar(
                       focusedDay: _selectedDate, // Keep only one instance
