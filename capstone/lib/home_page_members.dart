@@ -453,6 +453,11 @@ class _DashboardPageState extends State<DashboardPage> {
                                   Colors.deepPurple),
                               buildSensorCard(Icons.cloud, 'Humidity',
                                   '${sensorData['humidity']}%', Colors.orange),
+                                  buildSensorCard(
+                                  Icons.access_time,
+                                  'Timestamp',
+                                  formatTimestamp(sensorData['timestamp']),
+                                  Colors.grey),
                             ],
                           );
                         }
