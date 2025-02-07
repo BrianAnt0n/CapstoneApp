@@ -20,11 +20,11 @@ jobs:
           channel: 'stable'
 
       - name: Run Flutter pub get
-        working-directory: ./CapstoneApp  <--- Add this line
+        working-directory: ./capstone  <--- Add this line
         run: flutter pub get
 
       - name: Flutter Build APK
-        working-directory: ./CapstoneApp  <--- Add this line
+        working-directory: ./capstone  <--- Add this line
         run: flutter build apk --release
 
       - name: Generate release notes
