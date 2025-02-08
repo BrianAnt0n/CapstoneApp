@@ -163,20 +163,22 @@ class _DashboardPageState extends State<DashboardPage> {
       fixedMaxY = 100; // Default if unknown
     }
 
+    double graphHeight =
+        fixedMaxY > 50 ? 250 : 200; // Taller graphs get more space
+
     return Container(
-      height: 200,
-      width: data.length * 50.0, //Ensures proper spacing for many data points
-      padding:
-          const EdgeInsets.only(right: 30.0), // Adds right padding for labels
+      height: graphHeight + 50,
+      width: data.length * 50.0,
+      padding: const EdgeInsets.only(right: 30.0, top: 30.0),
       child: BarChart(
         BarChartData(
-          maxY: fixedMaxY, //  Prevents auto-scaling and sets a proper limit
+          maxY: fixedMaxY,
           alignment: BarChartAlignment.spaceAround,
           titlesData: FlTitlesData(
             leftTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
-                reservedSize: 40, //  Ensures enough space for Y-axis labels
+                reservedSize: 40, // Ensures enough space for Y-axis labels
                 getTitlesWidget: (value, meta) {
                   return Padding(
                     padding: const EdgeInsets.only(right: 5.0),
@@ -189,8 +191,8 @@ class _DashboardPageState extends State<DashboardPage> {
               ),
             ),
             rightTitles: AxisTitles(
-              sideTitles: SideTitles(
-                  showTitles: false), // Hides right labels to avoid clutter
+              sideTitles:
+                  SideTitles(showTitles: false), // Hide right-side labels
             ),
             bottomTitles: AxisTitles(
               sideTitles: SideTitles(
@@ -216,14 +218,14 @@ class _DashboardPageState extends State<DashboardPage> {
             show: true,
             drawVerticalLine: false,
             checkToShowHorizontalLine: (value) =>
-                value % 10 == 0, //  Keeps Y-axis grid clean
+                value % 10 == 0, // Keeps Y-axis grid clean
           ),
           barGroups: data.asMap().entries.map((entry) {
             int index = entry.key;
             double value = (entry.value[key] as num?)?.toDouble() ?? 0;
             return BarChartGroupData(
               x: index,
-              barsSpace: 10, //  Space sa bawat bar graph
+              barsSpace: 12, // Slightly increased bar spacing
               barRods: [
                 BarChartRodData(
                   toY: value,
@@ -448,14 +450,19 @@ class _DashboardPageState extends State<DashboardPage> {
                           return const Center(
                               child: Text('No historical data available.'));
                         } else {
-                          final historyData =
-                              snapshot.data as List<Map<String, dynamic>>;
+                          List<Map<String, dynamic>> historyData =
+                              (snapshot.data as List<Map<String, dynamic>>)
+                                  .reversed
+                                  .toList(); // ✅ Reverse data
 
                           return SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
+                            scrollDirection:
+                                Axis.vertical, // ✅ Enables vertical scrolling
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                const SizedBox(height: 20),
+
                                 // Temperature Graph Section
                                 const Text(
                                   'Temperature Monitoring',
@@ -468,8 +475,20 @@ class _DashboardPageState extends State<DashboardPage> {
                                   style: TextStyle(
                                       fontSize: 14, color: Colors.grey),
                                 ),
-                                buildBarChart(historyData, 'Temperature',
-                                    'temperature', Colors.green),
+                                SingleChildScrollView(
+                                  scrollDirection: Axis
+                                      .horizontal, // ✅ Keeps graph scrollable
+                                  child: buildBarChart(
+                                      historyData,
+                                      'Temperature',
+                                      'temperature',
+                                      Colors.green),
+                                ),
+                                const SizedBox(height: 20),
+                                Divider(
+                                    thickness: 2,
+                                    color:
+                                        Colors.grey.shade400), // ✅ Visible now!
                                 const SizedBox(height: 20),
 
                                 // Moisture Graph Section
@@ -484,8 +503,14 @@ class _DashboardPageState extends State<DashboardPage> {
                                   style: TextStyle(
                                       fontSize: 14, color: Colors.grey),
                                 ),
-                                buildBarChart(historyData, 'Moisture',
-                                    'moisture', Colors.blue),
+                                SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  child: buildBarChart(historyData, 'Moisture',
+                                      'moisture', Colors.blue),
+                                ),
+                                const SizedBox(height: 20),
+                                Divider(
+                                    thickness: 2, color: Colors.grey.shade400),
                                 const SizedBox(height: 20),
 
                                 // pH Level 1 Graph Section
@@ -496,12 +521,18 @@ class _DashboardPageState extends State<DashboardPage> {
                                       fontWeight: FontWeight.bold),
                                 ),
                                 const Text(
-                                  '• Ideal: 6.0 - 8.0  |  Too Acidic: Below 6.0  |  Too Basic: Above 8',
+                                  '• Ideal: 6.0 - 8.0 | Too Acidic: Below 6.0 | Too Basic: Above 8',
                                   style: TextStyle(
                                       fontSize: 14, color: Colors.grey),
                                 ),
-                                buildBarChart(historyData, 'pH Level 1',
-                                    'ph_level1', Colors.purple),
+                                SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  child: buildBarChart(historyData,
+                                      'pH Level 1', 'ph_level1', Colors.purple),
+                                ),
+                                const SizedBox(height: 20),
+                                Divider(
+                                    thickness: 2, color: Colors.grey.shade400),
                                 const SizedBox(height: 20),
 
                                 // pH Level 2 Graph Section
@@ -512,12 +543,21 @@ class _DashboardPageState extends State<DashboardPage> {
                                       fontWeight: FontWeight.bold),
                                 ),
                                 const Text(
-                                  '• Ideal: 6.0 - 8.0  |  Too Acidic: Below 6.0  |  Too Basic: Above 8',
+                                  '• Ideal: 6.0 - 8.0 | Too Acidic: Below 6.0 | Too Basic: Above 8',
                                   style: TextStyle(
                                       fontSize: 14, color: Colors.grey),
                                 ),
-                                buildBarChart(historyData, 'pH Level 2',
-                                    'ph_level2', Colors.deepPurple),
+                                SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  child: buildBarChart(
+                                      historyData,
+                                      'pH Level 2',
+                                      'ph_level2',
+                                      Colors.deepPurple),
+                                ),
+                                const SizedBox(height: 20),
+                                Divider(
+                                    thickness: 2, color: Colors.grey.shade400),
                                 const SizedBox(height: 20),
 
                                 // Humidity Graph Section
@@ -532,8 +572,11 @@ class _DashboardPageState extends State<DashboardPage> {
                                   style: TextStyle(
                                       fontSize: 14, color: Colors.grey),
                                 ),
-                                buildBarChart(historyData, 'Humidity',
-                                    'humidity', Colors.orange),
+                                SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  child: buildBarChart(historyData, 'Humidity',
+                                      'humidity', Colors.orange),
+                                ),
                               ],
                             ),
                           );
