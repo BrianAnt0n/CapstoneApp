@@ -663,7 +663,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                       fontWeight: FontWeight.bold),
                                 ),
                                 const Text(
-                                  '• Ideal: 6.0 - 8.0  |  Too Acidic: Below 6.0  |  Too Basic: Above 8.0',
+                                  '• Ideal: 6.0 - 8.0  |  Too Acidic: Below 6.0  |  Too Basic: Above 8',
                                   style: TextStyle(
                                       fontSize: 14, color: Colors.grey),
                                 ),
@@ -679,7 +679,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                       fontWeight: FontWeight.bold),
                                 ),
                                 const Text(
-                                  '• Ideal: 6.0 - 8.0  |  Too Acidic: Below 6.0  |  Too Basic: Above 8.0',
+                                  '• Ideal: 6.0 - 8.0  |  Too Acidic: Below 6.0  |  Too Basic: Above 8',
                                   style: TextStyle(
                                       fontSize: 14, color: Colors.grey),
                                 ),

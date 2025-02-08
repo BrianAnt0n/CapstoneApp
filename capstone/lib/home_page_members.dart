@@ -625,7 +625,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                       fontWeight: FontWeight.bold),
                                 ),
                                 const Text(
-                                  '• Safe: Below 50°C  |  Warning: 50-70°C  |  Critical: Above 70°C',
+                                  '• Safe: Between 10°C to 54°C  |  Critical: Above 54°C',
                                   style: TextStyle(
                                       fontSize: 14, color: Colors.grey),
                                 ),
@@ -641,7 +641,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                       fontWeight: FontWeight.bold),
                                 ),
                                 const Text(
-                                  '• Optimal: 40-60%  |  Dry: Below 40%  |  Too Wet: Above 60%',
+                                  '• Optimal: 50-60%  |  Dry: Below 50%  |  Too Wet: Above 60%',
                                   style: TextStyle(
                                       fontSize: 14, color: Colors.grey),
                                 ),
@@ -657,7 +657,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                       fontWeight: FontWeight.bold),
                                 ),
                                 const Text(
-                                  '• Ideal: 6.5 - 7.5  |  Too Acidic: Below 6.5  |  Too Basic: Above 7.5',
+                                  '• Ideal: 6.0 - 8.0  |  Too Acidic: Below 6.0  |  Too Basic: Above 8',
                                   style: TextStyle(
                                       fontSize: 14, color: Colors.grey),
                                 ),
@@ -673,7 +673,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                       fontWeight: FontWeight.bold),
                                 ),
                                 const Text(
-                                  '• Ideal: 6.5 - 7.5  |  Too Acidic: Below 6.5  |  Too Basic: Above 7.5',
+                                  '• Ideal: 6.0 - 8.0  |  Too Acidic: Below 6.0  |  Too Basic: Above 8',
                                   style: TextStyle(
                                       fontSize: 14, color: Colors.grey),
                                 ),
