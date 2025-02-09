@@ -27,6 +27,49 @@ class ContainerState extends ChangeNotifier {
   }
 }
 
+Future<int?> getStoredInt(String key) async {
+  final prefs = await SharedPreferences.getInstance();
+  return prefs.getInt('user_id_pref');
+}
+
+Future<void> fetchData(int storedInt, String scannedCode) async {
+  final supabase = Supabase.instance.client;
+
+  final response = await supabase
+      .from('Containers_test') // Replace with your table name
+      .select('container_id, hardware_id, user_id, "Hardware_Sensors_Test".qr_value')
+      .eq('user_id', storedInt)
+      .eq('qr_value', scannedCode)
+      .maybeSingle(); // Use `maybeSingle()` to avoid errors if no match is found
+
+  if (response != null) {
+    print("Data fetched: $response");
+  } else {
+    print("No matching record found.");
+  }
+}
+
+void performQuery(BuildContext context) async {
+  int? storedInt = await getStoredInt("your_int_key");
+
+  if (storedInt == null) {
+    print("No int found in SharedPreferences.");
+    return;
+  }
+
+  // Navigate to the scanner screen
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => ScannerPage(
+        onScanned: (scannedCode) {
+          fetchData(storedInt, scannedCode);
+        },
+      ),
+    ),
+  );
+}
+
 class HomePageMember extends StatefulWidget {
   const HomePageMember({super.key});
 
@@ -852,14 +895,7 @@ class _ContainerPageState extends State<ContainerPage> {
                     backgroundColor: Colors.green,
                     minimumSize: const Size(double.infinity, 50),
                   ),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) =>
-                              ScannerPage()), // Navigate to ScannerPage
-                    );
-                  },
+                  onPressed: () => performQuery(context),
                   icon: const Icon(Icons.add, color: Colors.white),
                   label: const Text('New container',
                       style: TextStyle(color: Colors.white)),
