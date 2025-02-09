@@ -1,0 +1,61 @@
+name: Build and Release APK
+
+on:
+  push:
+    branches: [Project_Releases]
+  workflow_dispatch:
+
+permissions:  
+  contents: write  # To create releases
+  pull-requests: write # Required for release-drafter
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'
+          channel: 'stable'
+
+      - name: Run Flutter pub get
+        working-directory: ./capstone
+        run: flutter pub get
+
+      - name: Flutter Build APK
+        working-directory: ./capstone 
+        run: flutter build apk --release
+
+      - name: Generate release notes
+        id: release_notes
+        uses: release-drafter/release-drafter@v5
+        with:
+          config: .github/release-drafter.yml
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create a release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ github.run_number }}
+          release_name: Release v${{ github.run_number }}
+          body: ${{ steps.release_notes.outputs.release_notes }}
+          prerelease: true
+
+      - name: Upload APK to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: capstone/build/app/outputs/flutter-apk/app-release.apk  
+          asset_name: app-release.apk
+          asset_content_type: application/vnd.android.package-archive

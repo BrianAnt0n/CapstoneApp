@@ -1,0 +1,39 @@
+name: Release Drafter
+
+on:
+  push:
+    branches:
+      - Project_Releases # or your release branch
+
+types:
+  - feat
+  - fix
+  - chore
+  - docs
+  - style
+  - refactor
+  - perf
+  - test
+
+categories:
+  - title: ✨ Features
+    labels:
+      - feat
+  - title: 🐛 Bug Fixes
+    labels:
+      - fix
+  - title: 🧰 Maintenance
+    labels:
+      - chore
+      - docs
+      - style
+      - refactor
+      - perf
+      - test
+
+template: |
+  $CHANGES
+
+  ---
+
+  :rocket: **Full Changelog:** [`$PREVIOUS_TAG`...`$CURRENT_TAG`](https://github.com/$OWNER/$REPOSITORY/compare/$PREVIOUS_TAG...$CURRENT_TAG)
