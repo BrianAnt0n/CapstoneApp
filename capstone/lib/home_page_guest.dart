@@ -532,7 +532,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
                     const SizedBox(height: 30),
                     const Divider(thickness: 2),
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 10),
                     const Text('Historical Data Graph',
                         style: TextStyle(
                             fontSize: 24, fontWeight: FontWeight.bold)),
@@ -542,15 +542,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           fontSize: 14, fontWeight: FontWeight.normal),
                     ),
 
-                    Padding(
-                      padding: EdgeInsets.only(
-                          top: 10), // ✅ Adds two blank spaces (16 pixels)
-                      child: Text(
-                        '',
-                        style: TextStyle(
-                            fontSize: 20, fontWeight: FontWeight.bold),
-                      ),
-                    ),
+
 
                     FutureBuilder(
                       future: _historyFuture,

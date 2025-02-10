@@ -695,7 +695,9 @@ class _DashboardPageState extends State<DashboardPage> {
                       },
                     ),
 
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 30),
+                    const Divider(thickness: 2),
+                    const SizedBox(height: 10),
                     const Text('Historical Data Graph',
                         style: TextStyle(
                             fontSize: 24, fontWeight: FontWeight.bold)),
