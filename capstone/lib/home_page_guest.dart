@@ -91,6 +91,8 @@ class DashboardPage extends StatefulWidget {
   _DashboardPageState createState() => _DashboardPageState();
 }
 
+DateTime? _containerAddedDate; // Holds the compost start date
+
 class _DashboardPageState extends State<DashboardPage> {
   Future<Map<String, dynamic>>? _sensorDataFuture;
   Future<List<Map<String, dynamic>>>? _notesFuture;
@@ -100,6 +102,10 @@ class _DashboardPageState extends State<DashboardPage> {
   DateTime _selectedDate = DateTime.now();
   String _containerAge = "";
   Color _ageColor = Colors.green;
+  DateTime? _lastRefreshTime;
+  
+
+  
 
   @override
   void didChangeDependencies() {
@@ -109,10 +115,38 @@ class _DashboardPageState extends State<DashboardPage> {
 
     if (selectedContainerId != null) {
       _sensorDataFuture = fetchSensorData(selectedContainerId!);
-
+      
       _historyFuture = fetchHistoryData(selectedContainerId!);
       fetchContainerDetails(selectedContainerId!);
     }
+  }
+
+  Future<void> _refreshData() async {
+    setState(() {
+      _lastRefreshTime = DateTime.now();
+      _sensorDataFuture = fetchSensorData(selectedContainerId!);
+      
+      _historyFuture = fetchHistoryData(selectedContainerId!);
+    });
+  }
+
+ String _getLastRefreshedText() {
+  if (_lastRefreshTime == null) return "Not refreshed yet";
+  final difference = DateTime.now().difference(_lastRefreshTime!);
+  if (difference.inMinutes < 1) { // Changed to minutes and checking if less than 1
+    return "Last Refreshed: Less than a minute ago"; // More user-friendly
+  } else if (difference.inMinutes < 60) {
+    return "Last Refreshed: ${difference.inMinutes} minutes ago";
+  } else {
+    return "Last Refreshed: ${difference.inHours} hours ago";
+  }
+}
+
+
+  String _getTimeRefreshed() {
+    return _lastRefreshTime != null
+        ? "Time Refreshed: ${DateFormat('hh:mm:ss a').format(_lastRefreshTime!)}"
+        : "Time Refreshed: Not available";
   }
 
   Future<List<Map<String, dynamic>>> fetchHistoryData(int containerId) async {
@@ -151,94 +185,138 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Widget buildBarChart(
       List<Map<String, dynamic>> data, String title, String key, Color color) {
-    // Set maxY based on data type
-    double fixedMaxY;
-    if (key.contains('temperature')) {
-      fixedMaxY = 100; // Temperature scale (0-100°C)
-    } else if (key.contains('moisture') || key.contains('humidity')) {
-      fixedMaxY = 100; // Moisture & Humidity scale (0-100%)
-    } else if (key.contains('ph')) {
-      fixedMaxY = 14; // pH Level scale (0-14)
-    } else {
-      fixedMaxY = 100; // Default if unknown
-    }
+    try {
+      print("Building chart for $title with ${data.length} data points.");
 
-    double graphHeight =
-        fixedMaxY > 50 ? 250 : 200; // Taller graphs get more space
+      double fixedMaxY;
+      if (key.contains('temperature')) {
+        fixedMaxY = 100;
+      } else if (key.contains('moisture') || key.contains('humidity')) {
+        fixedMaxY = 100;
+      } else if (key.contains('ph')) {
+        fixedMaxY = 14;
+      } else {
+        fixedMaxY = 100;
+      }
 
-    return Container(
-      height: graphHeight + 50,
-      width: data.length * 50.0,
-      padding: const EdgeInsets.only(right: 30.0, top: 30.0),
-      child: BarChart(
-        BarChartData(
-          maxY: fixedMaxY,
-          alignment: BarChartAlignment.spaceAround,
-          titlesData: FlTitlesData(
-            leftTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                reservedSize: 40, // Ensures enough space for Y-axis labels
-                getTitlesWidget: (value, meta) {
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 5.0),
-                    child: Text(
-                      value.toInt().toString(),
-                      style: const TextStyle(fontSize: 12, color: Colors.black),
-                    ),
-                  );
-                },
-              ),
-            ),
-            rightTitles: AxisTitles(
-              sideTitles:
-                  SideTitles(showTitles: false), // Hide right-side labels
-            ),
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                reservedSize: 20,
-                getTitlesWidget: (value, meta) {
-                  int index = value.toInt();
-                  if (index >= 0 && index < data.length) {
-                    DateTime date = DateTime.parse(data[index]['timestamp']);
+      double chartHeight = fixedMaxY > 50
+          ? 320
+          : 270; // Increased height to prevent tooltip cutoff
+
+      return Container(
+        height: chartHeight + 50, // Ensures extra space for tooltips
+        width: data.length * 50.0,
+        padding: const EdgeInsets.only(
+            right: 30.0, top: 40.0), // More padding at the top
+        child: BarChart(
+          BarChartData(
+            maxY: fixedMaxY,
+            alignment: BarChartAlignment.spaceAround,
+            titlesData: FlTitlesData(
+              leftTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: 40,
+                  getTitlesWidget: (value, meta) {
                     return Padding(
-                      padding: const EdgeInsets.only(top: 8.0),
-                      child: Text("${date.month}/${date.day}",
-                          style: const TextStyle(fontSize: 10)),
+                      padding: const EdgeInsets.only(right: 5.0),
+                      child: Text(
+                        value.toInt().toString(),
+                        style:
+                            const TextStyle(fontSize: 12, color: Colors.black),
+                      ),
                     );
-                  }
-                  return const SizedBox.shrink();
-                },
+                  },
+                ),
+              ),
+              rightTitles: AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
+              ),
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: 20,
+                  getTitlesWidget: (value, meta) {
+                    int index = value.toInt();
+                    if (index >= 0 && index < data.length) {
+                      DateTime date = DateTime.parse(data[index]['timestamp']);
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 8.0),
+                        child: Text(
+                          "${date.month}/${date.day}",
+                          style: const TextStyle(fontSize: 10),
+                        ),
+                      );
+                    }
+                    print("Bottom label index out of range: $index");
+                    return const SizedBox.shrink();
+                  },
+                ),
+              ),
+              topTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: 20,
+                  getTitlesWidget: (value, meta) {
+                    int index = value.toInt();
+                    int reversedIndex = data.length - index;
+                    if (reversedIndex <= 0 || reversedIndex > data.length) {
+                      print("Top label index out of range: $reversedIndex");
+                      return const SizedBox.shrink();
+                    }
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8.0),
+                      child: Text(
+                        "$reversedIndex",
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black,
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
+            borderData: FlBorderData(show: false),
+            gridData: FlGridData(
+              show: true,
+              drawVerticalLine: false,
+              checkToShowHorizontalLine: (value) => value % 10 == 0,
+            ),
+            barGroups: data.asMap().entries.map((entry) {
+              int index = entry.key;
+              double value = (entry.value[key] as num?)?.toDouble() ?? 0;
+
+              if (index >= data.length) {
+                print("Bar chart index out of range: $index");
+                return null!;
+              }
+
+              return BarChartGroupData(
+                x: index,
+                barsSpace: 12,
+                barRods: [
+                  BarChartRodData(
+                    toY: value,
+                    color: color,
+                    width: 24,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ],
+              );
+            }).toList(),
           ),
-          borderData: FlBorderData(show: false),
-          gridData: FlGridData(
-            show: true,
-            drawVerticalLine: false,
-            checkToShowHorizontalLine: (value) =>
-                value % 10 == 0, // Keeps Y-axis grid clean
-          ),
-          barGroups: data.asMap().entries.map((entry) {
-            int index = entry.key;
-            double value = (entry.value[key] as num?)?.toDouble() ?? 0;
-            return BarChartGroupData(
-              x: index,
-              barsSpace: 12, // Slightly increased bar spacing
-              barRods: [
-                BarChartRodData(
-                  toY: value,
-                  color: color,
-                  width: 24,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ],
-            );
-          }).toList(),
         ),
-      ),
-    );
+      );
+    } catch (e, stacktrace) {
+      print("Error in buildBarChart: $e");
+      print(stacktrace);
+      return const Center(
+        child: Text("Error loading chart"),
+      );
+    }
   }
 
   Future<void> fetchContainerDetails(int containerId) async {
@@ -249,25 +327,77 @@ class _DashboardPageState extends State<DashboardPage> {
           .select('date_added')
           .eq('container_id', containerId)
           .single();
+
       if (response['date_added'] != null) {
-        DateTime addedDate = DateTime.parse(response['date_added']);
-        _calculateContainerAge(addedDate);
+        setState(() {
+          _containerAddedDate =
+              DateTime.parse(response['date_added']); // ✅ Store the date
+          _calculateContainerAge(); // ✅ Call the function without arguments
+        });
       }
-    } catch (error) {}
+    } catch (error) {
+      print("Error fetching container details: $error");
+    }
   }
 
-  void _calculateContainerAge(DateTime addedDate) {
-    final now = DateTime.now();
-    final difference = now.difference(addedDate);
-    int days = difference.inDays;
-    int weeks = (days / 7).floor();
+  void _openFullCalendar() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Full Calendar inside the popup
+                TableCalendar(
+                  focusedDay: _selectedDate,
+                  firstDay: DateTime(2000),
+                  lastDay: DateTime(2100),
+                  calendarFormat: CalendarFormat.month, // Show full month
+                  selectedDayPredicate: (day) => isSameDay(_selectedDate, day),
+                  onDaySelected: (selectedDay, focusedDay) {
+                    setState(() {
+                      _selectedDate = selectedDay;
 
-    if (days < 7) {
-      _containerAge = "$days ${days == 1 ? 'day' : 'days'}";
-    } else {
-      _containerAge = "$weeks ${weeks == 1 ? 'week' : 'weeks'}";
+                      _calculateContainerAge(); // ✅ Update the age when a date is selected
+                    });
+                    Navigator.pop(context); // Close the popup after selection
+                  },
+                  headerStyle: const HeaderStyle(
+                    formatButtonVisible: false, // ✅ Hide the week toggle button
+                    titleCentered: true,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("Close"),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _calculateContainerAge() {
+    if (_containerAddedDate == null) {
+      _containerAge = "Unknown";
+      return;
     }
 
+    final difference = _selectedDate.difference(_containerAddedDate!);
+    int days = difference.inDays;
+    int weeks = (days / 7).floor(); // Always display as weeks
+
+    _containerAge = "$weeks ${weeks == 1 ? 'WEEK' : 'WEEKS'}";
+
+    // Set color based on compost age
     if (weeks >= 12) {
       _ageColor = Colors.red;
     } else if (weeks >= 7) {
@@ -277,7 +407,7 @@ class _DashboardPageState extends State<DashboardPage> {
     }
 
     if (mounted) {
-      setState(() {});
+      setState(() {}); // Update UI
     }
   }
 
@@ -287,13 +417,7 @@ class _DashboardPageState extends State<DashboardPage> {
         ? const Center(
             child: Text('Please select a container from the Container tab.'))
         : RefreshIndicator(
-            onRefresh: () async {
-              setState(() {
-                _sensorDataFuture = fetchSensorData(selectedContainerId!);
-
-                _historyFuture = fetchHistoryData(selectedContainerId!);
-              });
-            },
+            onRefresh: _refreshData,
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               child: Padding(
@@ -304,6 +428,17 @@ class _DashboardPageState extends State<DashboardPage> {
                     const Text('Dashboard',
                         style: TextStyle(
                             fontSize: 24, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 5),
+                   // Text(
+                    //  _getLastRefreshedText(),
+                     // style: const TextStyle(
+                       //   fontSize: 16, fontWeight: FontWeight.w500),
+                    //),
+                    Text(
+                      _getTimeRefreshed(),
+                      style: const TextStyle(
+                          fontSize: 14, color: Colors.grey),
+                    ),
                     const SizedBox(height: 20),
                     FutureBuilder(
                       future: _sensorDataFuture,
@@ -338,11 +473,6 @@ class _DashboardPageState extends State<DashboardPage> {
                                   Colors.deepPurple),
                               buildSensorCard(Icons.cloud, 'Humidity',
                                   '${sensorData['humidity']}%', Colors.orange),
-                                  buildSensorCard(
-                                  Icons.access_time,
-                                  'Timestamp',
-                                  formatTimestamp(sensorData['timestamp']),
-                                  Colors.grey),
                             ],
                           );
                         }
@@ -352,83 +482,99 @@ class _DashboardPageState extends State<DashboardPage> {
                     const Divider(thickness: 2),
                     const SizedBox(height: 10),
 
-
-
-                    
-
 // TableCalendar with Compost Age and Built-in Navigation
-                    TableCalendar(
-                      focusedDay: _selectedDate, // Keep only one instance
-                      firstDay: DateTime(2000),
-                      lastDay: DateTime(2100),
-                      headerStyle: HeaderStyle(
-                        titleCentered: true,
-                        formatButtonVisible: false, // Disable format toggle
-                        titleTextFormatter: (date, locale) {
-                          return DateFormat.yMMMM(locale).format(date);
-                        },
-                        leftChevronIcon:
-                            const Icon(Icons.chevron_left), // Left arrow
-                        rightChevronIcon:
-                            const Icon(Icons.chevron_right), // Right arrow
-                      ),
-                      calendarBuilders: CalendarBuilders(
-                        headerTitleBuilder: (context, date) {
-                          String formattedDate =
-                              DateFormat.yMMMM().format(date);
-
-                          // Determine color based on compost age
-                          Color ageColor =
-                              Colors.green; // Default: Green (1-6 weeks)
-                          if (_containerAge.contains("weeks")) {
-                            int? weeks =
-                                int.tryParse(_containerAge.split(" ")[0]);
-                            if (weeks != null) {
-                              if (weeks >= 7 && weeks <= 11) {
-                                ageColor = Colors.orange; // 7-11 weeks → Orange
-                              } else if (weeks >= 12) {
-                                ageColor = Colors.red; // 12+ weeks → Red
-                              }
-                            }
-                          }
-
-                          return Column(
-                            children: [
-                              if (_containerAge
-                                  .isNotEmpty) // Compost Age Indicator
-                                Container(
-                                  margin: const EdgeInsets.only(bottom: 4),
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: ageColor,
-                                    borderRadius: BorderRadius.circular(8),
+                    Column(
+                      children: [
+                        // Weekly Calendar
+                        TableCalendar(
+                          focusedDay: _selectedDate,
+                          firstDay: DateTime(2000),
+                          lastDay: DateTime(2100),
+                          calendarFormat:
+                              CalendarFormat.week, // Show only one week
+                          headerStyle: HeaderStyle(
+                            titleCentered: true,
+                            formatButtonVisible: false,
+                            leftChevronIcon: const Icon(Icons.chevron_left),
+                            rightChevronIcon: const Icon(Icons.chevron_right),
+                            titleTextFormatter: (date, locale) {
+                              return DateFormat.yMMMM(locale).format(date);
+                            },
+                          ),
+                          calendarBuilders: CalendarBuilders(
+                            headerTitleBuilder: (context, date) {
+                              return Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Opacity(
+                                    opacity: 0.0,
+                                    child: IconButton(
+                                      icon: const Icon(Icons.arrow_left),
+                                      onPressed: () {},
+                                    ),
                                   ),
-                                  child: Text(
-                                    _containerAge,
+                                  Text(
+                                    DateFormat.yMMMM().format(date),
                                     style: const TextStyle(
-                                      color: Colors.white,
+                                      fontSize: 18,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                ),
-                              Text(
-                                formattedDate,
-                                style: const TextStyle(
-                                    fontSize: 18, fontWeight: FontWeight.bold),
-                                overflow: TextOverflow
-                                    .ellipsis, // Prevents overflow issues
+                                  IconButton(
+                                    icon: const Icon(Icons.calendar_month),
+                                    onPressed: () {
+                                      _openFullCalendar(); // Open full calendar
+                                    },
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                          selectedDayPredicate: (day) =>
+                              isSameDay(_selectedDate, day),
+                          onDaySelected: (selectedDay, focusedDay) {
+                            setState(() {
+                              _selectedDate = selectedDay;
+                              (selectedContainerId!, _selectedDate);
+                              _calculateContainerAge(); // ✅ Update age dynamically
+                            });
+                          },
+                        ),
+
+                        const SizedBox(
+                            height: 16), // Space between calendar and age text
+
+                        // Container Age Display
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            const Text(
+                              "Container Age:",
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black,
                               ),
-                            ],
-                          );
-                        },
-                      ),
-                      selectedDayPredicate: (day) =>
-                          isSameDay(_selectedDate, day),
-                      onDaySelected: (selectedDay, focusedDay) {},
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              _containerAge, // ✅ Show container/compost age
+                              style: TextStyle(
+                                fontSize: 30, // Large Text
+                                fontWeight: FontWeight.bold,
+                                color:
+                                    _ageColor, // ✅ Color changes dynamically based on age
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
 
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 30),
+                    const Divider(thickness: 2),
+                    const SizedBox(height: 10),
                     const Text('Historical Data Graph',
                         style: TextStyle(
                             fontSize: 24, fontWeight: FontWeight.bold)),
@@ -436,16 +582,6 @@ class _DashboardPageState extends State<DashboardPage> {
                       'Data for the last 24 hours',
                       style: TextStyle(
                           fontSize: 14, fontWeight: FontWeight.normal),
-                    ),
-
-                    Padding(
-                      padding: EdgeInsets.only(
-                          top: 10), // ✅ Adds two blank spaces (16 pixels)
-                      child: Text(
-                        '',
-                        style: TextStyle(
-                            fontSize: 20, fontWeight: FontWeight.bold),
-                      ),
                     ),
 
                     FutureBuilder(
@@ -461,12 +597,18 @@ class _DashboardPageState extends State<DashboardPage> {
                         } else {
                           List<Map<String, dynamic>> historyData =
                               (snapshot.data as List<Map<String, dynamic>>)
-                                  .reversed
-                                  .toList(); // ✅ Reverse data
+                                  .toList();
+
+                          ScrollController scrollController =
+                              ScrollController();
+
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            scrollController.jumpTo(
+                                scrollController.position.maxScrollExtent);
+                          });
 
                           return SingleChildScrollView(
-                            scrollDirection:
-                                Axis.vertical, // ✅ Enables vertical scrolling
+                            scrollDirection: Axis.vertical,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -485,8 +627,9 @@ class _DashboardPageState extends State<DashboardPage> {
                                       fontSize: 14, color: Colors.grey),
                                 ),
                                 SingleChildScrollView(
-                                  scrollDirection: Axis
-                                      .horizontal, // ✅ Keeps graph scrollable
+                                  controller: scrollController,
+                                  scrollDirection: Axis.horizontal,
+                                  reverse: true,
                                   child: buildBarChart(
                                       historyData,
                                       'Temperature',
@@ -495,9 +638,8 @@ class _DashboardPageState extends State<DashboardPage> {
                                 ),
                                 const SizedBox(height: 20),
                                 Divider(
-                                    thickness: 2,
-                                    color:
-                                        Colors.grey.shade400), // ✅ Visible now!
+                                    thickness: 2, color: Colors.grey.shade400),
+
                                 const SizedBox(height: 20),
 
                                 // Moisture Graph Section
@@ -513,13 +655,16 @@ class _DashboardPageState extends State<DashboardPage> {
                                       fontSize: 14, color: Colors.grey),
                                 ),
                                 SingleChildScrollView(
+                                  controller: scrollController,
                                   scrollDirection: Axis.horizontal,
+                                  reverse: true,
                                   child: buildBarChart(historyData, 'Moisture',
                                       'moisture', Colors.blue),
                                 ),
                                 const SizedBox(height: 20),
                                 Divider(
                                     thickness: 2, color: Colors.grey.shade400),
+
                                 const SizedBox(height: 20),
 
                                 // pH Level 1 Graph Section
@@ -535,13 +680,16 @@ class _DashboardPageState extends State<DashboardPage> {
                                       fontSize: 14, color: Colors.grey),
                                 ),
                                 SingleChildScrollView(
+                                  controller: scrollController,
                                   scrollDirection: Axis.horizontal,
+                                  reverse: true,
                                   child: buildBarChart(historyData,
                                       'pH Level 1', 'ph_level1', Colors.purple),
                                 ),
                                 const SizedBox(height: 20),
                                 Divider(
                                     thickness: 2, color: Colors.grey.shade400),
+
                                 const SizedBox(height: 20),
 
                                 // pH Level 2 Graph Section
@@ -557,7 +705,9 @@ class _DashboardPageState extends State<DashboardPage> {
                                       fontSize: 14, color: Colors.grey),
                                 ),
                                 SingleChildScrollView(
+                                  controller: scrollController,
                                   scrollDirection: Axis.horizontal,
+                                  reverse: true,
                                   child: buildBarChart(
                                       historyData,
                                       'pH Level 2',
@@ -567,6 +717,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                 const SizedBox(height: 20),
                                 Divider(
                                     thickness: 2, color: Colors.grey.shade400),
+
                                 const SizedBox(height: 20),
 
                                 // Humidity Graph Section
@@ -582,7 +733,9 @@ class _DashboardPageState extends State<DashboardPage> {
                                       fontSize: 14, color: Colors.grey),
                                 ),
                                 SingleChildScrollView(
+                                  controller: scrollController,
                                   scrollDirection: Axis.horizontal,
+                                  reverse: true,
                                   child: buildBarChart(historyData, 'Humidity',
                                       'humidity', Colors.orange),
                                 ),
