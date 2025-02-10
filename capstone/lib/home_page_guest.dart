@@ -95,11 +95,17 @@ DateTime? _containerAddedDate; // Holds the compost start date
 
 class _DashboardPageState extends State<DashboardPage> {
   Future<Map<String, dynamic>>? _sensorDataFuture;
+  Future<List<Map<String, dynamic>>>? _notesFuture;
   Future<List<Map<String, dynamic>>>? _historyFuture;
   int? selectedContainerId;
+  final TextEditingController _notesController = TextEditingController();
   DateTime _selectedDate = DateTime.now();
   String _containerAge = "";
   Color _ageColor = Colors.green;
+  DateTime? _lastRefreshTime;
+  
+
+  
 
   @override
   void didChangeDependencies() {
@@ -109,10 +115,38 @@ class _DashboardPageState extends State<DashboardPage> {
 
     if (selectedContainerId != null) {
       _sensorDataFuture = fetchSensorData(selectedContainerId!);
-
+      
       _historyFuture = fetchHistoryData(selectedContainerId!);
       fetchContainerDetails(selectedContainerId!);
     }
+  }
+
+  Future<void> _refreshData() async {
+    setState(() {
+      _lastRefreshTime = DateTime.now();
+      _sensorDataFuture = fetchSensorData(selectedContainerId!);
+      
+      _historyFuture = fetchHistoryData(selectedContainerId!);
+    });
+  }
+
+ String _getLastRefreshedText() {
+  if (_lastRefreshTime == null) return "Not refreshed yet";
+  final difference = DateTime.now().difference(_lastRefreshTime!);
+  if (difference.inMinutes < 1) { // Changed to minutes and checking if less than 1
+    return "Last Refreshed: Less than a minute ago"; // More user-friendly
+  } else if (difference.inMinutes < 60) {
+    return "Last Refreshed: ${difference.inMinutes} minutes ago";
+  } else {
+    return "Last Refreshed: ${difference.inHours} hours ago";
+  }
+}
+
+
+  String _getTimeRefreshed() {
+    return _lastRefreshTime != null
+        ? "Time Refreshed: ${DateFormat('hh:mm:ss a').format(_lastRefreshTime!)}"
+        : "Time Refreshed: Not available";
   }
 
   Future<List<Map<String, dynamic>>> fetchHistoryData(int containerId) async {
@@ -383,13 +417,7 @@ class _DashboardPageState extends State<DashboardPage> {
         ? const Center(
             child: Text('Please select a container from the Container tab.'))
         : RefreshIndicator(
-            onRefresh: () async {
-              setState(() {
-                _sensorDataFuture = fetchSensorData(selectedContainerId!);
-
-                _historyFuture = fetchHistoryData(selectedContainerId!);
-              });
-            },
+            onRefresh: _refreshData,
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               child: Padding(
@@ -400,6 +428,17 @@ class _DashboardPageState extends State<DashboardPage> {
                     const Text('Dashboard',
                         style: TextStyle(
                             fontSize: 24, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 5),
+                   // Text(
+                    //  _getLastRefreshedText(),
+                     // style: const TextStyle(
+                       //   fontSize: 16, fontWeight: FontWeight.w500),
+                    //),
+                    Text(
+                      _getTimeRefreshed(),
+                      style: const TextStyle(
+                          fontSize: 14, color: Colors.grey),
+                    ),
                     const SizedBox(height: 20),
                     FutureBuilder(
                       future: _sensorDataFuture,
