@@ -1,4 +1,5 @@
 //import 'Others tab/account_management_page.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'Others tab/account_settings_page.dart';
@@ -27,48 +28,12 @@ class ContainerState extends ChangeNotifier {
   }
 }
 
-Future<int?> getStoredInt(String key) async {
+Future<String?> getStoredString(String key) async {
   final prefs = await SharedPreferences.getInstance();
-  return prefs.getInt('user_id_pref');
+  return prefs.getString(key);
 }
 
-Future<void> fetchData(int storedInt, String scannedCode) async {
-  final supabase = Supabase.instance.client;
 
-  final response = await supabase
-      .from('Containers_test') // Replace with your table name
-      .select('container_id, hardware_id, user_id, "Hardware_Sensors_Test".qr_value')
-      .eq('user_id', storedInt)
-      .eq('qr_value', scannedCode)
-      .maybeSingle(); // Use `maybeSingle()` to avoid errors if no match is found
-
-  if (response != null) {
-    print("Data fetched: $response");
-  } else {
-    print("No matching record found.");
-  }
-}
-
-void performQuery(BuildContext context) async {
-  int? storedInt = await getStoredInt("your_int_key");
-
-  if (storedInt == null) {
-    print("No int found in SharedPreferences.");
-    return;
-  }
-
-  // Navigate to the scanner screen
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => ScannerPage(
-        onScanned: (scannedCode) {
-          fetchData(storedInt, scannedCode);
-        },
-      ),
-    ),
-  );
-}
 
 class HomePageMember extends StatefulWidget {
   const HomePageMember({super.key});
@@ -1072,6 +1037,72 @@ class _ContainerPageState extends State<ContainerPage> {
     });
   }
 
+  Future<void> fetchData(int storedInt, String scannedCode) async {
+  final contSupabase = Supabase.instance.client;
+
+  final checkHardwareTableResponse = await contSupabase
+      .from('Hardware_Sensors_Test')
+      .select() 
+      .eq('qr_value',scannedCode)
+      .maybeSingle();
+
+  final checkContainerResponse = await contSupabase
+      .from('Containers_test')
+      .select('container_id, hardware_id, user_id') // Use dot notation with !inner for join
+      .eq('hardware_id', checkHardwareTableResponse?['hardware_id'])
+      .eq('user_id', storedInt)
+      .maybeSingle(); // Use `maybeSingle()` to avoid errors if no match is found
+
+  if (checkContainerResponse != null) {
+    print("Data fetched: $checkContainerResponse");
+    showToast("This container is already added");
+  } else {
+      await contSupabase
+      .from('Containers_test')
+      .insert({
+    'hardware_id': checkHardwareTableResponse?['hardware_id'],
+    'user_id': storedInt,
+    'date_added': DateFormat('yyyy-MM-dd kk:mm:ss').format(DateTime.now()),
+  });
+      _fetchContainers();
+      showToast("Container addded");
+  }
+}
+
+void showToast(String message) {
+  Fluttertoast.showToast(
+    msg: message,
+    toastLength: Toast.LENGTH_SHORT,
+    gravity: ToastGravity.BOTTOM,
+    backgroundColor: const Color(0xAA000000),
+    textColor: const Color(0xFFFFFFFF),
+    fontSize: 16.0,
+  );
+}
+
+void performQuery(BuildContext context) async {
+  String? storedString = await getStoredString("user_id_pref");
+
+  int storedInt = int.parse(storedString ?? "");
+
+  if (storedInt == null) {
+    print("No int found in SharedPreferences.");
+    return;
+  }
+
+  // Navigate to the scanner screen
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => ScannerPage(
+        onScanned: (scannedCode) {
+          fetchData(storedInt, scannedCode);
+        },
+      ),
+    ),
+  );
+}
+
   @override
   Widget build(BuildContext context) {
     final containerState = Provider.of<ContainerState>(context);
@@ -1096,7 +1127,7 @@ class _ContainerPageState extends State<ContainerPage> {
                     backgroundColor: Colors.green,
                     minimumSize: const Size(double.infinity, 50),
                   ),
-                  onPressed: () => performQuery(context),
+                  onPressed: () async {performQuery(context); _fetchContainers;},
                   icon: const Icon(Icons.add, color: Colors.white),
                   label: const Text('New container',
                       style: TextStyle(color: Colors.white)),
