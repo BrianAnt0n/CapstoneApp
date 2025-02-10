@@ -206,96 +206,135 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Widget buildBarChart(
       List<Map<String, dynamic>> data, String title, String key, Color color) {
-    // Set maxY based on data type
-    double fixedMaxY;
-    if (key.contains('temperature')) {
-      fixedMaxY = 100; // Temperature scale (0-100°C)
-    } else if (key.contains('moisture') || key.contains('humidity')) {
-      fixedMaxY = 100; // Moisture & Humidity scale (0-100%)
-    } else if (key.contains('ph')) {
-      fixedMaxY = 14; // pH Level scale (0-14)
-    } else {
-      fixedMaxY = 100; // Default if unknown
-    }
+    try {
+      print("Building chart for $title with ${data.length} data points.");
 
-    
-    double graphHeight =
-        fixedMaxY > 50 ? 250 : 200; // Taller graphs get more space
+      double fixedMaxY;
+      if (key.contains('temperature')) {
+        fixedMaxY = 100;
+      } else if (key.contains('moisture') || key.contains('humidity')) {
+        fixedMaxY = 100;
+      } else if (key.contains('ph')) {
+        fixedMaxY = 14;
+      } else {
+        fixedMaxY = 100;
+      }
 
-    return Container(
-      height: graphHeight + 50,
-      width: data.length * 50.0, 
-      padding: const EdgeInsets.only(
-          right: 30.0, top: 30.0), 
-      child: BarChart(
-        BarChartData(
-          maxY: fixedMaxY, 
-          alignment: BarChartAlignment.spaceAround,
-          titlesData: FlTitlesData(
-            leftTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                reservedSize: 40, // Ensures enough space for Y-axis labels
-                getTitlesWidget: (value, meta) {
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 5.0),
-                    child: Text(
-                      value.toInt().toString(),
-                      style: const TextStyle(fontSize: 12, color: Colors.black),
-                    ),
-                  );
-                },
-              ),
-            ),
-            rightTitles: AxisTitles(
-              sideTitles:
-                  SideTitles(showTitles: false), // Hide right-side labels
-            ),
-            bottomTitles: AxisTitles(
-              sideTitles: SideTitles(
-                showTitles: true,
-                reservedSize: 20,
-                getTitlesWidget: (value, meta) {
-                  int index = value.toInt();
-                  if (index >= 0 && index < data.length) {
-                    DateTime date = DateTime.parse(data[index]['timestamp']);
+      double chartHeight = fixedMaxY > 50 ? 250 : 200;
+
+      return Container(
+        height: chartHeight + 50,
+        width: data.length * 50.0,
+        padding: const EdgeInsets.only(right: 30.0, top: 20.0),
+        child: BarChart(
+          BarChartData(
+            maxY: fixedMaxY,
+            alignment: BarChartAlignment.spaceAround,
+            titlesData: FlTitlesData(
+              leftTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: 40,
+                  getTitlesWidget: (value, meta) {
                     return Padding(
-                      padding: const EdgeInsets.only(top: 8.0),
-                      child: Text("${date.month}/${date.day}",
-                          style: const TextStyle(fontSize: 10)),
+                      padding: const EdgeInsets.only(right: 5.0),
+                      child: Text(
+                        value.toInt().toString(),
+                        style:
+                            const TextStyle(fontSize: 12, color: Colors.black),
+                      ),
                     );
-                  }
-                  return const SizedBox.shrink();
-                },
+                  },
+                ),
+              ),
+              rightTitles: AxisTitles(
+                sideTitles: SideTitles(showTitles: false),
+              ),
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: 20,
+                  getTitlesWidget: (value, meta) {
+                    int index = value.toInt();
+                    if (index >= 0 && index < data.length) {
+                      DateTime date = DateTime.parse(data[index]['timestamp']);
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 8.0),
+                        child: Text(
+                          "${date.month}/${date.day}",
+                          style: const TextStyle(fontSize: 10),
+                        ),
+                      );
+                    }
+                    print("Bottom label index out of range: $index");
+                    return const SizedBox.shrink();
+                  },
+                ),
+              ),
+              topTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  reservedSize: 20,
+                  getTitlesWidget: (value, meta) {
+                    int index = value.toInt();
+                    int reversedIndex = data.length - index;
+                    if (reversedIndex <= 0 || reversedIndex > data.length) {
+                      print("Top label index out of range: $reversedIndex");
+                      return const SizedBox.shrink();
+                    }
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8.0),
+                      child: Text(
+                        "$reversedIndex",
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black,
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
+            borderData: FlBorderData(show: false),
+            gridData: FlGridData(
+              show: true,
+              drawVerticalLine: false,
+              checkToShowHorizontalLine: (value) => value % 10 == 0,
+            ),
+            barGroups: data.asMap().entries.map((entry) {
+              int index = entry.key;
+              double value = (entry.value[key] as num?)?.toDouble() ?? 0;
+
+              if (index >= data.length) {
+                print("Bar chart index out of range: $index");
+                return null!;
+              }
+
+              return BarChartGroupData(
+                x: index,
+                barsSpace: 12,
+                barRods: [
+                  BarChartRodData(
+                    toY: value,
+                    color: color,
+                    width: 24,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ],
+              );
+            }).toList(),
           ),
-          borderData: FlBorderData(show: false),
-          gridData: FlGridData(
-            show: true,
-            drawVerticalLine: false,
-            checkToShowHorizontalLine: (value) =>
-                value % 10 == 0, // Keeps Y-axis grid clean
-          ),
-          barGroups: data.asMap().entries.map((entry) {
-            int index = entry.key;
-            double value = (entry.value[key] as num?)?.toDouble() ?? 0;
-            return BarChartGroupData(
-              x: index,
-              barsSpace: 12, // Slightly increased bar spacing
-              barRods: [
-                BarChartRodData(
-                  toY: value,
-                  color: color,
-                  width: 24,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ],
-            );
-          }).toList(),
         ),
-      ),
-    );
+      );
+    } catch (e, stacktrace) {
+      print("Error in buildBarChart: $e");
+      print(stacktrace);
+      return const Center(
+        child: Text("Error loading chart"),
+      );
+    }
   }
 
   Future<void> fetchContainerDetails(int containerId) async {
@@ -463,11 +502,6 @@ class _DashboardPageState extends State<DashboardPage> {
                                   Colors.deepPurple),
                               buildSensorCard(Icons.cloud, 'Humidity',
                                   '${sensorData['humidity']}%', Colors.orange),
-                                  buildSensorCard(
-                                  Icons.access_time,
-                                  'Timestamp',
-                                  formatTimestamp(sensorData['timestamp']),
-                                  Colors.grey),
                             ],
                           );
                         }
@@ -626,12 +660,18 @@ class _DashboardPageState extends State<DashboardPage> {
                         } else {
                           List<Map<String, dynamic>> historyData =
                               (snapshot.data as List<Map<String, dynamic>>)
-                                  .reversed
-                                  .toList(); // ✅ Reverse data
+                                  .toList();
+
+                          ScrollController scrollController =
+                              ScrollController();
+
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            scrollController.jumpTo(
+                                scrollController.position.maxScrollExtent);
+                          });
 
                           return SingleChildScrollView(
-                            scrollDirection:
-                                Axis.vertical, // ✅ Enables vertical scrolling
+                            scrollDirection: Axis.vertical,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -650,8 +690,9 @@ class _DashboardPageState extends State<DashboardPage> {
                                       fontSize: 14, color: Colors.grey),
                                 ),
                                 SingleChildScrollView(
-                                  scrollDirection: Axis
-                                      .horizontal, // ✅ Keeps graph scrollable
+                                  controller: scrollController,
+                                  scrollDirection: Axis.horizontal,
+                                  reverse: true,
                                   child: buildBarChart(
                                       historyData,
                                       'Temperature',
@@ -660,9 +701,8 @@ class _DashboardPageState extends State<DashboardPage> {
                                 ),
                                 const SizedBox(height: 20),
                                 Divider(
-                                    thickness: 2,
-                                    color:
-                                        Colors.grey.shade400), // ✅ Visible now!
+                                    thickness: 2, color: Colors.grey.shade400),
+
                                 const SizedBox(height: 20),
 
                                 // Moisture Graph Section
@@ -678,13 +718,16 @@ class _DashboardPageState extends State<DashboardPage> {
                                       fontSize: 14, color: Colors.grey),
                                 ),
                                 SingleChildScrollView(
+                                  controller: scrollController,
                                   scrollDirection: Axis.horizontal,
+                                  reverse: true,
                                   child: buildBarChart(historyData, 'Moisture',
                                       'moisture', Colors.blue),
                                 ),
                                 const SizedBox(height: 20),
                                 Divider(
                                     thickness: 2, color: Colors.grey.shade400),
+
                                 const SizedBox(height: 20),
 
                                 // pH Level 1 Graph Section
@@ -700,13 +743,16 @@ class _DashboardPageState extends State<DashboardPage> {
                                       fontSize: 14, color: Colors.grey),
                                 ),
                                 SingleChildScrollView(
+                                  controller: scrollController,
                                   scrollDirection: Axis.horizontal,
+                                  reverse: true,
                                   child: buildBarChart(historyData,
                                       'pH Level 1', 'ph_level1', Colors.purple),
                                 ),
                                 const SizedBox(height: 20),
                                 Divider(
                                     thickness: 2, color: Colors.grey.shade400),
+
                                 const SizedBox(height: 20),
 
                                 // pH Level 2 Graph Section
@@ -722,7 +768,9 @@ class _DashboardPageState extends State<DashboardPage> {
                                       fontSize: 14, color: Colors.grey),
                                 ),
                                 SingleChildScrollView(
+                                  controller: scrollController,
                                   scrollDirection: Axis.horizontal,
+                                  reverse: true,
                                   child: buildBarChart(
                                       historyData,
                                       'pH Level 2',
@@ -732,6 +780,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                 const SizedBox(height: 20),
                                 Divider(
                                     thickness: 2, color: Colors.grey.shade400),
+
                                 const SizedBox(height: 20),
 
                                 // Humidity Graph Section
@@ -747,7 +796,9 @@ class _DashboardPageState extends State<DashboardPage> {
                                       fontSize: 14, color: Colors.grey),
                                 ),
                                 SingleChildScrollView(
+                                  controller: scrollController,
                                   scrollDirection: Axis.horizontal,
+                                  reverse: true,
                                   child: buildBarChart(historyData, 'Humidity',
                                       'humidity', Colors.orange),
                                 ),
