@@ -95,6 +95,8 @@ class DashboardPage extends StatefulWidget {
   _DashboardPageState createState() => _DashboardPageState();
 }
 
+DateTime? _containerAddedDate; // Holds the compost start date
+
 class _DashboardPageState extends State<DashboardPage> {
   Future<Map<String, dynamic>>? _sensorDataFuture;
   Future<List<Map<String, dynamic>>>? _notesFuture;
@@ -333,41 +335,22 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Future<void> fetchContainerDetails(int containerId) async {
     final supabase = Supabase.instance.client;
+
     try {
       final response = await supabase
           .from('Containers_test')
           .select('date_added')
           .eq('container_id', containerId)
           .single();
+
       if (response['date_added'] != null) {
-        DateTime addedDate = DateTime.parse(response['date_added']);
-        _calculateContainerAge(addedDate);
+        setState(() {
+          _containerAddedDate = DateTime.parse(response['date_added']);
+          _calculateContainerAge(); // ✅ Call to update compost age
+        });
       }
-    } catch (error) {}
-  }
-
-  void _calculateContainerAge(DateTime addedDate) {
-    final now = DateTime.now();
-    final difference = now.difference(addedDate);
-    int days = difference.inDays;
-    int weeks = (days / 7).floor();
-
-    if (days < 7) {
-      _containerAge = "$days ${days == 1 ? 'day' : 'days'}";
-    } else {
-      _containerAge = "$weeks ${weeks == 1 ? 'week' : 'weeks'}";
-    }
-
-    if (weeks >= 12) {
-      _ageColor = Colors.red;
-    } else if (weeks >= 7) {
-      _ageColor = Colors.orange;
-    } else {
-      _ageColor = Colors.green;
-    }
-
-    if (mounted) {
-      setState(() {});
+    } catch (error) {
+      print("Error fetching container details: $error");
     }
   }
 
@@ -439,6 +422,78 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
+  void _openFullCalendar() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Full Calendar inside the popup
+                TableCalendar(
+                  focusedDay: _selectedDate,
+                  firstDay: DateTime(2000),
+                  lastDay: DateTime(2100),
+                  calendarFormat: CalendarFormat.month, // Show full month
+                  selectedDayPredicate: (day) => isSameDay(_selectedDate, day),
+                  onDaySelected: (selectedDay, focusedDay) {
+                    setState(() {
+                      _selectedDate = selectedDay;
+                      _notesFuture =
+                          fetchNotes(selectedContainerId!, _selectedDate);
+                      _calculateContainerAge(); // ✅ Update the age when a date is selected
+                    });
+                    Navigator.pop(context); // Close the popup after selection
+                  },
+                  headerStyle: const HeaderStyle(
+                    formatButtonVisible: false, // ✅ Hide the week toggle button
+                    titleCentered: true,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("Close"),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _calculateContainerAge() {
+    if (_containerAddedDate == null) {
+      _containerAge = "Unknown";
+      return;
+    }
+
+    final difference = _selectedDate.difference(_containerAddedDate!);
+    int days = difference.inDays;
+    int weeks = (days / 7).floor(); // Always display as weeks
+
+    _containerAge = "$weeks ${weeks == 1 ? 'WEEK' : 'WEEKS'}";
+
+    // Set color based on compost age
+    if (weeks >= 12) {
+      _ageColor = Colors.red;
+    } else if (weeks >= 7) {
+      _ageColor = Colors.orange;
+    } else {
+      _ageColor = Colors.green;
+    }
+
+    if (mounted) {
+      setState(() {}); // Update UI
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return selectedContainerId == null
@@ -506,81 +561,94 @@ class _DashboardPageState extends State<DashboardPage> {
                     const SizedBox(height: 10),
 
 // TableCalendar with Compost Age and Built-in Navigation
-                    TableCalendar(
-                      focusedDay: _selectedDate, // Keep only one instance
-                      firstDay: DateTime(2000),
-                      lastDay: DateTime(2100),
-                      headerStyle: HeaderStyle(
-                        titleCentered: true,
-                        formatButtonVisible: false, // Disable format toggle
-                        titleTextFormatter: (date, locale) {
-                          return DateFormat.yMMMM(locale).format(date);
-                        },
-                        leftChevronIcon:
-                            const Icon(Icons.chevron_left), // Left arrow
-                        rightChevronIcon:
-                            const Icon(Icons.chevron_right), // Right arrow
-                      ),
-                      calendarBuilders: CalendarBuilders(
-                        headerTitleBuilder: (context, date) {
-                          String formattedDate =
-                              DateFormat.yMMMM().format(date);
-
-                          // Determine color based on compost age
-                          Color ageColor =
-                              Colors.green; // Default: Green (1-6 weeks)
-                          if (_containerAge.contains("weeks")) {
-                            int? weeks =
-                                int.tryParse(_containerAge.split(" ")[0]);
-                            if (weeks != null) {
-                              if (weeks >= 7 && weeks <= 11) {
-                                ageColor = Colors.orange; // 7-11 weeks → Orange
-                              } else if (weeks >= 12) {
-                                ageColor = Colors.red; // 12+ weeks → Red
-                              }
-                            }
-                          }
-
-                          return Column(
-                            children: [
-                              if (_containerAge
-                                  .isNotEmpty) // Compost Age Indicator
-                                Container(
-                                  margin: const EdgeInsets.only(bottom: 4),
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: ageColor,
-                                    borderRadius: BorderRadius.circular(8),
+                    Column(
+                      children: [
+                        // Weekly Calendar
+                        TableCalendar(
+                          focusedDay: _selectedDate,
+                          firstDay: DateTime(2000),
+                          lastDay: DateTime(2100),
+                          calendarFormat:
+                              CalendarFormat.week, // Show only one week
+                          headerStyle: HeaderStyle(
+                            titleCentered: true,
+                            formatButtonVisible: false,
+                            leftChevronIcon: const Icon(Icons.chevron_left),
+                            rightChevronIcon: const Icon(Icons.chevron_right),
+                            titleTextFormatter: (date, locale) {
+                              return DateFormat.yMMMM(locale).format(date);
+                            },
+                          ),
+                          calendarBuilders: CalendarBuilders(
+                            headerTitleBuilder: (context, date) {
+                              return Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Opacity(
+                                    opacity: 0.0,
+                                    child: IconButton(
+                                      icon: const Icon(Icons.arrow_left),
+                                      onPressed: () {},
+                                    ),
                                   ),
-                                  child: Text(
-                                    _containerAge,
+                                  Text(
+                                    DateFormat.yMMMM().format(date),
                                     style: const TextStyle(
-                                      color: Colors.white,
+                                      fontSize: 18,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                ),
-                              Text(
-                                formattedDate,
-                                style: const TextStyle(
-                                    fontSize: 18, fontWeight: FontWeight.bold),
-                                overflow: TextOverflow
-                                    .ellipsis, // Prevents overflow issues
+                                  IconButton(
+                                    icon: const Icon(Icons.calendar_month),
+                                    onPressed: () {
+                                      _openFullCalendar(); // Open full calendar
+                                    },
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                          selectedDayPredicate: (day) =>
+                              isSameDay(_selectedDate, day),
+                          onDaySelected: (selectedDay, focusedDay) {
+                            setState(() {
+                              _selectedDate = selectedDay;
+                              _notesFuture = fetchNotes(
+                                  selectedContainerId!, _selectedDate);
+                              _calculateContainerAge(); // ✅ Update age dynamically
+                            });
+                          },
+                        ),
+
+                        const SizedBox(
+                            height: 16), // Space between calendar and age text
+
+                        // Container Age Display
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            const Text(
+                              "Container Age:",
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black,
                               ),
-                            ],
-                          );
-                        },
-                      ),
-                      selectedDayPredicate: (day) =>
-                          isSameDay(_selectedDate, day),
-                      onDaySelected: (selectedDay, focusedDay) {
-                        setState(() {
-                          _selectedDate = selectedDay;
-                          _notesFuture =
-                              fetchNotes(selectedContainerId!, _selectedDate);
-                        });
-                      },
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              _containerAge, // ✅ Show container/compost age
+                              style: TextStyle(
+                                fontSize: 30, // Large Text
+                                fontWeight: FontWeight.bold,
+                                color:
+                                    _ageColor, // ✅ Color changes dynamically based on age
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
 
                     const SizedBox(height: 20),
@@ -621,7 +689,9 @@ class _DashboardPageState extends State<DashboardPage> {
                       },
                     ),
 
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 30),
+                    const Divider(thickness: 2),
+                    const SizedBox(height: 10),
                     const Text('Historical Data Graph',
                         style: TextStyle(
                             fontSize: 24, fontWeight: FontWeight.bold)),
@@ -629,16 +699,6 @@ class _DashboardPageState extends State<DashboardPage> {
                       'Data for the last 24 hours',
                       style: TextStyle(
                           fontSize: 14, fontWeight: FontWeight.normal),
-                    ),
-
-                    Padding(
-                      padding: EdgeInsets.only(
-                          top: 10), // ✅ Adds two blank spaces (16 pixels)
-                      child: Text(
-                        '',
-                        style: TextStyle(
-                            fontSize: 20, fontWeight: FontWeight.bold),
-                      ),
                     ),
 
                     FutureBuilder(
