@@ -165,12 +165,15 @@ class _DashboardPageState extends State<DashboardPage> {
         fixedMaxY = 100;
       }
 
-      double chartHeight = fixedMaxY > 50 ? 250 : 200;
+      double chartHeight = fixedMaxY > 50
+          ? 320
+          : 270; // Increased height to prevent tooltip cutoff
 
       return Container(
-        height: chartHeight + 50,
+        height: chartHeight + 50, // Ensures extra space for tooltips
         width: data.length * 50.0,
-        padding: const EdgeInsets.only(right: 30.0, top: 20.0),
+        padding: const EdgeInsets.only(
+            right: 30.0, top: 40.0), // More padding at the top
         child: BarChart(
           BarChartData(
             maxY: fixedMaxY,
@@ -541,8 +544,6 @@ class _DashboardPageState extends State<DashboardPage> {
                       style: TextStyle(
                           fontSize: 14, fontWeight: FontWeight.normal),
                     ),
-
-
 
                     FutureBuilder(
                       future: _historyFuture,
