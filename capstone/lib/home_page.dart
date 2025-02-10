@@ -450,11 +450,11 @@ class _DashboardPageState extends State<DashboardPage> {
                   onDaySelected: (selectedDay, focusedDay) {
                     setState(() {
                       _selectedDate = selectedDay;
-                      _notesFuture = fetchNotes(selectedContainerId!,
-                          _selectedDate); // ✅ Fetch notes when date is selected
+                      _notesFuture =
+                          fetchNotes(selectedContainerId!, _selectedDate);
+                      _calculateContainerAge(); // ✅ Update the age when a date is selected
                     });
-                    Navigator.pop(
-                        context); // Close the popup when a date is selected
+                    Navigator.pop(context); // Close the popup after selection
                   },
                   headerStyle: const HeaderStyle(
                     formatButtonVisible: false, // ✅ Hide the week toggle button
