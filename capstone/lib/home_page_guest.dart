@@ -12,6 +12,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'constants.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'dart:async';
 
 // State Management: Tracks the selected container
 class ContainerState extends ChangeNotifier {
@@ -31,14 +32,46 @@ class HomePageGuest extends StatefulWidget {
 }
 
 class _HomePageGuestState extends State<HomePageGuest> {
-  int _currentIndex = 0; // Tracks the selected tab index
+ int _currentIndex = 0; // Tracks the selected tab index
+Timer? _autoRefreshTimer;
 
+/// Sets up auto-refresh for the Dashboard every 5 minutes
+  void _setupAutoRefresh() {
+  _autoRefreshTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
+    if (mounted && _currentIndex == 0) { // Only refresh if Dashboard is active
+      setState(() {});
+    }
+  });
+}
+  
+  
   // Pages for bottom navigation
   final List<Widget> _pages = [
     const DashboardPage(),
     const ContainerPage(),
     const OthersPage(),
   ];
+  
+  @override
+void initState() {
+super.initState();
+_setupAutoRefresh(); // Initialize auto-refresh only for Dashboard
+}
+ 
+  String formatTimestamp(String timestamp) {
+    try {
+      DateTime parsedDate = DateTime.parse(timestamp);
+      return DateFormat('yyyy-MM-dd hh:mm a').format(parsedDate);
+    } catch (e) {
+      return 'Invalid Date';
+    }
+  }
+
+   @override
+  void dispose() {
+    _autoRefreshTimer?.cancel(); // Cancel auto-refresh timer when disposed
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
