@@ -44,6 +44,9 @@ dependencies:
   fl_chart: ^0.70.2
   mobile_scanner: ^6.0.5
   qr_scanner_overlay: ^0.0.2
+  fluttertoast: ^8.2.11
+  image_picker: ^1.1.2
+
 
 dev_dependencies:
   flutter_test:
