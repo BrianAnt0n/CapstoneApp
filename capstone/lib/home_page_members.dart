@@ -33,8 +33,6 @@ Future<String?> getStoredString(String key) async {
   return prefs.getString(key);
 }
 
-
-
 class HomePageMember extends StatefulWidget {
   const HomePageMember({super.key});
 
@@ -115,9 +113,6 @@ class _DashboardPageState extends State<DashboardPage> {
   String _containerAge = "";
   Color _ageColor = Colors.green;
   DateTime? _lastRefreshTime;
-  
-
-  
 
   @override
   void didChangeDependencies() {
@@ -142,23 +137,23 @@ class _DashboardPageState extends State<DashboardPage> {
     });
   }
 
- String _getLastRefreshedText() {
-  if (_lastRefreshTime == null) return "Not refreshed yet";
-  final difference = DateTime.now().difference(_lastRefreshTime!);
-  if (difference.inMinutes < 1) { // Changed to minutes and checking if less than 1
-    return "Last Refreshed: Less than a minute ago"; // More user-friendly
-  } else if (difference.inMinutes < 60) {
-    return "Last Refreshed: ${difference.inMinutes} minutes ago";
-  } else {
-    return "Last Refreshed: ${difference.inHours} hours ago";
+  String _getLastRefreshedText() {
+    if (_lastRefreshTime == null) return "Not refreshed yet";
+    final difference = DateTime.now().difference(_lastRefreshTime!);
+    if (difference.inMinutes < 1) {
+      // Changed to minutes and checking if less than 1
+      return "Last Refreshed: Less than a minute ago"; // More user-friendly
+    } else if (difference.inMinutes < 60) {
+      return "Last Refreshed: ${difference.inMinutes} minutes ago";
+    } else {
+      return "Last Refreshed: ${difference.inHours} hours ago";
+    }
   }
-}
-
 
   String _getTimeRefreshed() {
     return _lastRefreshTime != null
         ? "Time Refreshed: ${DateFormat('hh:mm:ss a').format(_lastRefreshTime!)}"
-        : "Time Refreshed: Not available";
+        : "Time Refreshed: Refresh Pending";
   }
 
   Future<List<Map<String, dynamic>>> fetchHistoryData(int containerId) async {
@@ -525,11 +520,11 @@ class _DashboardPageState extends State<DashboardPage> {
 
     // Set color based on compost age
     if (weeks >= 12) {
-      _ageColor = Colors.red;
+      _ageColor = Colors.green;
     } else if (weeks >= 7) {
       _ageColor = Colors.orange;
     } else {
-      _ageColor = Colors.green;
+      _ageColor = Colors.red;
     }
 
     if (mounted) {
@@ -537,7 +532,7 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
- @override
+  @override
   Widget build(BuildContext context) {
     return selectedContainerId == null
         ? const Center(
@@ -556,14 +551,13 @@ class _DashboardPageState extends State<DashboardPage> {
                             fontSize: 24, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 5),
                     //Text(
-                     // _getLastRefreshedText(),
-                     // style: const TextStyle(
-                       //   fontSize: 16, fontWeight: FontWeight.w500),
+                    // _getLastRefreshedText(),
+                    // style: const TextStyle(
+                    //   fontSize: 16, fontWeight: FontWeight.w500),
                     //),
                     Text(
                       _getTimeRefreshed(),
-                      style: const TextStyle(
-                          fontSize: 14, color: Colors.grey),
+                      style: const TextStyle(fontSize: 14, color: Colors.grey),
                     ),
                     const SizedBox(height: 20),
                     FutureBuilder(
@@ -679,20 +673,69 @@ class _DashboardPageState extends State<DashboardPage> {
                             const Text(
                               "Container Age:",
                               style: TextStyle(
-                                fontSize: 17,
+                                fontSize: 22,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.black,
                               ),
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              _containerAge, // ✅ Show container/compost age
+                              _containerAge, // ✅ Show container age
                               style: TextStyle(
-                                fontSize: 30, // Large Text
+                                fontSize: 26, // Large Text
                                 fontWeight: FontWeight.bold,
-                                color:
-                                    _ageColor, // ✅ Color changes dynamically based on age
+                                color: _ageColor, // ✅ Color dynamically updates
                               ),
+                            ),
+
+                            const SizedBox(height: 30), // Space before legend
+
+                            // Legend
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                // Red (Not Ready)
+                                Container(
+                                  width: 16,
+                                  height: 16,
+                                  decoration: BoxDecoration(
+                                      color: Colors.red,
+                                      shape: BoxShape.circle),
+                                ),
+                                const SizedBox(width: 8),
+                                const Text("Not Ready",
+                                    style: TextStyle(fontSize: 14)),
+
+                                const SizedBox(
+                                    width: 16), // Space between legends
+
+                                // Yellow (Decomposing)
+                                Container(
+                                  width: 16,
+                                  height: 16,
+                                  decoration: BoxDecoration(
+                                      color: Colors.orange,
+                                      shape: BoxShape.circle),
+                                ),
+                                const SizedBox(width: 8),
+                                const Text("Decomposing",
+                                    style: TextStyle(fontSize: 14)),
+
+                                const SizedBox(
+                                    width: 16), // Space between legends
+
+                                // Green (Ready)
+                                Container(
+                                  width: 16,
+                                  height: 16,
+                                  decoration: BoxDecoration(
+                                      color: Colors.green,
+                                      shape: BoxShape.circle),
+                                ),
+                                const SizedBox(width: 8),
+                                const Text("Ready",
+                                    style: TextStyle(fontSize: 14)),
+                              ],
                             ),
                           ],
                         ),
@@ -1038,70 +1081,69 @@ class _ContainerPageState extends State<ContainerPage> {
   }
 
   Future<void> fetchData(int storedInt, String scannedCode) async {
-  final contSupabase = Supabase.instance.client;
+    final contSupabase = Supabase.instance.client;
 
-  final checkHardwareTableResponse = await contSupabase
-      .from('Hardware_Sensors_Test')
-      .select() 
-      .eq('qr_value',scannedCode)
-      .maybeSingle();
+    final checkHardwareTableResponse = await contSupabase
+        .from('Hardware_Sensors_Test')
+        .select()
+        .eq('qr_value', scannedCode)
+        .maybeSingle();
 
-  final checkContainerResponse = await contSupabase
-      .from('Containers_test')
-      .select('container_id, hardware_id, user_id') // Use dot notation with !inner for join
-      .eq('hardware_id', checkHardwareTableResponse?['hardware_id'])
-      .eq('user_id', storedInt)
-      .maybeSingle(); // Use `maybeSingle()` to avoid errors if no match is found
+    final checkContainerResponse = await contSupabase
+        .from('Containers_test')
+        .select(
+            'container_id, hardware_id, user_id') // Use dot notation with !inner for join
+        .eq('hardware_id', checkHardwareTableResponse?['hardware_id'])
+        .eq('user_id', storedInt)
+        .maybeSingle(); // Use `maybeSingle()` to avoid errors if no match is found
 
-  if (checkContainerResponse != null) {
-    print("Data fetched: $checkContainerResponse");
-    showToast("This container is already added");
-  } else {
-      await contSupabase
-      .from('Containers_test')
-      .insert({
-    'hardware_id': checkHardwareTableResponse?['hardware_id'],
-    'user_id': storedInt,
-    'date_added': DateFormat('yyyy-MM-dd kk:mm:ss').format(DateTime.now()),
-  });
+    if (checkContainerResponse != null) {
+      print("Data fetched: $checkContainerResponse");
+      showToast("This container is already added");
+    } else {
+      await contSupabase.from('Containers_test').insert({
+        'hardware_id': checkHardwareTableResponse?['hardware_id'],
+        'user_id': storedInt,
+        'date_added': DateFormat('yyyy-MM-dd kk:mm:ss').format(DateTime.now()),
+      });
       _fetchContainers();
       showToast("Container addded");
-  }
-}
-
-void showToast(String message) {
-  Fluttertoast.showToast(
-    msg: message,
-    toastLength: Toast.LENGTH_SHORT,
-    gravity: ToastGravity.BOTTOM,
-    backgroundColor: const Color(0xAA000000),
-    textColor: const Color(0xFFFFFFFF),
-    fontSize: 16.0,
-  );
-}
-
-void performQuery(BuildContext context) async {
-  String? storedString = await getStoredString("user_id_pref");
-
-  int storedInt = int.parse(storedString ?? "");
-
-  if (storedInt == null) {
-    print("No int found in SharedPreferences.");
-    return;
+    }
   }
 
-  // Navigate to the scanner screen
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => ScannerPage(
-        onScanned: (scannedCode) {
-          fetchData(storedInt, scannedCode);
-        },
+  void showToast(String message) {
+    Fluttertoast.showToast(
+      msg: message,
+      toastLength: Toast.LENGTH_SHORT,
+      gravity: ToastGravity.BOTTOM,
+      backgroundColor: const Color(0xAA000000),
+      textColor: const Color(0xFFFFFFFF),
+      fontSize: 16.0,
+    );
+  }
+
+  void performQuery(BuildContext context) async {
+    String? storedString = await getStoredString("user_id_pref");
+
+    int storedInt = int.parse(storedString ?? "");
+
+    if (storedInt == null) {
+      print("No int found in SharedPreferences.");
+      return;
+    }
+
+    // Navigate to the scanner screen
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ScannerPage(
+          onScanned: (scannedCode) {
+            fetchData(storedInt, scannedCode);
+          },
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1127,7 +1169,10 @@ void performQuery(BuildContext context) async {
                     backgroundColor: Colors.green,
                     minimumSize: const Size(double.infinity, 50),
                   ),
-                  onPressed: () async {performQuery(context); _fetchContainers;},
+                  onPressed: () async {
+                    performQuery(context);
+                    _fetchContainers;
+                  },
                   icon: const Icon(Icons.add, color: Colors.white),
                   label: const Text('New container',
                       style: TextStyle(color: Colors.white)),

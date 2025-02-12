@@ -95,10 +95,9 @@ DateTime? _containerAddedDate; // Holds the compost start date
 
 class _DashboardPageState extends State<DashboardPage> {
   Future<Map<String, dynamic>>? _sensorDataFuture;
-  Future<List<Map<String, dynamic>>>? _notesFuture;
+
   Future<List<Map<String, dynamic>>>? _historyFuture;
   int? selectedContainerId;
-  final TextEditingController _notesController = TextEditingController();
   DateTime _selectedDate = DateTime.now();
   String _containerAge = "";
   Color _ageColor = Colors.green;
@@ -143,7 +142,7 @@ class _DashboardPageState extends State<DashboardPage> {
   String _getTimeRefreshed() {
     return _lastRefreshTime != null
         ? "Time Refreshed: ${DateFormat('hh:mm:ss a').format(_lastRefreshTime!)}"
-        : "Time Refreshed: Not available";
+        : "Time Refreshed: Refresh Pending";
   }
 
   Future<List<Map<String, dynamic>>> fetchHistoryData(int containerId) async {
