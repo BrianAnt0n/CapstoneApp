@@ -14,8 +14,6 @@ import 'constants.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'notification_page.dart';
-
 
 // State Management: Tracks the selected container
 class ContainerState extends ChangeNotifier {
@@ -59,24 +57,13 @@ class _HomePageState extends State<HomePage> {
   }
 
   @override
-Widget build(BuildContext context) {
-  return ChangeNotifierProvider(
-    create: (_) => ContainerState(),
-    child: Scaffold(
-      appBar: AppBar(
-        title: const Text('E-ComposThink Home - Admin'), // AppBar title
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications), // Notification bell icon
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => NotificationPage()), // Navigate to NotificationPage
-              );
-            },
-          ),
-        ],
-      ),
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (_) => ContainerState(),
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('E-ComposThink Home - Admin'), // AppBar title
+        ),
         body: _pages[_currentIndex], // Show the selected page
 
         // Updated Bottom Navigation Bar with green theme
@@ -132,9 +119,6 @@ class _DashboardPageState extends State<DashboardPage> {
   String _containerAge = "";
   Color _ageColor = Colors.green;
   DateTime? _lastRefreshTime;
-  
-
-  
 
   @override
   void didChangeDependencies() {
@@ -159,23 +143,23 @@ class _DashboardPageState extends State<DashboardPage> {
     });
   }
 
- //String _getLastRefreshedText() {
-  //if (_lastRefreshTime == null) return "Not refreshed yet";
-  //final difference = DateTime.now().difference(_lastRefreshTime!);
-  //if (difference.inMinutes < 1) { // Changed to minutes and checking if less than 1
-    //return "Last Refreshed: Less than a minute ago"; // More user-friendly
-  //} else if (difference.inMinutes < 60) {
-    //return "Last Refreshed: ${difference.inMinutes} minutes ago";
-  //} else {
-    //return "Last Refreshed: ${difference.inHours} hours ago";
-  //}
-//}
-
+  String _getLastRefreshedText() {
+    if (_lastRefreshTime == null) return "Not refreshed yet";
+    final difference = DateTime.now().difference(_lastRefreshTime!);
+    if (difference.inMinutes < 1) {
+      // Changed to minutes and checking if less than 1
+      return "Last Refreshed: Less than a minute ago"; // More user-friendly
+    } else if (difference.inMinutes < 60) {
+      return "Last Refreshed: ${difference.inMinutes} minutes ago";
+    } else {
+      return "Last Refreshed: ${difference.inHours} hours ago";
+    }
+  }
 
   String _getTimeRefreshed() {
     return _lastRefreshTime != null
         ? "Time Refreshed: ${DateFormat('hh:mm:ss a').format(_lastRefreshTime!)}"
-        : "Time Refreshed: Not available";
+        : "Time Refreshed: Refresh Pending";
   }
 
   Future<List<Map<String, dynamic>>> fetchHistoryData(int containerId) async {
@@ -204,13 +188,43 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Future<void> _addNote() async {
-    if (selectedContainerId != null && _notesController.text.isNotEmpty) {
-      await addNoteToDatabase(selectedContainerId!, _notesController.text);
-      _notesController.clear();
-      setState(() {
-        _notesFuture = fetchNotes(selectedContainerId!, _selectedDate);
-      });
+    if (selectedContainerId == null) return;
+
+    // Trim the note to remove leading/trailing spaces
+    String trimmedNote = _notesController.text.trim();
+
+    // Validate if the note is empty
+    if (trimmedNote.isEmpty) {
+      _showErrorDialog("Please provide notes."); // Show popup for empty input
+      return;
     }
+
+    // Save valid note to database
+    await addNoteToDatabase(selectedContainerId!, trimmedNote);
+    _notesController.clear();
+
+    setState(() {
+      _notesFuture = fetchNotes(selectedContainerId!, _selectedDate);
+    });
+  }
+
+// Function to Show Error Popup
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Invalid Input"),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("OK"),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _onDateSelected(DateTime selectedDate) async {
@@ -542,11 +556,11 @@ class _DashboardPageState extends State<DashboardPage> {
 
     // Set color based on compost age
     if (weeks >= 12) {
-      _ageColor = Colors.red;
+      _ageColor = Colors.green;
     } else if (weeks >= 7) {
       _ageColor = Colors.orange;
     } else {
-      _ageColor = Colors.green;
+      _ageColor = Colors.red;
     }
 
     if (mounted) {
@@ -554,7 +568,12 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
- @override
+  void _uploadPicture() {
+    // TODO: Implement file picker or camera capture
+    print("Upload Picture button clicked!");
+  }
+
+  @override
   Widget build(BuildContext context) {
     return selectedContainerId == null
         ? const Center(
@@ -572,15 +591,14 @@ class _DashboardPageState extends State<DashboardPage> {
                         style: TextStyle(
                             fontSize: 24, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 5),
-                   // Text(
+                    // Text(
                     //  _getLastRefreshedText(),
-                     // style: const TextStyle(
-                       //   fontSize: 16, fontWeight: FontWeight.w500),
+                    // style: const TextStyle(
+                    //   fontSize: 16, fontWeight: FontWeight.w500),
                     //),
                     Text(
                       _getTimeRefreshed(),
-                      style: const TextStyle(
-                          fontSize: 14, color: Colors.grey),
+                      style: const TextStyle(fontSize: 14, color: Colors.grey),
                     ),
                     const SizedBox(height: 20),
                     FutureBuilder(
@@ -681,7 +699,7 @@ class _DashboardPageState extends State<DashboardPage> {
                               _selectedDate = selectedDay;
                               _notesFuture = fetchNotes(
                                   selectedContainerId!, _selectedDate);
-                              _calculateContainerAge(); // ✅ Update age dynamically
+                              _calculateContainerAge(); //  Update age dynamically
                             });
                           },
                         ),
@@ -696,20 +714,69 @@ class _DashboardPageState extends State<DashboardPage> {
                             const Text(
                               "Container Age:",
                               style: TextStyle(
-                                fontSize: 17,
+                                fontSize: 22,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.black,
                               ),
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              _containerAge, // ✅ Show container/compost age
+                              _containerAge, // ✅ Show container age
                               style: TextStyle(
-                                fontSize: 30, // Large Text
+                                fontSize: 26, // Large Text
                                 fontWeight: FontWeight.bold,
-                                color:
-                                    _ageColor, // ✅ Color changes dynamically based on age
+                                color: _ageColor, // ✅ Color dynamically updates
                               ),
+                            ),
+
+                            const SizedBox(height: 30), // Space before legend
+
+                            // Legend
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                // Red (Not Ready)
+                                Container(
+                                  width: 16,
+                                  height: 16,
+                                  decoration: BoxDecoration(
+                                      color: Colors.red,
+                                      shape: BoxShape.circle),
+                                ),
+                                const SizedBox(width: 8),
+                                const Text("Not Ready",
+                                    style: TextStyle(fontSize: 14)),
+
+                                const SizedBox(
+                                    width: 16), // Space between legends
+
+                                // Yellow (Decomposing)
+                                Container(
+                                  width: 16,
+                                  height: 16,
+                                  decoration: BoxDecoration(
+                                      color: Colors.orange,
+                                      shape: BoxShape.circle),
+                                ),
+                                const SizedBox(width: 8),
+                                const Text("Decomposing",
+                                    style: TextStyle(fontSize: 14)),
+
+                                const SizedBox(
+                                    width: 16), // Space between legends
+
+                                // Green (Ready)
+                                Container(
+                                  width: 16,
+                                  height: 16,
+                                  decoration: BoxDecoration(
+                                      color: Colors.green,
+                                      shape: BoxShape.circle),
+                                ),
+                                const SizedBox(width: 8),
+                                const Text("Ready",
+                                    style: TextStyle(fontSize: 14)),
+                              ],
                             ),
                           ],
                         ),
@@ -717,21 +784,71 @@ class _DashboardPageState extends State<DashboardPage> {
                     ),
 
                     const SizedBox(height: 20),
-                    const Text('Notes',
-                        style: TextStyle(
-                            fontSize: 24, fontWeight: FontWeight.bold)),
-                    TextField(
-                      controller: _notesController,
-                      decoration: InputDecoration(
-                        hintText: 'Enter a note',
-                        suffixIcon: IconButton(
-                          icon: const Icon(Icons.add_comment_outlined),
-                          onPressed: () {
-                            _addNote();
-                          },
-                        ),
+                    const Divider(thickness: 2),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Notes',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
+                    const SizedBox(height: 10),
+
+// Styled TextField for Notes with Inline Buttons
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200], // Light grey background
+                        borderRadius:
+                            BorderRadius.circular(12), // Rounded corners
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 4),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Expanded TextField
+                          Expanded(
+                            child: TextField(
+                              controller: _notesController,
+                              maxLines: 3, // Allow multiline input
+                              style: const TextStyle(fontSize: 16),
+                              decoration: const InputDecoration(
+                                hintText: 'Write your note here...',
+                                border:
+                                    InputBorder.none, // Remove default border
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(
+                              width: 8), // Space between text field and buttons
+
+                          // Column for Buttons (Stacked Vertically)
+                          Column(
+                            children: [
+                              // Add Note Button (Icon Only)
+                              IconButton(
+                                onPressed: _addNote,
+                                icon: const Icon(Icons.add_comment_outlined),
+                                color: Colors.green,
+                                tooltip: "Add Note", // Hover tooltip
+                              ),
+
+                              // Upload Picture Button (Icon Only)
+                              IconButton(
+                                onPressed:
+                                    _uploadPicture, // Replace with actual function
+                                icon: const Icon(Icons.image),
+                                color: Colors.brown,
+                                tooltip: "Upload Picture", // Hover tooltip
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
                     const SizedBox(height: 10),
                     FutureBuilder(
                       future: _notesFuture,
@@ -754,9 +871,9 @@ class _DashboardPageState extends State<DashboardPage> {
                       },
                     ),
 
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 20),
                     const Divider(thickness: 2),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 20),
                     const Text('Historical Data Graph',
                         style: TextStyle(
                             fontSize: 24, fontWeight: FontWeight.bold)),
@@ -1054,70 +1171,69 @@ class _ContainerPageState extends State<ContainerPage> {
   }
 
   Future<void> fetchData(int storedInt, String scannedCode) async {
-  final contSupabase = Supabase.instance.client;
+    final contSupabase = Supabase.instance.client;
 
-  final checkHardwareTableResponse = await contSupabase
-      .from('Hardware_Sensors_Test')
-      .select() 
-      .eq('qr_value',scannedCode)
-      .maybeSingle();
+    final checkHardwareTableResponse = await contSupabase
+        .from('Hardware_Sensors_Test')
+        .select()
+        .eq('qr_value', scannedCode)
+        .maybeSingle();
 
-  final checkContainerResponse = await contSupabase
-      .from('Containers_test')
-      .select('container_id, hardware_id, user_id') // Use dot notation with !inner for join
-      .eq('hardware_id', checkHardwareTableResponse?['hardware_id'])
-      .eq('user_id', storedInt)
-      .maybeSingle(); // Use `maybeSingle()` to avoid errors if no match is found
+    final checkContainerResponse = await contSupabase
+        .from('Containers_test')
+        .select(
+            'container_id, hardware_id, user_id') // Use dot notation with !inner for join
+        .eq('hardware_id', checkHardwareTableResponse?['hardware_id'])
+        .eq('user_id', storedInt)
+        .maybeSingle(); // Use `maybeSingle()` to avoid errors if no match is found
 
-  if (checkContainerResponse != null) {
-    print("Data fetched: $checkContainerResponse");
-    showToast("This container is already added");
-  } else {
-      await contSupabase
-      .from('Containers_test')
-      .insert({
-    'hardware_id': checkHardwareTableResponse?['hardware_id'],
-    'user_id': storedInt,
-    'date_added': DateFormat('yyyy-MM-dd kk:mm:ss').format(DateTime.now()),
-  });
+    if (checkContainerResponse != null) {
+      print("Data fetched: $checkContainerResponse");
+      showToast("This container is already added");
+    } else {
+      await contSupabase.from('Containers_test').insert({
+        'hardware_id': checkHardwareTableResponse?['hardware_id'],
+        'user_id': storedInt,
+        'date_added': DateFormat('yyyy-MM-dd kk:mm:ss').format(DateTime.now()),
+      });
       _fetchContainers();
       showToast("Container addded");
-  }
-}
-
-void showToast(String message) {
-  Fluttertoast.showToast(
-    msg: message,
-    toastLength: Toast.LENGTH_SHORT,
-    gravity: ToastGravity.BOTTOM,
-    backgroundColor: const Color(0xAA000000),
-    textColor: const Color(0xFFFFFFFF),
-    fontSize: 16.0,
-  );
-}
-
-void performQuery(BuildContext context) async {
-  String? storedString = await getStoredString("user_id_pref");
-
-  int storedInt = int.parse(storedString ?? "");
-
-  if (storedInt == null) {
-    print("No int found in SharedPreferences.");
-    return;
+    }
   }
 
-  // Navigate to the scanner screen
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => ScannerPage(
-        onScanned: (scannedCode) {
-          fetchData(storedInt, scannedCode);
-        },
+  void showToast(String message) {
+    Fluttertoast.showToast(
+      msg: message,
+      toastLength: Toast.LENGTH_SHORT,
+      gravity: ToastGravity.BOTTOM,
+      backgroundColor: const Color(0xAA000000),
+      textColor: const Color(0xFFFFFFFF),
+      fontSize: 16.0,
+    );
+  }
+
+  void performQuery(BuildContext context) async {
+    String? storedString = await getStoredString("user_id_pref");
+
+    int storedInt = int.parse(storedString ?? "");
+
+    if (storedInt == null) {
+      print("No int found in SharedPreferences.");
+      return;
+    }
+
+    // Navigate to the scanner screen
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ScannerPage(
+          onScanned: (scannedCode) {
+            fetchData(storedInt, scannedCode);
+          },
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   @override
   Widget build(BuildContext context) {

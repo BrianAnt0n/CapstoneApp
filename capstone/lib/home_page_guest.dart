@@ -12,7 +12,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'constants.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'dart:async';
 
 // State Management: Tracks the selected container
 class ContainerState extends ChangeNotifier {
@@ -32,46 +31,14 @@ class HomePageGuest extends StatefulWidget {
 }
 
 class _HomePageGuestState extends State<HomePageGuest> {
- int _currentIndex = 0; // Tracks the selected tab index
-Timer? _autoRefreshTimer;
+  int _currentIndex = 0; // Tracks the selected tab index
 
-/// Sets up auto-refresh for the Dashboard every 5 minutes
-  void _setupAutoRefresh() {
-  _autoRefreshTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
-    if (mounted && _currentIndex == 0) { // Only refresh if Dashboard is active
-      setState(() {});
-    }
-  });
-}
-  
-  
   // Pages for bottom navigation
   final List<Widget> _pages = [
     const DashboardPage(),
     const ContainerPage(),
     const OthersPage(),
   ];
-  
-  @override
-void initState() {
-super.initState();
-_setupAutoRefresh(); // Initialize auto-refresh only for Dashboard
-}
- 
-  String formatTimestamp(String timestamp) {
-    try {
-      DateTime parsedDate = DateTime.parse(timestamp);
-      return DateFormat('yyyy-MM-dd hh:mm a').format(parsedDate);
-    } catch (e) {
-      return 'Invalid Date';
-    }
-  }
-
-   @override
-  void dispose() {
-    _autoRefreshTimer?.cancel(); // Cancel auto-refresh timer when disposed
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -128,17 +95,13 @@ DateTime? _containerAddedDate; // Holds the compost start date
 
 class _DashboardPageState extends State<DashboardPage> {
   Future<Map<String, dynamic>>? _sensorDataFuture;
-  Future<List<Map<String, dynamic>>>? _notesFuture;
+
   Future<List<Map<String, dynamic>>>? _historyFuture;
   int? selectedContainerId;
-  final TextEditingController _notesController = TextEditingController();
   DateTime _selectedDate = DateTime.now();
   String _containerAge = "";
   Color _ageColor = Colors.green;
   DateTime? _lastRefreshTime;
-  
-
-  
 
   @override
   void didChangeDependencies() {
@@ -148,7 +111,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
     if (selectedContainerId != null) {
       _sensorDataFuture = fetchSensorData(selectedContainerId!);
-      
+
       _historyFuture = fetchHistoryData(selectedContainerId!);
       fetchContainerDetails(selectedContainerId!);
     }
@@ -158,28 +121,28 @@ class _DashboardPageState extends State<DashboardPage> {
     setState(() {
       _lastRefreshTime = DateTime.now();
       _sensorDataFuture = fetchSensorData(selectedContainerId!);
-      
+
       _historyFuture = fetchHistoryData(selectedContainerId!);
     });
   }
 
- //String _getLastRefreshedText() {
-  //if (_lastRefreshTime == null) return "Not refreshed yet";
-  //final difference = DateTime.now().difference(_lastRefreshTime!);
-  //if (difference.inMinutes < 1) { // Changed to minutes and checking if less than 1
-    //return "Last Refreshed: Less than a minute ago"; // More user-friendly
-  //} else if (difference.inMinutes < 60) {
-    //return "Last Refreshed: ${difference.inMinutes} minutes ago";
-  //} else {
-    //return "Last Refreshed: ${difference.inHours} hours ago";
-  //}
-//}
-
+  String _getLastRefreshedText() {
+    if (_lastRefreshTime == null) return "Not refreshed yet";
+    final difference = DateTime.now().difference(_lastRefreshTime!);
+    if (difference.inMinutes < 1) {
+      // Changed to minutes and checking if less than 1
+      return "Last Refreshed: Less than a minute ago"; // More user-friendly
+    } else if (difference.inMinutes < 60) {
+      return "Last Refreshed: ${difference.inMinutes} minutes ago";
+    } else {
+      return "Last Refreshed: ${difference.inHours} hours ago";
+    }
+  }
 
   String _getTimeRefreshed() {
     return _lastRefreshTime != null
         ? "Time Refreshed: ${DateFormat('hh:mm:ss a').format(_lastRefreshTime!)}"
-        : "Time Refreshed: Not available";
+        : "Time Refreshed: Refresh Pending";
   }
 
   Future<List<Map<String, dynamic>>> fetchHistoryData(int containerId) async {
@@ -432,11 +395,11 @@ class _DashboardPageState extends State<DashboardPage> {
 
     // Set color based on compost age
     if (weeks >= 12) {
-      _ageColor = Colors.red;
+      _ageColor = Colors.green;
     } else if (weeks >= 7) {
       _ageColor = Colors.orange;
     } else {
-      _ageColor = Colors.green;
+      _ageColor = Colors.red;
     }
 
     if (mounted) {
@@ -462,15 +425,14 @@ class _DashboardPageState extends State<DashboardPage> {
                         style: TextStyle(
                             fontSize: 24, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 5),
-                   // Text(
+                    // Text(
                     //  _getLastRefreshedText(),
-                     // style: const TextStyle(
-                       //   fontSize: 16, fontWeight: FontWeight.w500),
+                    // style: const TextStyle(
+                    //   fontSize: 16, fontWeight: FontWeight.w500),
                     //),
                     Text(
                       _getTimeRefreshed(),
-                      style: const TextStyle(
-                          fontSize: 14, color: Colors.grey),
+                      style: const TextStyle(fontSize: 14, color: Colors.grey),
                     ),
                     const SizedBox(height: 20),
                     FutureBuilder(
@@ -576,36 +538,85 @@ class _DashboardPageState extends State<DashboardPage> {
                         ),
 
                         const SizedBox(
-                            height: 16), // Space between calendar and age text
+                            height: 30), // Space between calendar and age text
 
-                        // Container Age Display
+// Container Age Display
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             const Text(
                               "Container Age:",
                               style: TextStyle(
-                                fontSize: 17,
+                                fontSize: 22,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.black,
                               ),
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              _containerAge, // ✅ Show container/compost age
+                              _containerAge, // ✅ Show container age
                               style: TextStyle(
-                                fontSize: 30, // Large Text
+                                fontSize: 26, // Large Text
                                 fontWeight: FontWeight.bold,
-                                color:
-                                    _ageColor, // ✅ Color changes dynamically based on age
+                                color: _ageColor, // ✅ Color dynamically updates
                               ),
+                            ),
+
+                            const SizedBox(height: 30), // Space before legend
+
+                            // Legend
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                // Red (Not Ready)
+                                Container(
+                                  width: 16,
+                                  height: 16,
+                                  decoration: BoxDecoration(
+                                      color: Colors.red,
+                                      shape: BoxShape.circle),
+                                ),
+                                const SizedBox(width: 8),
+                                const Text("Not Ready",
+                                    style: TextStyle(fontSize: 14)),
+
+                                const SizedBox(
+                                    width: 16), // Space between legends
+
+                                // Yellow (Decomposing)
+                                Container(
+                                  width: 16,
+                                  height: 16,
+                                  decoration: BoxDecoration(
+                                      color: Colors.orange,
+                                      shape: BoxShape.circle),
+                                ),
+                                const SizedBox(width: 8),
+                                const Text("Decomposing",
+                                    style: TextStyle(fontSize: 14)),
+
+                                const SizedBox(
+                                    width: 16), // Space between legends
+
+                                // Green (Ready)
+                                Container(
+                                  width: 16,
+                                  height: 16,
+                                  decoration: BoxDecoration(
+                                      color: Colors.green,
+                                      shape: BoxShape.circle),
+                                ),
+                                const SizedBox(width: 8),
+                                const Text("Ready",
+                                    style: TextStyle(fontSize: 14)),
+                              ],
                             ),
                           ],
                         ),
                       ],
                     ),
 
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 15),
                     const Divider(thickness: 2),
                     const SizedBox(height: 10),
                     const Text('Historical Data Graph',
