@@ -188,13 +188,43 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Future<void> _addNote() async {
-    if (selectedContainerId != null && _notesController.text.isNotEmpty) {
-      await addNoteToDatabase(selectedContainerId!, _notesController.text);
-      _notesController.clear();
-      setState(() {
-        _notesFuture = fetchNotes(selectedContainerId!, _selectedDate);
-      });
+    if (selectedContainerId == null) return;
+
+    // Trim the note to remove leading/trailing spaces
+    String trimmedNote = _notesController.text.trim();
+
+    // Validate if the note is empty
+    if (trimmedNote.isEmpty) {
+      _showErrorDialog("Please provide notes."); // Show popup for empty input
+      return;
     }
+
+    // Save valid note to database
+    await addNoteToDatabase(selectedContainerId!, trimmedNote);
+    _notesController.clear();
+
+    setState(() {
+      _notesFuture = fetchNotes(selectedContainerId!, _selectedDate);
+    });
+  }
+
+// Function to Show Error Popup
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Invalid Input"),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("OK"),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _onDateSelected(DateTime selectedDate) async {
@@ -538,6 +568,11 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
+  void _uploadPicture() {
+    // TODO: Implement file picker or camera capture
+    print("Upload Picture button clicked!");
+  }
+
   @override
   Widget build(BuildContext context) {
     return selectedContainerId == null
@@ -664,7 +699,7 @@ class _DashboardPageState extends State<DashboardPage> {
                               _selectedDate = selectedDay;
                               _notesFuture = fetchNotes(
                                   selectedContainerId!, _selectedDate);
-                              _calculateContainerAge(); // ✅ Update age dynamically
+                              _calculateContainerAge(); //  Update age dynamically
                             });
                           },
                         ),
@@ -749,6 +784,8 @@ class _DashboardPageState extends State<DashboardPage> {
                     ),
 
                     const SizedBox(height: 20),
+                    const Divider(thickness: 2),
+                    const SizedBox(height: 10),
                     const Text(
                       'Notes',
                       style: TextStyle(
@@ -801,7 +838,7 @@ class _DashboardPageState extends State<DashboardPage> {
                               // Upload Picture Button (Icon Only)
                               IconButton(
                                 onPressed:
-                                    _addNote, // Replace with actual function
+                                    _uploadPicture, // Replace with actual function
                                 icon: const Icon(Icons.image),
                                 color: Colors.brown,
                                 tooltip: "Upload Picture", // Hover tooltip
@@ -834,9 +871,9 @@ class _DashboardPageState extends State<DashboardPage> {
                       },
                     ),
 
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 20),
                     const Divider(thickness: 2),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 20),
                     const Text('Historical Data Graph',
                         style: TextStyle(
                             fontSize: 24, fontWeight: FontWeight.bold)),

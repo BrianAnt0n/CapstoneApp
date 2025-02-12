@@ -182,13 +182,41 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Future<void> _addNote() async {
-    if (selectedContainerId != null && _notesController.text.isNotEmpty) {
-      await addNoteToDatabase(selectedContainerId!, _notesController.text);
-      _notesController.clear();
-      setState(() {
-        _notesFuture = fetchNotes(selectedContainerId!, _selectedDate);
-      });
+    if (selectedContainerId == null) return;
+
+    // Trim the input to check if it's just empty spaces
+    String trimmedNote = _notesController.text.trim();
+
+    if (trimmedNote.isEmpty) {
+      _showErrorDialog(
+          "Please provide notes."); // ✅ Show popup if input is empty
+      return;
     }
+
+    await addNoteToDatabase(selectedContainerId!, trimmedNote);
+    _notesController.clear();
+    setState(() {
+      _notesFuture = fetchNotes(selectedContainerId!, _selectedDate);
+    });
+  }
+
+// Function to Show Error Popup
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Invalid Input"),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("OK"),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _onDateSelected(DateTime selectedDate) async {
@@ -532,6 +560,11 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
+  void _uploadPicture() {
+    // TODO: Implement file picker or camera capture
+    print("Upload Picture button clicked!");
+  }
+
   @override
   Widget build(BuildContext context) {
     return selectedContainerId == null
@@ -550,8 +583,8 @@ class _DashboardPageState extends State<DashboardPage> {
                         style: TextStyle(
                             fontSize: 24, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 5),
-                    //Text(
-                    // _getLastRefreshedText(),
+                    // Text(
+                    //  _getLastRefreshedText(),
                     // style: const TextStyle(
                     //   fontSize: 16, fontWeight: FontWeight.w500),
                     //),
@@ -658,7 +691,7 @@ class _DashboardPageState extends State<DashboardPage> {
                               _selectedDate = selectedDay;
                               _notesFuture = fetchNotes(
                                   selectedContainerId!, _selectedDate);
-                              _calculateContainerAge(); // ✅ Update age dynamically
+                              _calculateContainerAge(); //  Update age dynamically
                             });
                           },
                         ),
@@ -680,11 +713,11 @@ class _DashboardPageState extends State<DashboardPage> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              _containerAge, // ✅ Show container age
+                              _containerAge, // Show container age
                               style: TextStyle(
                                 fontSize: 26, // Large Text
                                 fontWeight: FontWeight.bold,
-                                color: _ageColor, // ✅ Color dynamically updates
+                                color: _ageColor, //  Color dynamically updates
                               ),
                             ),
 
@@ -741,23 +774,72 @@ class _DashboardPageState extends State<DashboardPage> {
                         ),
                       ],
                     ),
-
                     const SizedBox(height: 20),
-                    const Text('Notes',
-                        style: TextStyle(
-                            fontSize: 24, fontWeight: FontWeight.bold)),
-                    TextField(
-                      controller: _notesController,
-                      decoration: InputDecoration(
-                        hintText: 'Enter a note',
-                        suffixIcon: IconButton(
-                          icon: const Icon(Icons.add_comment_outlined),
-                          onPressed: () {
-                            _addNote();
-                          },
-                        ),
+                    const Divider(thickness: 2),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Notes',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
+                    const SizedBox(height: 10),
+
+// Styled TextField for Notes with Inline Buttons
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200], // Light grey background
+                        borderRadius:
+                            BorderRadius.circular(12), // Rounded corners
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 4),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Expanded TextField
+                          Expanded(
+                            child: TextField(
+                              controller: _notesController,
+                              maxLines: 3, // Allow multiline input
+                              style: const TextStyle(fontSize: 16),
+                              decoration: const InputDecoration(
+                                hintText: 'Write your note here...',
+                                border:
+                                    InputBorder.none, // Remove default border
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(
+                              width: 8), // Space between text field and buttons
+
+                          // Column for Buttons (Stacked Vertically)
+                          Column(
+                            children: [
+                              // Add Note Button (Icon Only)
+                              IconButton(
+                                onPressed: _addNote,
+                                icon: const Icon(Icons.add_comment_outlined),
+                                color: Colors.green,
+                                tooltip: "Add Note", // Hover tooltip
+                              ),
+
+                              // Upload Picture Button (Icon Only)
+                              IconButton(
+                                onPressed:
+                                    _uploadPicture, // Replace with actual function
+                                icon: const Icon(Icons.image),
+                                color: Colors.brown,
+                                tooltip: "Upload Picture", // Hover tooltip
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
                     const SizedBox(height: 10),
                     FutureBuilder(
                       future: _notesFuture,
@@ -780,9 +862,9 @@ class _DashboardPageState extends State<DashboardPage> {
                       },
                     ),
 
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 20),
                     const Divider(thickness: 2),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 20),
                     const Text('Historical Data Graph',
                         style: TextStyle(
                             fontSize: 24, fontWeight: FontWeight.bold)),

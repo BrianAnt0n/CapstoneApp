@@ -24,6 +24,8 @@ class _ScannerPageState extends State<ScannerPage> {
     super.dispose();
   }
 
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
