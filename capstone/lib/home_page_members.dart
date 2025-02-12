@@ -1,7 +1,7 @@
 //import 'Others tab/account_management_page.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
+import 'dart:io';
 import 'Others tab/account_settings_page.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -18,6 +18,9 @@ import 'constants.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'notification_page.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // State Management: Tracks the selected container
 class ContainerState extends ChangeNotifier {
@@ -51,25 +54,27 @@ class _HomePageMemberState extends State<HomePageMember> {
     const OthersPage(),
   ];
 
-   @override
-Widget build(BuildContext context) {
-  return ChangeNotifierProvider(
-    create: (_) => ContainerState(),
-    child: Scaffold(
-      appBar: AppBar(
-        title: const Text('E-ComposThink Home - Member'), // AppBar title
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications), // Notification bell icon
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => NotificationPage()), // Navigate to NotificationPage
-              );
-            },
-          ),
-        ],
-      ),
+  @override
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (_) => ContainerState(),
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('E-ComposThink Home - Member'), // AppBar title
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.notifications), // Notification bell icon
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) =>
+                          NotificationPage()), // Navigate to NotificationPage
+                );
+              },
+            ),
+          ],
+        ),
         body: _pages[_currentIndex], // Show the selected page
 
         // Updated Bottom Navigation Bar with green theme
@@ -147,6 +152,7 @@ class _DashboardPageState extends State<DashboardPage> {
       _notesFuture = fetchNotes(selectedContainerId!, _selectedDate);
       _historyFuture = fetchHistoryData(selectedContainerId!);
     });
+    FocusScope.of(context).unfocus();
   }
 
   String _getLastRefreshedText() {
@@ -218,7 +224,7 @@ class _DashboardPageState extends State<DashboardPage> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text("Invalid Input"),
+          title: const Text("Error"),
           content: Text(message),
           actions: [
             TextButton(
@@ -524,12 +530,12 @@ class _DashboardPageState extends State<DashboardPage> {
                       _selectedDate = selectedDay;
                       _notesFuture =
                           fetchNotes(selectedContainerId!, _selectedDate);
-                      _calculateContainerAge(); // ✅ Update the age when a date is selected
+                      _calculateContainerAge(); // Update the age when a date is selected
                     });
                     Navigator.pop(context); // Close the popup after selection
                   },
                   headerStyle: const HeaderStyle(
-                    formatButtonVisible: false, // ✅ Hide the week toggle button
+                    formatButtonVisible: false, // Hide the week toggle button
                     titleCentered: true,
                   ),
                 ),
@@ -572,10 +578,82 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  void _uploadPicture() {
-    // TODO: Implement file picker or camera capture
-    print("Upload Picture button clicked!");
+  Future<void> _requestPermissions() async {
+    await [
+      Permission.camera,
+      Permission.photos, // ✅ Use this instead of Permission.photoLibrary
+      Permission.storage,
+    ].request();
   }
+
+  final ImagePicker _picker = ImagePicker(); //Create instance
+
+  Future<void> saveData(String key, String value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(key, value);
+  }
+
+  Future<String?> loadData(String key) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(key);
+  }
+
+  Future<void> _uploadPicture() async {
+    await _requestPermissions(); // ✅ Request permissions before opening picker
+
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.camera_alt, color: Colors.blue),
+                title: const Text("Take a Photo"),
+                onTap: () async {
+                  Navigator.pop(context);
+                  await _pickImage(ImageSource.camera);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library, color: Colors.green),
+                title: const Text("Choose from Gallery"),
+                onTap: () async {
+                  Navigator.pop(context);
+                  await _pickImage(ImageSource.gallery);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+// Helper Function to Pick Image with Error Handling
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: source,
+        preferredCameraDevice:
+            CameraDevice.rear, // Force rear camera for photos
+        imageQuality: 85, // Reduce image size for better performance
+      );
+
+      if (image != null) {
+        File selectedImage = File(image.path);
+        print("✅ Selected Image: ${selectedImage.path}");
+        // TODO: Use the selected image
+      } else {
+        print("⚠️ No image selected");
+      }
+    } catch (e) {
+      print("❌ Error picking image: $e");
+      _showErrorDialog("Failed to open the image picker. Please try again.");
+    }
+  }
+
+// Show an error popup if something goes wrong
 
   @override
   Widget build(BuildContext context) {
