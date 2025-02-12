@@ -51,25 +51,27 @@ class _HomePageMemberState extends State<HomePageMember> {
     const OthersPage(),
   ];
 
-   @override
-Widget build(BuildContext context) {
-  return ChangeNotifierProvider(
-    create: (_) => ContainerState(),
-    child: Scaffold(
-      appBar: AppBar(
-        title: const Text('E-ComposThink Home - Member'), // AppBar title
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications), // Notification bell icon
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => NotificationPage()), // Navigate to NotificationPage
-              );
-            },
-          ),
-        ],
-      ),
+  @override
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (_) => ContainerState(),
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('E-ComposThink Home - Member'), // AppBar title
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.notifications), // Notification bell icon
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) =>
+                          NotificationPage()), // Navigate to NotificationPage
+                );
+              },
+            ),
+          ],
+        ),
         body: _pages[_currentIndex], // Show the selected page
 
         // Updated Bottom Navigation Bar with green theme
@@ -147,6 +149,7 @@ class _DashboardPageState extends State<DashboardPage> {
       _notesFuture = fetchNotes(selectedContainerId!, _selectedDate);
       _historyFuture = fetchHistoryData(selectedContainerId!);
     });
+    FocusScope.of(context).unfocus();
   }
 
   String _getLastRefreshedText() {

@@ -58,24 +58,26 @@ class _HomePageState extends State<HomePage> {
   }
 
   @override
-Widget build(BuildContext context) {
-  return ChangeNotifierProvider(
-    create: (_) => ContainerState(),
-    child: Scaffold(
-      appBar: AppBar(
-        title: const Text('E-ComposThink Home - Admin'), // AppBar title
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications), // Notification bell icon
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => NotificationPage()), // Navigate to NotificationPage
-              );
-            },
-          ),
-        ],
-      ),
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (_) => ContainerState(),
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('E-ComposThink Home - Admin'), // AppBar title
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.notifications), // Notification bell icon
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) =>
+                          NotificationPage()), // Navigate to NotificationPage
+                );
+              },
+            ),
+          ],
+        ),
         body: _pages[_currentIndex], // Show the selected page
 
         // Updated Bottom Navigation Bar with green theme
@@ -153,6 +155,7 @@ class _DashboardPageState extends State<DashboardPage> {
       _notesFuture = fetchNotes(selectedContainerId!, _selectedDate);
       _historyFuture = fetchHistoryData(selectedContainerId!);
     });
+    FocusScope.of(context).unfocus();
   }
 
   String _getLastRefreshedText() {
@@ -509,44 +512,50 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _openFullCalendar() {
+    // ✅ Force remove focus from any active text field
+    FocusManager.instance.primaryFocus?.unfocus();
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return Dialog(
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Full Calendar inside the popup
-                TableCalendar(
-                  focusedDay: _selectedDate,
-                  firstDay: DateTime(2000),
-                  lastDay: DateTime(2100),
-                  calendarFormat: CalendarFormat.month, // Show full month
-                  selectedDayPredicate: (day) => isSameDay(_selectedDate, day),
-                  onDaySelected: (selectedDay, focusedDay) {
-                    setState(() {
-                      _selectedDate = selectedDay;
-                      _notesFuture =
-                          fetchNotes(selectedContainerId!, _selectedDate);
-                      _calculateContainerAge(); // ✅ Update the age when a date is selected
-                    });
-                    Navigator.pop(context); // Close the popup after selection
-                  },
-                  headerStyle: const HeaderStyle(
-                    formatButtonVisible: false, // ✅ Hide the week toggle button
-                    titleCentered: true,
+          child: SingleChildScrollView(
+            // ✅ Prevents layout issues
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TableCalendar(
+                    focusedDay: _selectedDate,
+                    firstDay: DateTime(2000),
+                    lastDay: DateTime(2100),
+                    calendarFormat: CalendarFormat.month,
+                    selectedDayPredicate: (day) =>
+                        isSameDay(_selectedDate, day),
+                    onDaySelected: (selectedDay, focusedDay) {
+                      setState(() {
+                        _selectedDate = selectedDay;
+                        _notesFuture =
+                            fetchNotes(selectedContainerId!, _selectedDate);
+                        _calculateContainerAge();
+                      });
+                      Navigator.pop(context);
+                    },
+                    headerStyle: const HeaderStyle(
+                      formatButtonVisible: false,
+                      titleCentered: true,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 10),
-                ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text("Close"),
-                ),
-              ],
+                  const SizedBox(height: 10),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text("Close"),
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -808,56 +817,60 @@ class _DashboardPageState extends State<DashboardPage> {
                     const SizedBox(height: 10),
 
 // Styled TextField for Notes with Inline Buttons
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.grey[200], // Light grey background
-                        borderRadius:
-                            BorderRadius.circular(12), // Rounded corners
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 4),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Expanded TextField
-                          Expanded(
-                            child: TextField(
-                              controller: _notesController,
-                              maxLines: 3, // Allow multiline input
-                              style: const TextStyle(fontSize: 16),
-                              decoration: const InputDecoration(
-                                hintText: 'Write your note here...',
-                                border:
-                                    InputBorder.none, // Remove default border
+                    GestureDetector(
+                      onTap: () {
+                        FocusScope.of(context)
+                            .unfocus(); // ✅ Dismiss keyboard when tapping outside
+                      },
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.grey[200], // Light grey background
+                          borderRadius:
+                              BorderRadius.circular(12), // Rounded corners
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            // Expanded TextField
+                            Expanded(
+                              child: TextField(
+                                controller: _notesController,
+                                maxLines: 3, // Allow multiline input
+                                style: const TextStyle(fontSize: 16),
+                                decoration: const InputDecoration(
+                                  hintText: 'Write your note here...',
+                                  border:
+                                      InputBorder.none, // Remove default border
+                                ),
                               ),
                             ),
-                          ),
 
-                          const SizedBox(
-                              width: 8), // Space between text field and buttons
+                            const SizedBox(
+                                width:
+                                    8), // Space between text field and buttons
 
-                          // Column for Buttons (Stacked Vertically)
-                          Column(
-                            children: [
-                              // Add Note Button (Icon Only)
-                              IconButton(
-                                onPressed: _addNote,
-                                icon: const Icon(Icons.add_comment_outlined),
-                                color: Colors.green,
-                                tooltip: "Add Note", // Hover tooltip
-                              ),
-
-                              // Upload Picture Button (Icon Only)
-                              IconButton(
-                                onPressed:
-                                    _uploadPicture, // Replace with actual function
-                                icon: const Icon(Icons.image),
-                                color: Colors.brown,
-                                tooltip: "Upload Picture", // Hover tooltip
-                              ),
-                            ],
-                          ),
-                        ],
+                            // Column for Buttons (Stacked Vertically)
+                            Column(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                IconButton(
+                                  onPressed: _addNote,
+                                  icon: const Icon(Icons.add_comment_outlined),
+                                  color: Colors.green,
+                                  tooltip: "Add Note",
+                                ),
+                                IconButton(
+                                  onPressed: _uploadPicture,
+                                  icon: const Icon(Icons.image),
+                                  color: Colors.brown,
+                                  tooltip: "Upload Picture",
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
 
