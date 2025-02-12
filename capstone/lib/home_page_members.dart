@@ -18,6 +18,7 @@ import 'constants.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'dart:async';
+import 'notification_page.dart';
 
 // State Management: Tracks the selected container
 class ContainerState extends ChangeNotifier {
@@ -86,13 +87,24 @@ _setupAutoRefresh(); // Initialize auto-refresh only for Dashboard
   }
 
   @override
-  Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => ContainerState(),
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('E-ComposThink Home - Member'), // AppBar title
-        ),
+Widget build(BuildContext context) {
+  return ChangeNotifierProvider(
+    create: (_) => ContainerState(),
+    child: Scaffold(
+      appBar: AppBar(
+        title: const Text('E-ComposThink Home - Member'), // AppBar title
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications), // Notification bell icon
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => NotificationPage()), // Navigate to NotificationPage
+              );
+            },
+          ),
+        ],
+      ),
         body: _pages[_currentIndex], // Show the selected page
 
         // Updated Bottom Navigation Bar with green theme
@@ -175,17 +187,17 @@ class _DashboardPageState extends State<DashboardPage> {
     });
   }
 
- String _getLastRefreshedText() {
-  if (_lastRefreshTime == null) return "Not refreshed yet";
-  final difference = DateTime.now().difference(_lastRefreshTime!);
-  if (difference.inMinutes < 1) { // Changed to minutes and checking if less than 1
-    return "Last Refreshed: Less than a minute ago"; // More user-friendly
-  } else if (difference.inMinutes < 60) {
-    return "Last Refreshed: ${difference.inMinutes} minutes ago";
-  } else {
-    return "Last Refreshed: ${difference.inHours} hours ago";
-  }
-}
+ //String _getLastRefreshedText() {
+  //if (_lastRefreshTime == null) return "Not refreshed yet";
+  //final difference = DateTime.now().difference(_lastRefreshTime!);
+  //if (difference.inMinutes < 1) { // Changed to minutes and checking if less than 1
+    //return "Last Refreshed: Less than a minute ago"; // More user-friendly
+  //} else if (difference.inMinutes < 60) {
+    //return "Last Refreshed: ${difference.inMinutes} minutes ago";
+  //} else {
+    //return "Last Refreshed: ${difference.inHours} hours ago";
+  //}
+//}
 
 
   String _getTimeRefreshed() {

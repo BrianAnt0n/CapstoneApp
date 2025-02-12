@@ -163,17 +163,17 @@ class _DashboardPageState extends State<DashboardPage> {
     });
   }
 
- String _getLastRefreshedText() {
-  if (_lastRefreshTime == null) return "Not refreshed yet";
-  final difference = DateTime.now().difference(_lastRefreshTime!);
-  if (difference.inMinutes < 1) { // Changed to minutes and checking if less than 1
-    return "Last Refreshed: Less than a minute ago"; // More user-friendly
-  } else if (difference.inMinutes < 60) {
-    return "Last Refreshed: ${difference.inMinutes} minutes ago";
-  } else {
-    return "Last Refreshed: ${difference.inHours} hours ago";
-  }
-}
+ //String _getLastRefreshedText() {
+  //if (_lastRefreshTime == null) return "Not refreshed yet";
+  //final difference = DateTime.now().difference(_lastRefreshTime!);
+  //if (difference.inMinutes < 1) { // Changed to minutes and checking if less than 1
+    //return "Last Refreshed: Less than a minute ago"; // More user-friendly
+  //} else if (difference.inMinutes < 60) {
+    //return "Last Refreshed: ${difference.inMinutes} minutes ago";
+  //} else {
+    //return "Last Refreshed: ${difference.inHours} hours ago";
+  //}
+//}
 
 
   String _getTimeRefreshed() {
