@@ -13,9 +13,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'constants.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'dart:async';
-
-
+import 'package:fluttertoast/fluttertoast.dart';
 
 // State Management: Tracks the selected container
 class ContainerState extends ChangeNotifier {
@@ -27,6 +25,11 @@ class ContainerState extends ChangeNotifier {
   }
 }
 
+Future<String?> getStoredString(String key) async {
+  final prefs = await SharedPreferences.getInstance();
+  return prefs.getString(key);
+}
+
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -34,35 +37,16 @@ class HomePage extends StatefulWidget {
   _HomePageState createState() => _HomePageState();
 }
 
-
-
 class _HomePageState extends State<HomePage> {
-int _currentIndex = 0; // Tracks the selected tab index
-Timer? _autoRefreshTimer;
+  int _currentIndex = 0; // Tracks the selected tab index
 
-/// Sets up auto-refresh for the Dashboard every 5 minutes
-  void _setupAutoRefresh() {
-  _autoRefreshTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
-    if (mounted && _currentIndex == 0) { // Only refresh if Dashboard is active
-      setState(() {});
-    }
-  });
-}
-  
-  
   // Pages for bottom navigation
   final List<Widget> _pages = [
     const DashboardPage(),
     const ContainerPage(),
     const OthersPage(),
   ];
-  
-  @override
-void initState() {
-super.initState();
-_setupAutoRefresh(); // Initialize auto-refresh only for Dashboard
-}
- 
+
   String formatTimestamp(String timestamp) {
     try {
       DateTime parsedDate = DateTime.parse(timestamp);
@@ -70,12 +54,6 @@ _setupAutoRefresh(); // Initialize auto-refresh only for Dashboard
     } catch (e) {
       return 'Invalid Date';
     }
-  }
-
-   @override
-  void dispose() {
-    _autoRefreshTimer?.cancel(); // Cancel auto-refresh timer when disposed
-    super.dispose();
   }
 
   @override
@@ -1062,6 +1040,72 @@ class _ContainerPageState extends State<ContainerPage> {
     });
   }
 
+  Future<void> fetchData(int storedInt, String scannedCode) async {
+  final contSupabase = Supabase.instance.client;
+
+  final checkHardwareTableResponse = await contSupabase
+      .from('Hardware_Sensors_Test')
+      .select() 
+      .eq('qr_value',scannedCode)
+      .maybeSingle();
+
+  final checkContainerResponse = await contSupabase
+      .from('Containers_test')
+      .select('container_id, hardware_id, user_id') // Use dot notation with !inner for join
+      .eq('hardware_id', checkHardwareTableResponse?['hardware_id'])
+      .eq('user_id', storedInt)
+      .maybeSingle(); // Use `maybeSingle()` to avoid errors if no match is found
+
+  if (checkContainerResponse != null) {
+    print("Data fetched: $checkContainerResponse");
+    showToast("This container is already added");
+  } else {
+      await contSupabase
+      .from('Containers_test')
+      .insert({
+    'hardware_id': checkHardwareTableResponse?['hardware_id'],
+    'user_id': storedInt,
+    'date_added': DateFormat('yyyy-MM-dd kk:mm:ss').format(DateTime.now()),
+  });
+      _fetchContainers();
+      showToast("Container addded");
+  }
+}
+
+void showToast(String message) {
+  Fluttertoast.showToast(
+    msg: message,
+    toastLength: Toast.LENGTH_SHORT,
+    gravity: ToastGravity.BOTTOM,
+    backgroundColor: const Color(0xAA000000),
+    textColor: const Color(0xFFFFFFFF),
+    fontSize: 16.0,
+  );
+}
+
+void performQuery(BuildContext context) async {
+  String? storedString = await getStoredString("user_id_pref");
+
+  int storedInt = int.parse(storedString ?? "");
+
+  if (storedInt == null) {
+    print("No int found in SharedPreferences.");
+    return;
+  }
+
+  // Navigate to the scanner screen
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => ScannerPage(
+        onScanned: (scannedCode) {
+          fetchData(storedInt, scannedCode);
+        },
+      ),
+    ),
+  );
+}
+
   @override
   Widget build(BuildContext context) {
     final containerState = Provider.of<ContainerState>(context);
@@ -1086,14 +1130,7 @@ class _ContainerPageState extends State<ContainerPage> {
                     backgroundColor: Colors.green,
                     minimumSize: const Size(double.infinity, 50),
                   ),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) =>
-                              ScannerPage()), // Navigate to ScannerPage
-                    );
-                  },
+                  onPressed: () => performQuery(context),
                   icon: const Icon(Icons.add, color: Colors.white),
                   label: const Text('New container',
                       style: TextStyle(color: Colors.white)),

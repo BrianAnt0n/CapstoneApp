@@ -904,12 +904,12 @@ class _ContainerPageState extends State<ContainerPage> {
                     minimumSize: const Size(double.infinity, 50),
                   ),
                   onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) =>
-                              ScannerPage()), // Navigate to ScannerPage
-                    );
+                    // Navigator.push(
+                    //   context,
+                    //   MaterialPageRoute(
+                    //       builder: (context) =>
+                    //           ScannerPage()), // Navigate to ScannerPage
+                    // );
                   },
                   icon: const Icon(Icons.add, color: Colors.white),
                   label: const Text('New container',
