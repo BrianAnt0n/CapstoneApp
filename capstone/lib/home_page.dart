@@ -14,6 +14,7 @@ import 'constants.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'notification_page.dart';
 
 // State Management: Tracks the selected container
 class ContainerState extends ChangeNotifier {
@@ -57,13 +58,24 @@ class _HomePageState extends State<HomePage> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => ContainerState(),
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('E-ComposThink Home - Admin'), // AppBar title
-        ),
+Widget build(BuildContext context) {
+  return ChangeNotifierProvider(
+    create: (_) => ContainerState(),
+    child: Scaffold(
+      appBar: AppBar(
+        title: const Text('E-ComposThink Home - Admin'), // AppBar title
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications), // Notification bell icon
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => NotificationPage()), // Navigate to NotificationPage
+              );
+            },
+          ),
+        ],
+      ),
         body: _pages[_currentIndex], // Show the selected page
 
         // Updated Bottom Navigation Bar with green theme
