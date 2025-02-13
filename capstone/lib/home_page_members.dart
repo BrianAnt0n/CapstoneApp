@@ -21,6 +21,7 @@ import 'notification_page.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:path_provider/path_provider.dart';
 
 // State Management: Tracks the selected container
 class ContainerState extends ChangeNotifier {
@@ -507,49 +508,62 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _openFullCalendar() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return Dialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Full Calendar inside the popup
-                TableCalendar(
-                  focusedDay: _selectedDate,
-                  firstDay: DateTime(2000),
-                  lastDay: DateTime(2100),
-                  calendarFormat: CalendarFormat.month, // Show full month
-                  selectedDayPredicate: (day) => isSameDay(_selectedDate, day),
-                  onDaySelected: (selectedDay, focusedDay) {
-                    setState(() {
-                      _selectedDate = selectedDay;
-                      _notesFuture =
-                          fetchNotes(selectedContainerId!, _selectedDate);
-                      _calculateContainerAge(); // Update the age when a date is selected
-                    });
-                    Navigator.pop(context); // Close the popup after selection
-                  },
-                  headerStyle: const HeaderStyle(
-                    formatButtonVisible: false, // Hide the week toggle button
-                    titleCentered: true,
+    //Ensure keyboard is fully dismissed before opening the calendar
+    FocusScope.of(context).requestFocus(FocusNode());
+
+    //Use Future.delayed to wait for the keyboard to close completely
+    Future.delayed(const Duration(milliseconds: 200), () {
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return Builder(
+            builder: (context) {
+              return Dialog(
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Full Calendar inside the popup
+                      TableCalendar(
+                        focusedDay: _selectedDate,
+                        firstDay: DateTime(2000),
+                        lastDay: DateTime(2100),
+                        calendarFormat: CalendarFormat.month, // Show full month
+                        selectedDayPredicate: (day) =>
+                            isSameDay(_selectedDate, day),
+                        onDaySelected: (selectedDay, focusedDay) {
+                          setState(() {
+                            _selectedDate = selectedDay;
+                            _notesFuture =
+                                fetchNotes(selectedContainerId!, _selectedDate);
+                            _calculateContainerAge(); // Update the age when a date is selected
+                          });
+                          Navigator.pop(
+                              context); // Close the popup after selection
+                        },
+                        headerStyle: const HeaderStyle(
+                          formatButtonVisible:
+                              false, // Hide the week toggle button
+                          titleCentered: true,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      ElevatedButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text("Close"),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 10),
-                ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text("Close"),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+              );
+            },
+          );
+        },
+      );
+    });
   }
 
   void _calculateContainerAge() {
@@ -586,21 +600,9 @@ class _DashboardPageState extends State<DashboardPage> {
     ].request();
   }
 
-  final ImagePicker _picker = ImagePicker(); //Create instance
-
-  Future<void> saveData(String key, String value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(key, value);
-  }
-
-  Future<String?> loadData(String key) async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(key);
-  }
+  final ImagePicker _picker = ImagePicker(); // ✅ Create instance
 
   Future<void> _uploadPicture() async {
-    await _requestPermissions(); // ✅ Request permissions before opening picker
-
     showModalBottomSheet(
       context: context,
       builder: (BuildContext context) {
@@ -611,16 +613,16 @@ class _DashboardPageState extends State<DashboardPage> {
                 leading: const Icon(Icons.camera_alt, color: Colors.blue),
                 title: const Text("Take a Photo"),
                 onTap: () async {
-                  Navigator.pop(context);
-                  await _pickImage(ImageSource.camera);
+                  Navigator.pop(context); // Close modal
+                  _pickImage(ImageSource.camera);
                 },
               ),
               ListTile(
                 leading: const Icon(Icons.photo_library, color: Colors.green),
                 title: const Text("Choose from Gallery"),
                 onTap: () async {
-                  Navigator.pop(context);
-                  await _pickImage(ImageSource.gallery);
+                  Navigator.pop(context); // Close modal
+                  _pickImage(ImageSource.gallery);
                 },
               ),
             ],
@@ -630,30 +632,66 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-// Helper Function to Pick Image with Error Handling
+//  Helper Function to Pick Image
+// Move image to a permanent directory
   Future<void> _pickImage(ImageSource source) async {
-    try {
-      final XFile? image = await _picker.pickImage(
-        source: source,
-        preferredCameraDevice:
-            CameraDevice.rear, // Force rear camera for photos
-        imageQuality: 85, // Reduce image size for better performance
-      );
+    final XFile? image = await _picker.pickImage(source: source);
+    if (image != null) {
+      try {
+        final Directory appDir = await getApplicationDocumentsDirectory();
+        final String newPath =
+            '${appDir.path}/${DateTime.now().millisecondsSinceEpoch}.jpg';
 
-      if (image != null) {
-        File selectedImage = File(image.path);
-        print("✅ Selected Image: ${selectedImage.path}");
-        // TODO: Use the selected image
-      } else {
-        print("⚠️ No image selected");
+        final File savedImage = await File(image.path).copy(newPath);
+
+        setState(() {
+          _selectedImage = savedImage;
+        });
+
+        print("Saved Image Path: ${savedImage.path}");
+      } catch (e) {
+        print("Error saving image: $e");
       }
-    } catch (e) {
-      print("❌ Error picking image: $e");
-      _showErrorDialog("Failed to open the image picker. Please try again.");
     }
   }
 
-// Show an error popup if something goes wrong
+  File? _selectedImage; //  Store selected image
+
+//  Remove Selected Image
+  void _removeImage() {
+    setState(() {
+      _selectedImage = null;
+    });
+  }
+
+//pag pinindot ni user yung image mag fufullscreen
+  void _showFullScreenImage(File image) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.black, // Full black background
+          insetPadding: EdgeInsets.zero, // Remove extra padding
+          child: Stack(
+            children: [
+              Center(
+                child:
+                    Image.file(image, fit: BoxFit.contain), // Fullscreen Image
+              ),
+              Positioned(
+                top: 20,
+                right: 20,
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                  onPressed: () => Navigator.pop(context), // Close fullscreen
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -876,53 +914,74 @@ class _DashboardPageState extends State<DashboardPage> {
                     ),
                     const SizedBox(height: 10),
 
+// Show Image Above Text Field (if selected)
+                    if (_selectedImage != null)
+                      GestureDetector(
+                        onTap: () => _showFullScreenImage(
+                            _selectedImage!), // Open fullscreen
+                        child: Stack(
+                          alignment: Alignment.topRight,
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.file(
+                                _selectedImage!,
+                                width: double.infinity,
+                                height: 200,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.cancel, color: Colors.red),
+                              onPressed: _removeImage,
+                            ),
+                          ],
+                        ),
+                      ),
+
+                    const SizedBox(height: 10),
+
 // Styled TextField for Notes with Inline Buttons
                     Container(
                       decoration: BoxDecoration(
-                        color: Colors.grey[200], // Light grey background
-                        borderRadius:
-                            BorderRadius.circular(12), // Rounded corners
+                        color: Colors.grey[200],
+                        borderRadius: BorderRadius.circular(12),
                       ),
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 4),
+                          horizontal: 12, vertical: 8),
                       child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           // Expanded TextField
                           Expanded(
                             child: TextField(
                               controller: _notesController,
-                              maxLines: 3, // Allow multiline input
+                              maxLines: 3,
                               style: const TextStyle(fontSize: 16),
                               decoration: const InputDecoration(
                                 hintText: 'Write your note here...',
-                                border:
-                                    InputBorder.none, // Remove default border
+                                border: InputBorder.none,
                               ),
                             ),
                           ),
 
-                          const SizedBox(
-                              width: 8), // Space between text field and buttons
+                          const SizedBox(width: 8),
 
                           // Column for Buttons (Stacked Vertically)
                           Column(
+                            mainAxisAlignment: MainAxisAlignment.end,
                             children: [
-                              // Add Note Button (Icon Only)
                               IconButton(
                                 onPressed: _addNote,
                                 icon: const Icon(Icons.add_comment_outlined),
                                 color: Colors.green,
-                                tooltip: "Add Note", // Hover tooltip
+                                tooltip: "Add Note",
                               ),
-
-                              // Upload Picture Button (Icon Only)
                               IconButton(
-                                onPressed:
-                                    _uploadPicture, // Replace with actual function
+                                onPressed: _uploadPicture,
                                 icon: const Icon(Icons.image),
                                 color: Colors.brown,
-                                tooltip: "Upload Picture", // Hover tooltip
+                                tooltip: "Upload Picture",
                               ),
                             ],
                           ),
@@ -931,6 +990,8 @@ class _DashboardPageState extends State<DashboardPage> {
                     ),
 
                     const SizedBox(height: 10),
+
+// Display Notes List
                     FutureBuilder(
                       future: _notesFuture,
                       builder: (context, snapshot) {
@@ -1246,7 +1307,7 @@ class _ContainerPageState extends State<ContainerPage> {
   }
 
   Future<void> _fetchContainers() async {
-    // ✅ Updated for Pull-to-Refresh
+    // Updated for Pull-to-Refresh
     setState(() {
       _containersFuture = fetchContainers();
     });
