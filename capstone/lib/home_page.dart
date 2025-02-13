@@ -15,6 +15,9 @@ import 'package:table_calendar/table_calendar.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'notification_page.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 
 // State Management: Tracks the selected container
 class ContainerState extends ChangeNotifier {
@@ -229,7 +232,7 @@ class _DashboardPageState extends State<DashboardPage> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text("Invalid Input"),
+          title: const Text("Error"),
           content: Text(message),
           actions: [
             TextButton(
@@ -596,9 +599,68 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  void _uploadPicture() {
-    // TODO: Implement file picker or camera capture
-    print("Upload Picture button clicked!");
+  final ImagePicker _picker = ImagePicker(); // ✅ Create instance
+
+  Future<void> _uploadPicture() async {
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.camera_alt, color: Colors.blue),
+                title: const Text("Take a Photo"),
+                onTap: () async {
+                  Navigator.pop(context); // Close modal
+                  _pickImage(ImageSource.camera);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library, color: Colors.green),
+                title: const Text("Choose from Gallery"),
+                onTap: () async {
+                  Navigator.pop(context); // Close modal
+                  _pickImage(ImageSource.gallery);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+//  Helper Function to Pick Image
+// Move image to a permanent directory
+  Future<void> _pickImage(ImageSource source) async {
+    final XFile? image = await _picker.pickImage(source: source);
+    if (image != null) {
+      try {
+        final Directory appDir = await getApplicationDocumentsDirectory();
+        final String newPath =
+            '${appDir.path}/${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+        final File savedImage = await File(image.path).copy(newPath);
+
+        setState(() {
+          _selectedImage = savedImage;
+        });
+
+        print("Saved Image Path: ${savedImage.path}");
+      } catch (e) {
+        print("Error saving image: $e");
+      }
+    }
+  }
+
+  File? _selectedImage; //  Store selected image
+
+//  Remove Selected Image
+  void _removeImage() {
+    setState(() {
+      _selectedImage = null;
+    });
   }
 
   @override
@@ -823,65 +885,81 @@ class _DashboardPageState extends State<DashboardPage> {
                     ),
                     const SizedBox(height: 10),
 
+// Show Image Above Text Field (if selected)
+                    if (_selectedImage != null)
+                      Stack(
+                        alignment: Alignment.topRight,
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Image.file(
+                              _selectedImage!,
+                              width: double.infinity,
+                              height: 200,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.cancel, color: Colors.red),
+                            onPressed: _removeImage,
+                          ),
+                        ],
+                      ),
+
+                    const SizedBox(height: 10),
+
 // Styled TextField for Notes with Inline Buttons
-                    GestureDetector(
-                      onTap: () {
-                        FocusScope.of(context)
-                            .unfocus(); // ✅ Dismiss keyboard when tapping outside
-                      },
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.grey[200], // Light grey background
-                          borderRadius:
-                              BorderRadius.circular(12), // Rounded corners
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            // Expanded TextField
-                            Expanded(
-                              child: TextField(
-                                controller: _notesController,
-                                maxLines: 3, // Allow multiline input
-                                style: const TextStyle(fontSize: 16),
-                                decoration: const InputDecoration(
-                                  hintText: 'Write your note here...',
-                                  border:
-                                      InputBorder.none, // Remove default border
-                                ),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.grey[200], // Light grey background
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          // Expanded TextField
+                          Expanded(
+                            child: TextField(
+                              controller: _notesController,
+                              maxLines: 3,
+                              style: const TextStyle(fontSize: 16),
+                              decoration: const InputDecoration(
+                                hintText: 'Write your note here...',
+                                border: InputBorder.none,
                               ),
                             ),
+                          ),
 
-                            const SizedBox(
-                                width:
-                                    8), // Space between text field and buttons
+                          const SizedBox(
+                              width: 8), // Space between text field and buttons
 
-                            // Column for Buttons (Stacked Vertically)
-                            Column(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                IconButton(
-                                  onPressed: _addNote,
-                                  icon: const Icon(Icons.add_comment_outlined),
-                                  color: Colors.green,
-                                  tooltip: "Add Note",
-                                ),
-                                IconButton(
-                                  onPressed: _uploadPicture,
-                                  icon: const Icon(Icons.image),
-                                  color: Colors.brown,
-                                  tooltip: "Upload Picture",
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
+                          // Column for Buttons (Stacked Vertically)
+                          Column(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              IconButton(
+                                onPressed: _addNote,
+                                icon: const Icon(Icons.add_comment_outlined),
+                                color: Colors.green,
+                                tooltip: "Add Note",
+                              ),
+                              IconButton(
+                                onPressed: _uploadPicture,
+                                icon: const Icon(Icons.image),
+                                color: Colors.brown,
+                                tooltip: "Upload Picture",
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
 
                     const SizedBox(height: 10),
+
+//Display Notes List
                     FutureBuilder(
                       future: _notesFuture,
                       builder: (context, snapshot) {
