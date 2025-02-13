@@ -663,6 +663,35 @@ class _DashboardPageState extends State<DashboardPage> {
     });
   }
 
+//pag pinindot ni user yung image mag fufullscreen
+  void _showFullScreenImage(File image) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.black, // Full black background
+          insetPadding: EdgeInsets.zero, // Remove extra padding
+          child: Stack(
+            children: [
+              Center(
+                child:
+                    Image.file(image, fit: BoxFit.contain), // Fullscreen Image
+              ),
+              Positioned(
+                top: 20,
+                right: 20,
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                  onPressed: () => Navigator.pop(context), // Close fullscreen
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return selectedContainerId == null
@@ -887,23 +916,27 @@ class _DashboardPageState extends State<DashboardPage> {
 
 // Show Image Above Text Field (if selected)
                     if (_selectedImage != null)
-                      Stack(
-                        alignment: Alignment.topRight,
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: Image.file(
-                              _selectedImage!,
-                              width: double.infinity,
-                              height: 200,
-                              fit: BoxFit.cover,
+                      GestureDetector(
+                        onTap: () => _showFullScreenImage(
+                            _selectedImage!), // Open fullscreen
+                        child: Stack(
+                          alignment: Alignment.topRight,
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.file(
+                                _selectedImage!,
+                                width: double.infinity,
+                                height: 200,
+                                fit: BoxFit.cover,
+                              ),
                             ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.cancel, color: Colors.red),
-                            onPressed: _removeImage,
-                          ),
-                        ],
+                            IconButton(
+                              icon: const Icon(Icons.cancel, color: Colors.red),
+                              onPressed: _removeImage,
+                            ),
+                          ],
+                        ),
                       ),
 
                     const SizedBox(height: 10),
@@ -911,7 +944,7 @@ class _DashboardPageState extends State<DashboardPage> {
 // Styled TextField for Notes with Inline Buttons
                     Container(
                       decoration: BoxDecoration(
-                        color: Colors.grey[200], // Light grey background
+                        color: Colors.grey[200],
                         borderRadius: BorderRadius.circular(12),
                       ),
                       padding: const EdgeInsets.symmetric(
@@ -932,8 +965,7 @@ class _DashboardPageState extends State<DashboardPage> {
                             ),
                           ),
 
-                          const SizedBox(
-                              width: 8), // Space between text field and buttons
+                          const SizedBox(width: 8),
 
                           // Column for Buttons (Stacked Vertically)
                           Column(
@@ -959,7 +991,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
                     const SizedBox(height: 10),
 
-//Display Notes List
+// Display Notes List
                     FutureBuilder(
                       future: _notesFuture,
                       builder: (context, snapshot) {
