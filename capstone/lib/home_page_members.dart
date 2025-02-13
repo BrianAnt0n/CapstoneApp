@@ -507,49 +507,62 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   void _openFullCalendar() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return Dialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Full Calendar inside the popup
-                TableCalendar(
-                  focusedDay: _selectedDate,
-                  firstDay: DateTime(2000),
-                  lastDay: DateTime(2100),
-                  calendarFormat: CalendarFormat.month, // Show full month
-                  selectedDayPredicate: (day) => isSameDay(_selectedDate, day),
-                  onDaySelected: (selectedDay, focusedDay) {
-                    setState(() {
-                      _selectedDate = selectedDay;
-                      _notesFuture =
-                          fetchNotes(selectedContainerId!, _selectedDate);
-                      _calculateContainerAge(); // Update the age when a date is selected
-                    });
-                    Navigator.pop(context); // Close the popup after selection
-                  },
-                  headerStyle: const HeaderStyle(
-                    formatButtonVisible: false, // Hide the week toggle button
-                    titleCentered: true,
+    //Ensure keyboard is fully dismissed before opening the calendar
+    FocusScope.of(context).requestFocus(FocusNode());
+
+    //Use Future.delayed to wait for the keyboard to close completely
+    Future.delayed(const Duration(milliseconds: 200), () {
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return Builder(
+            builder: (context) {
+              return Dialog(
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Full Calendar inside the popup
+                      TableCalendar(
+                        focusedDay: _selectedDate,
+                        firstDay: DateTime(2000),
+                        lastDay: DateTime(2100),
+                        calendarFormat: CalendarFormat.month, // Show full month
+                        selectedDayPredicate: (day) =>
+                            isSameDay(_selectedDate, day),
+                        onDaySelected: (selectedDay, focusedDay) {
+                          setState(() {
+                            _selectedDate = selectedDay;
+                            _notesFuture =
+                                fetchNotes(selectedContainerId!, _selectedDate);
+                            _calculateContainerAge(); // Update the age when a date is selected
+                          });
+                          Navigator.pop(
+                              context); // Close the popup after selection
+                        },
+                        headerStyle: const HeaderStyle(
+                          formatButtonVisible:
+                              false, // Hide the week toggle button
+                          titleCentered: true,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      ElevatedButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text("Close"),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 10),
-                ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text("Close"),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+              );
+            },
+          );
+        },
+      );
+    });
   }
 
   void _calculateContainerAge() {
