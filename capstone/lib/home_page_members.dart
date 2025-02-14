@@ -28,8 +28,24 @@ import 'package:path_provider/path_provider.dart';
 class ContainerState extends ChangeNotifier {
   int? selectedContainerId;
 
-  void selectContainer(int containerId) {
+  ContainerState() {
+    _loadLastSelectedContainer(); // Load saved container on startup
+  }
+
+  void selectContainer(int containerId) async {
     selectedContainerId = containerId;
+    notifyListeners();
+    await _saveSelectedContainer(containerId);
+  }
+
+  Future<void> _saveSelectedContainer(int containerId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('last_selected_container', containerId);
+  }
+
+  Future<void> _loadLastSelectedContainer() async {
+    final prefs = await SharedPreferences.getInstance();
+    selectedContainerId = prefs.getInt('last_selected_container');
     notifyListeners();
   }
 }
@@ -38,6 +54,8 @@ Future<String?> getStoredString(String key) async {
   final prefs = await SharedPreferences.getInstance();
   return prefs.getString(key);
 }
+
+
 
 class HomePageMember extends StatefulWidget {
   const HomePageMember({super.key});

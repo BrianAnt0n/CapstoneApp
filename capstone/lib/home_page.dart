@@ -20,12 +20,29 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 
 
+
 // State Management: Tracks the selected container
 class ContainerState extends ChangeNotifier {
   int? selectedContainerId;
 
-  void selectContainer(int containerId) {
+  ContainerState() {
+    _loadLastSelectedContainer(); // Load saved container on startup
+  }
+
+  void selectContainer(int containerId) async {
     selectedContainerId = containerId;
+    notifyListeners();
+    await _saveSelectedContainer(containerId);
+  }
+
+  Future<void> _saveSelectedContainer(int containerId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('last_selected_container', containerId);
+  }
+
+  Future<void> _loadLastSelectedContainer() async {
+    final prefs = await SharedPreferences.getInstance();
+    selectedContainerId = prefs.getInt('last_selected_container');
     notifyListeners();
   }
 }
@@ -35,6 +52,8 @@ Future<String?> getStoredString(String key) async {
   return prefs.getString(key);
 }
 
+
+
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -43,14 +62,30 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  int _currentIndex = 0; // Tracks the selected tab index
+  int _currentIndex = 0; // ✅ Track selected tab
 
-  // Pages for bottom navigation
   final List<Widget> _pages = [
-    const DashboardPage(),
-    const ContainerPage(),
-    const OthersPage(),
+    DashboardPage(),  // Index 0
+    ContainerPage(),  // Index 1
+    OthersPage(),     // Index 2
   ];
+
+  @override
+void initState() {
+  super.initState();
+  _loadLastSelectedContainer(); // ✅ Load saved container on startup
+}
+
+void _loadLastSelectedContainer() async {
+  final containerState = Provider.of<ContainerState>(context, listen: false);
+  await Future.delayed(Duration(milliseconds: 500)); // Small delay to load state
+
+  if (containerState.selectedContainerId == null) {
+    setState(() {
+      _currentIndex = 1; // ✅ Switch to Container tab if no container is selected
+    });
+  }
+}
 
   String formatTimestamp(String timestamp) {
     try {
@@ -63,54 +98,39 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => ContainerState(),
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('E-ComposThink Home - Admin'), // AppBar title
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.notifications), // Notification bell icon
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) =>
-                          NotificationPage()), // Navigate to NotificationPage
-                );
-              },
-            ),
-          ],
-        ),
-        body: _pages[_currentIndex], // Show the selected page
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('E-ComposThink Home - Admin'), // AppBar title
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications), // Notification bell icon
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => NotificationPage()), // Navigate to NotificationPage
+              );
+            },
+          ),
+        ],
+      ),
+      body: _pages[_currentIndex], // ✅ Show the selected page
 
-        // Updated Bottom Navigation Bar with green theme
-        bottomNavigationBar: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          selectedItemColor:
-              Colors.green, // Change selected icon color to green
-          unselectedItemColor:
-              Colors.green[300], // Light green for unselected icons
-          onTap: (index) {
-            setState(() {
-              _currentIndex = index; // Update the selected tab
-            });
-          },
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.dashboard),
-              label: 'Dashboard',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.inbox),
-              label: 'Container',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.more_horiz),
-              label: 'Others',
-            ),
-          ],
-        ),
+      // Updated Bottom Navigation Bar with green theme
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        selectedItemColor: Colors.green, // Change selected icon color to green
+        unselectedItemColor: Colors.green[300], // Light green for unselected icons
+        onTap: (index) {
+          setState(() {
+            _currentIndex = index; // ✅ Switch tabs when tapped
+          });
+        },
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
+          BottomNavigationBarItem(icon: Icon(Icons.inbox), label: 'Container'),
+          BottomNavigationBarItem(icon: Icon(Icons.more_horiz), label: 'Others'),
+        ],
       ),
     );
   }
@@ -1524,11 +1544,14 @@ class ContainerPage extends StatefulWidget {
 class _ContainerPageState extends State<ContainerPage> {
   late Future<List<Map<String, dynamic>>> _containersFuture;
 
-  @override
-  void initState() {
-    super.initState();
-    _fetchContainers();
-  }
+ @override
+void initState() {
+  super.initState();
+  _fetchContainers();
+}
+
+  
+
 
   Future<void> _fetchContainers() async {
     setState(() {

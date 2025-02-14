@@ -1,38 +1,33 @@
 import 'package:capstone/splash_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart'; // ✅ Import Provider package
 import 'onboarding_page.dart';
 import 'login_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'constants.dart';
-
+import 'home_page.dart'; // ✅ Import home_page.dart where ContainerState is defined
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-//Supabase Initialization
-//const supabaseUrl = 'https://mibhnlcgkbgesgmkmufy.supabase.co';
-//const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1pYmhubGNna2JnZXNnbWttdWZ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzEzNzg2MDIsImV4cCI6MjA0Njk1NDYwMn0.0_pCroFd0IaLCpzaxI2FE2juS0wRaszcf3OtYFK5iA4';
 
   await Supabase.initialize(
      url: supabaseUrl,
      anonKey: supabaseAnonKey,
   );
-  
- //Android Init 
-  //final prefs = await SharedPreferences.getInstance();
-  //for Testing, remove after
-  //prefs.clear(); // Clears all saved preferences
-  //For Testing^^
-  //final seenOnboarding = prefs.getBool('seenOnboarding') ?? false;
-  
-  //runApp(MyApp(seenOnboarding: seenOnboarding));
-  runApp(MyApp());
+
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (context) => ContainerState()), // ✅ Provide ContainerState globally
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
-
 
   @override
   Widget build(BuildContext context) {
@@ -42,8 +37,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.green,
       ),
-      // home: seenOnboarding ? const LoginPage() : const OnboardingPage(),
-      home: SplashScreen(),
+      home: SplashScreen(), // ✅ Starts with SplashScreen
     );
   }
 }
