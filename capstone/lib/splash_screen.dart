@@ -38,10 +38,10 @@ class _SplashScreenState extends State<SplashScreen> {
       // Navigate based on user level
       if (userLevel == "Admin") {
         Navigator.pushReplacement(
-            context, MaterialPageRoute(builder: (context) => const HomePage()));
+            context, MaterialPageRoute(builder: (context) =>  HomePage()));
       } else {
         Navigator.pushReplacement(
-            context, MaterialPageRoute(builder: (context) => const HomePageMember()));
+            context, MaterialPageRoute(builder: (context) =>  HomePageMember()));
       }
     } else {
       // Navigate to login page

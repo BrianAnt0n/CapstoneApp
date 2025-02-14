@@ -20,14 +20,49 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 
 
+
 // State Management: Tracks the selected container
 class ContainerState extends ChangeNotifier {
   int? selectedContainerId;
 
-  void selectContainer(int containerId) {
+  ContainerState() {
+    _loadLastSelectedContainer(); // Load saved container on startup
+  }
+
+  void selectContainer(int containerId) async {
     selectedContainerId = containerId;
     notifyListeners();
+    await _saveSelectedContainer(containerId);
   }
+
+  Future<void> _saveSelectedContainer(int containerId) async {
+  final prefs = await SharedPreferences.getInstance();
+  
+  // ✅ Get the current logged-in user ID
+  String? userId = await getStoredString("user_id_pref");
+  
+  if (userId != null) {
+    await prefs.setInt('last_selected_container_$userId', containerId); // ✅ Save per user
+  }
+}
+
+
+
+  Future<void> _loadLastSelectedContainer() async {
+  final prefs = await SharedPreferences.getInstance();
+  
+  // ✅ Get the current logged-in user ID
+  String? userId = await getStoredString("user_id_pref");
+
+  if (userId != null) {
+    selectedContainerId = prefs.getInt('last_selected_container_$userId'); // ✅ Load per user
+  } else {
+    selectedContainerId = null; // No container if no user is found
+  }
+
+  notifyListeners();
+}
+
 }
 
 Future<String?> getStoredString(String key) async {
@@ -35,22 +70,43 @@ Future<String?> getStoredString(String key) async {
   return prefs.getString(key);
 }
 
+final GlobalKey<_HomePageState> homePageKey = GlobalKey<_HomePageState>();
+
+
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+   HomePage({Key? key}) : super(key: homePageKey); // ✅ Assign the global key here
 
   @override
   _HomePageState createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
-  int _currentIndex = 0; // Tracks the selected tab index
+  int _currentIndex = 0; // ✅ Track selected tab
 
-  // Pages for bottom navigation
   final List<Widget> _pages = [
-    const DashboardPage(),
-    const ContainerPage(),
-    const OthersPage(),
+    DashboardPage(),  // Index 0
+    ContainerPage(),  // Index 1
+    OthersPage(),     // Index 2
   ];
+
+  @override
+void initState() {
+  super.initState();
+  _loadLastSelectedContainer(); // ✅ Load saved container on startup
+}
+
+
+
+void _loadLastSelectedContainer() async {
+  final containerState = Provider.of<ContainerState>(context, listen: false);
+  await Future.delayed(Duration(milliseconds: 500)); // Small delay to load state
+
+  if (containerState.selectedContainerId == null) {
+    setState(() {
+      _currentIndex = 1; // ✅ Switch to Container tab if no container is selected
+    });
+  }
+}
 
   String formatTimestamp(String timestamp) {
     try {
@@ -63,58 +119,44 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => ContainerState(),
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('E-ComposThink Home - Admin'), // AppBar title
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.notifications), // Notification bell icon
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) =>
-                          NotificationPage()), // Navigate to NotificationPage
-                );
-              },
-            ),
-          ],
-        ),
-        body: _pages[_currentIndex], // Show the selected page
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('E-ComposThink Home - Admin'), // AppBar title
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications), // Notification bell icon
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => NotificationPage()), // Navigate to NotificationPage
+              );
+            },
+          ),
+        ],
+      ),
+      body: _pages[_currentIndex], // ✅ Show the selected page
 
-        // Updated Bottom Navigation Bar with green theme
-        bottomNavigationBar: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          selectedItemColor:
-              Colors.green, // Change selected icon color to green
-          unselectedItemColor:
-              Colors.green[300], // Light green for unselected icons
-          onTap: (index) {
-            setState(() {
-              _currentIndex = index; // Update the selected tab
-            });
-          },
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.dashboard),
-              label: 'Dashboard',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.inbox),
-              label: 'Container',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.more_horiz),
-              label: 'Others',
-            ),
-          ],
-        ),
+      // Updated Bottom Navigation Bar with green theme
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        selectedItemColor: Colors.green, // Change selected icon color to green
+        unselectedItemColor: Colors.green[300], // Light green for unselected icons
+        onTap: (index) {
+          setState(() {
+            _currentIndex = index; // ✅ Switch tabs when tapped
+          });
+        },
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
+          BottomNavigationBarItem(icon: Icon(Icons.inbox), label: 'Container'),
+          BottomNavigationBarItem(icon: Icon(Icons.more_horiz), label: 'Others'),
+        ],
       ),
     );
   }
 }
+
 
 // Dashboard Page: Displays sensor data for the selected container
 // Dashboard Page with pull-to-refresh functionality
@@ -138,6 +180,26 @@ class _DashboardPageState extends State<DashboardPage> {
   Color _ageColor = Colors.green;
   DateTime? _lastRefreshTime;
 
+  bool _dialogShown = false; // ✅ Prevents multiple popups
+
+  @override
+void initState() {
+  super.initState();
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    _checkAndShowContainerDialog(); // ✅ Check container status on load
+  });
+}
+
+void _checkAndShowContainerDialog() {
+  final containerState = Provider.of<ContainerState>(context, listen: false);
+  
+  if (containerState.selectedContainerId == null && !_dialogShown) {
+    _dialogShown = true; // ✅ Prevent duplicate pop-ups
+    _showNoContainerDialog();
+  }
+}
+
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -152,6 +214,7 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
+  
   Future<void> _refreshData() async {
     setState(() {
       _lastRefreshTime = DateTime.now();
@@ -161,6 +224,38 @@ class _DashboardPageState extends State<DashboardPage> {
     });
     FocusScope.of(context).unfocus();
   }
+
+  void _showNoContainerDialog() {
+  showDialog(
+  context: context,
+  builder: (BuildContext context) {
+    return AlertDialog(
+      title: const Text("No Container Selected"),
+      content: const Text("Please select a container from the Container tab before accessing the Dashboard."),
+      actions: [
+        TextButton(
+          onPressed: () {
+            Navigator.of(context).pop(); // Close popup
+            homePageKey.currentState?.setState(() {
+              homePageKey.currentState?._currentIndex = 1; // ✅ Switch to Container tab
+            });
+          },
+          child: const Text("OK"),
+        ),
+      ],
+    );
+  },
+);
+
+
+}
+
+
+
+
+
+
+
 
   Future<void> _deleteNoteImage(int noteId, String imageUrl) async {
   bool confirmDelete = await _showDeleteImageDialog(); // Show confirmation dialog
@@ -192,6 +287,7 @@ class _DashboardPageState extends State<DashboardPage> {
   } catch (e) {
     print("Error deleting image: $e");
   }
+  
 }
 
 Future<void> _replaceNoteImage(int noteId, String oldImageUrl) async {
@@ -935,44 +1031,54 @@ void _showFullScreenImage(String imagePath) {
                       style: const TextStyle(fontSize: 14, color: Colors.grey),
                     ),
                     const SizedBox(height: 20),
-                    FutureBuilder(
-                      future: _sensorDataFuture,
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState ==
-                            ConnectionState.waiting) {
-                          return const Center(
-                              child: CircularProgressIndicator());
-                        } else if (snapshot.hasError) {
-                          return const Text('Error fetching data');
-                        } else {
-                          final sensorData =
-                              snapshot.data as Map<String, dynamic>;
-                          return Column(
-                            children: [
-                              buildSensorCard(
-                                  Icons.thermostat,
-                                  'Temperature Monitoring',
-                                  '${sensorData['temperature']}°C',
-                                  Colors.green),
-                              buildSensorCard(
-                                  Icons.water_drop,
-                                  'Moisture Level',
-                                  '${sensorData['moisture']}%',
-                                  Colors.blue),
-                              buildSensorCard(Icons.science, 'pH Level 1',
-                                  '${sensorData['ph_level']}', Colors.purple),
-                              buildSensorCard(
-                                  Icons.science_outlined,
-                                  'pH Level 2',
-                                  '${sensorData['ph_level2']}',
-                                  Colors.deepPurple),
-                              buildSensorCard(Icons.cloud, 'Humidity',
-                                  '${sensorData['humidity']}%', Colors.orange),
-                            ],
-                          );
-                        }
-                      },
-                    ),
+               FutureBuilder(
+future: _sensorDataFuture,
+  builder: (context, snapshot) {
+    if (snapshot.connectionState == ConnectionState.waiting) {
+      return const Center(child: CircularProgressIndicator());
+    } else if (snapshot.hasError || snapshot.data == null) {
+      print("⚠️ No container selected. Error detected!"); // ✅ Debugging
+
+      if (!_dialogShown) {
+        print("🟢 Triggering _showNoContainerDialog()"); // ✅ Debugging
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _showNoContainerDialog();
+          _dialogShown = true; // ✅ Prevent duplicate popups
+          print("🔴 _dialogShown set to TRUE"); // ✅ Debugging
+        });
+      } else {
+        print("🔵 _dialogShown is already TRUE, skipping dialog"); // ✅ Debugging
+      }
+
+      return const Center(
+        child: Text('Error fetching data. Please select a container.'),
+      );
+    } else {
+      print("✅ Data fetched successfully, resetting _dialogShown"); // ✅ Debugging
+      _dialogShown = false; // ✅ Reset flag when data loads successfully
+
+
+      final sensorData = snapshot.data as Map<String, dynamic>;
+      return Column(
+        children: [
+          buildSensorCard(Icons.thermostat, 'Temperature Monitoring',
+              '${sensorData['temperature']}°C', Colors.green),
+          buildSensorCard(Icons.water_drop, 'Moisture Level',
+              '${sensorData['moisture']}%', Colors.blue),
+          buildSensorCard(Icons.science, 'pH Level 1',
+              '${sensorData['ph_level']}', Colors.purple),
+          buildSensorCard(Icons.science_outlined, 'pH Level 2',
+              '${sensorData['ph_level2']}', Colors.deepPurple),
+          buildSensorCard(Icons.cloud, 'Humidity',
+              '${sensorData['humidity']}%', Colors.orange),
+        ],
+      );
+    }
+  },
+),
+
+
+
                     const SizedBox(height: 30),
                     const Divider(thickness: 2),
                     const SizedBox(height: 10),
@@ -1408,6 +1514,7 @@ void _showFullScreenImage(String imagePath) {
   }
 }
 
+
 Future<void> updateNoteInDatabase(int noteId, String updatedNote) async {
   final supabase = Supabase.instance.client;
 
@@ -1512,6 +1619,7 @@ Future<Map<String, dynamic>> fetchSensorData(int containerId) async {
   return sensorResponse;
 }
 
+
 //Container Page : Displays a list of available containers
 
 class ContainerPage extends StatefulWidget {
@@ -1524,11 +1632,14 @@ class ContainerPage extends StatefulWidget {
 class _ContainerPageState extends State<ContainerPage> {
   late Future<List<Map<String, dynamic>>> _containersFuture;
 
-  @override
-  void initState() {
-    super.initState();
-    _fetchContainers();
-  }
+ @override
+void initState() {
+  super.initState();
+  _fetchContainers();
+}
+
+  
+
 
   Future<void> _fetchContainers() async {
     setState(() {
