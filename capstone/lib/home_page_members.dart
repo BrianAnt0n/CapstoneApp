@@ -23,13 +23,18 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
 
+Future<String?> getStoredString(String key) async {
+  final prefs = await SharedPreferences.getInstance();
+  return prefs.getString(key);
+}
 
-// State Management: Tracks the selected container
+
+// ✅ State Management: Tracks the selected container
 class ContainerState extends ChangeNotifier {
   int? selectedContainerId;
 
   ContainerState() {
-    _loadLastSelectedContainer(); // Load saved container on startup
+    _loadLastSelectedContainer(); // ✅ Load saved container on startup
   }
 
   void selectContainer(int containerId) async {
@@ -50,12 +55,6 @@ class ContainerState extends ChangeNotifier {
   }
 }
 
-Future<String?> getStoredString(String key) async {
-  final prefs = await SharedPreferences.getInstance();
-  return prefs.getString(key);
-}
-
-
 
 class HomePageMember extends StatefulWidget {
   const HomePageMember({super.key});
@@ -65,68 +64,71 @@ class HomePageMember extends StatefulWidget {
 }
 
 class _HomePageMemberState extends State<HomePageMember> {
-  int _currentIndex = 0; // Tracks the selected tab index
+  int _currentIndex = 0; // ✅ Track selected tab
 
-  // Pages for bottom navigation
   final List<Widget> _pages = [
-    const DashboardPage(),
-    const ContainerPage(),
-    const OthersPage(),
+    const DashboardPage(),  // Index 0
+    const ContainerPage(),  // Index 1
+    const OthersPage(),     // Index 2
   ];
 
   @override
-  Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => ContainerState(),
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('E-ComposThink Home - Member'), // AppBar title
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.notifications), // Notification bell icon
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) =>
-                          NotificationPage()), // Navigate to NotificationPage
-                );
-              },
-            ),
-          ],
-        ),
-        body: _pages[_currentIndex], // Show the selected page
-
-        // Updated Bottom Navigation Bar with green theme
-        bottomNavigationBar: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          selectedItemColor:
-              Colors.green, // Change selected icon color to green
-          unselectedItemColor:
-              Colors.green[300], // Light green for unselected icons
-          onTap: (index) {
-            setState(() {
-              _currentIndex = index; // Update the selected tab
-            });
-          },
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.dashboard),
-              label: 'Dashboard',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.inbox),
-              label: 'Container',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.more_horiz),
-              label: 'Others',
-            ),
-          ],
-        ),
-      ),
-    );
+  void initState() {
+    super.initState();
+    _checkSelectedContainer(); // ✅ Ensure a container is selected
   }
+
+  void _checkSelectedContainer() async {
+    final containerState = Provider.of<ContainerState>(context, listen: false);
+    await Future.delayed(const Duration(milliseconds: 500)); // Small delay to load state
+
+    if (containerState.selectedContainerId == null) {
+      setState(() {
+        _currentIndex = 1; // ✅ Redirect to Container Page if no container is selected
+      });
+    }
+  }
+
+@override
+Widget build(BuildContext context) {
+  return ChangeNotifierProvider(
+    create: (context) => ContainerState(), // ✅ Provide ContainerState only for this member session
+    child: Scaffold(
+      appBar: AppBar(
+        title: const Text('E-ComposThink Home - Member'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const NotificationPage()),
+              );
+            },
+          ),
+        ],
+      ),
+      body: _pages[_currentIndex], // ✅ Show the selected page
+
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        selectedItemColor: Colors.green,
+        unselectedItemColor: Colors.green[300],
+        onTap: (index) {
+          setState(() {
+            _currentIndex = index; // ✅ Switch tabs when tapped
+          });
+        },
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
+          BottomNavigationBarItem(icon: Icon(Icons.inbox), label: 'Container'),
+          BottomNavigationBarItem(icon: Icon(Icons.more_horiz), label: 'Others'),
+        ],
+      ),
+    ),
+  );
+}
 }
 
 // Dashboard Page: Displays sensor data for the selected container
