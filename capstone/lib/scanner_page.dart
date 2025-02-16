@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:image_picker/image_picker.dart';
@@ -13,8 +15,10 @@ class ScannerPage extends StatefulWidget {
 
 class _ScannerPageState extends State<ScannerPage> {
   bool isScanning = true;
+  bool isProcessingImage = false;
   MobileScannerController controller = MobileScannerController();
   final ImagePicker _picker = ImagePicker();
+  File? _selectedImage;
 
   @override
   void dispose() {
@@ -25,7 +29,16 @@ class _ScannerPageState extends State<ScannerPage> {
   Future<void> scanImageFromGallery() async {
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
     if (image != null) {
+      setState(() {
+        _selectedImage = File(image.path);
+        isProcessingImage = true;
+      });
+      
+      await Future.delayed(const Duration(seconds: 1));
+      
       final BarcodeCapture? capture = await controller.analyzeImage(image.path);
+      setState(() => isProcessingImage = false);
+      
       if (capture != null && capture.barcodes.isNotEmpty) {
         final String? result = capture.barcodes.first.rawValue;
         if (result != null) {
@@ -34,10 +47,28 @@ class _ScannerPageState extends State<ScannerPage> {
           return;
         }
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("No QR code found in the image.")),
-      );
+      _showDialog("No QR code found in the image.");
     }
+  }
+  
+  void _showDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Scan Result"),
+          content: Text(message),
+          actions: <Widget>[
+            TextButton(
+              child: const Text("OK", style: TextStyle(color: Colors.green)),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -60,25 +91,43 @@ class _ScannerPageState extends State<ScannerPage> {
         },
         child: Stack(
           children: [
-            MobileScanner(
-              scanWindow: scanWindowRect,
-              controller: controller,
-              onDetect: (capture) {
-                if (!isScanning) return;
-                for (final barcode in capture.barcodes) {
-                  if (barcode.rawValue != null) {
-                    setState(() => isScanning = false);
-                    widget.onScanned(barcode.rawValue!);
-                    Navigator.pop(context);
-                    break;
-                  }
-                }
-              },
-            ),
-            CustomPaint(
-              size: screenSize,
-              painter: ScanFramePainter(scanWindowRect),
-            ),
+            _selectedImage == null
+                ? MobileScanner(
+                    scanWindow: scanWindowRect,
+                    controller: controller,
+                    onDetect: (capture) {
+                      if (!isScanning) return;
+                      for (final barcode in capture.barcodes) {
+                        if (barcode.rawValue != null) {
+                          setState(() => isScanning = false);
+                          widget.onScanned(barcode.rawValue!);
+                          Navigator.pop(context);
+                          break;
+                        }
+                      }
+                    },
+                  )
+                : Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Image.file(
+                          _selectedImage!,
+                          width: screenSize.width * 0.8,
+                          height: screenSize.width * 0.8,
+                          fit: BoxFit.cover,
+                        ),
+                        const SizedBox(height: 20),
+                        if (isProcessingImage)
+                          const CircularProgressIndicator(),
+                      ],
+                    ),
+                  ),
+            if (_selectedImage == null)
+              CustomPaint(
+                size: screenSize,
+                painter: ScanFramePainter(scanWindowRect),
+              ),
             Align(
               alignment: Alignment.bottomCenter,
               child: Padding(
@@ -111,32 +160,26 @@ class ScanFramePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final Paint dimPaint = Paint()..color = Colors.black.withOpacity(0.5);
 
-    // Draw dimmed area
     Path dimPath = Path()
       ..addRect(Rect.fromLTWH(0, 0, size.width, size.height))
       ..addRect(scanWindow)
       ..fillType = PathFillType.evenOdd;
     canvas.drawPath(dimPath, dimPaint);
 
-    // Draw border corners
     Path path = Path();
     
-    // Top-left corner
     path.moveTo(scanWindow.left, scanWindow.top + cornerLength);
     path.lineTo(scanWindow.left, scanWindow.top);
     path.lineTo(scanWindow.left + cornerLength, scanWindow.top);
 
-    // Top-right corner
     path.moveTo(scanWindow.right - cornerLength, scanWindow.top);
     path.lineTo(scanWindow.right, scanWindow.top);
     path.lineTo(scanWindow.right, scanWindow.top + cornerLength);
 
-    // Bottom-left corner
     path.moveTo(scanWindow.left, scanWindow.bottom - cornerLength);
     path.lineTo(scanWindow.left, scanWindow.bottom);
     path.lineTo(scanWindow.left + cornerLength, scanWindow.bottom);
 
-    // Bottom-right corner
     path.moveTo(scanWindow.right - cornerLength, scanWindow.bottom);
     path.lineTo(scanWindow.right, scanWindow.bottom);
     path.lineTo(scanWindow.right, scanWindow.bottom - cornerLength);
@@ -147,6 +190,7 @@ class ScanFramePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
+
 
 
 // import 'package:flutter/material.dart';
@@ -210,4 +254,3 @@ class ScanFramePainter extends CustomPainter {
 //     );
 //   }
 // }
-
