@@ -27,8 +27,33 @@ import 'package:path_provider/path_provider.dart';
 class ContainerState extends ChangeNotifier {
   int? selectedContainerId;
 
-  void selectContainer(int containerId) {
+  ContainerState() {
+    _loadSelectedContainer();
+  }
+
+  void selectContainer(int? containerId) async {
     selectedContainerId = containerId;
+    notifyListeners();
+    if (containerId != null && containerId != 0) {
+      _saveSelectedContainer(containerId);
+    } else {
+      _removeSelectedContainer();
+    }
+  }
+
+  void _saveSelectedContainer(int containerId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('selected_container_id', containerId);
+  }
+
+  void _removeSelectedContainer() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('selected_container_id');
+  }
+
+  void _loadSelectedContainer() async {
+    final prefs = await SharedPreferences.getInstance();
+    selectedContainerId = prefs.getInt('selected_container_id');
     notifyListeners();
   }
 }
@@ -47,6 +72,16 @@ class HomePageMember extends StatefulWidget {
 
 class _HomePageMemberState extends State<HomePageMember> {
   int _currentIndex = 1; // Tracks the selected tab index
+
+  Future<void> _checkSelectedContainer() async {
+    final prefs = await SharedPreferences.getInstance();
+    final selectedContainerId = prefs.getInt('selected_container_id');
+    if (selectedContainerId != null) {
+      setState(() {
+        _currentIndex = 0; // Redirect to Dashboard page
+      });
+    }
+  }
 
   // Pages for bottom navigation
   final List<Widget> _pages = [
@@ -1826,7 +1861,10 @@ Future<List<Map<String, dynamic>>> fetchContainers() async {
   int storedInt = int.parse(storedString ?? "");
 
   try {
-    final response = await supabase.from('Containers_test').select('*').eq('user_id', storedInt);
+    final response = await supabase
+        .from('Containers_test')
+        .select('*')
+        .eq('user_id', storedInt);
     print('Supabase Response: $response');
     return List<Map<String, dynamic>>.from(response);
   } catch (error) {
@@ -1834,7 +1872,6 @@ Future<List<Map<String, dynamic>>> fetchContainers() async {
     throw Exception('Error fetching containers: $error');
   }
 }
-
 
 // Others Page: Displays options like Account Management, ESP Connection, App Guide, and Log Out
 class OthersPage extends StatelessWidget {
@@ -1911,6 +1948,7 @@ class OthersPage extends StatelessWidget {
                           await prefs.remove('user_level');
                           await prefs.remove('fullname');
                           await prefs.remove('email');
+                          await prefs.remove('selected_container_id');
                           await prefs.reload();
                           Navigator.pushAndRemoveUntil(
                             context,
