@@ -19,7 +19,6 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 
-
 // State Management: Tracks the selected container
 class ContainerState extends ChangeNotifier {
   int? selectedContainerId;
@@ -163,132 +162,133 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Future<void> _deleteNoteImage(int noteId, String imageUrl) async {
-  bool confirmDelete = await _showDeleteImageDialog(); // Show confirmation dialog
+    bool confirmDelete =
+        await _showDeleteImageDialog(); // Show confirmation dialog
 
-  if (!confirmDelete) return; // If user cancels, do nothing
+    if (!confirmDelete) return; // If user cancels, do nothing
 
-  try {
-    // Extract file name from URL
-    Uri uri = Uri.parse(imageUrl);
-    String fileName = uri.pathSegments.last;
+    try {
+      // Extract file name from URL
+      Uri uri = Uri.parse(imageUrl);
+      String fileName = uri.pathSegments.last;
 
-    // Delete from Supabase Storage
-    await supabase.storage.from('Notes_Image_Test').remove([fileName]);
-    print("Image deleted from Supabase: $fileName");
+      // Delete from Supabase Storage
+      await supabase.storage.from('Notes_Image_Test').remove([fileName]);
+      print("Image deleted from Supabase: $fileName");
 
-    // Remove image URL from the database (set `picture` column to NULL)
-    await supabase
-        .from('Notes_test_test')
-        .update({'picture': null})
-        .eq('note_id', noteId);
+      // Remove image URL from the database (set `picture` column to NULL)
+      await supabase
+          .from('Notes_test_test')
+          .update({'picture': null}).eq('note_id', noteId);
 
-    print("Image removed from note in database");
+      print("Image removed from note in database");
 
-    // Refresh the notes list
-    setState(() {
-      _notesFuture = fetchNotes(selectedContainerId!, _selectedDate);
-    });
-
-  } catch (e) {
-    print("Error deleting image: $e");
+      // Refresh the notes list
+      setState(() {
+        _notesFuture = fetchNotes(selectedContainerId!, _selectedDate);
+      });
+    } catch (e) {
+      print("Error deleting image: $e");
+    }
   }
-}
 
-Future<void> _replaceNoteImage(int noteId, String oldImageUrl) async {
-  showModalBottomSheet(
-    context: context,
-    builder: (BuildContext context) {
-      return SafeArea(
-        child: Wrap(
-          children: [
-            ListTile(
-              leading: const Icon(Icons.camera_alt, color: Colors.blue),
-              title: const Text("Take a Photo"),
-              onTap: () async {
-                Navigator.pop(context);
-                await _pickAndReplaceImage(noteId, oldImageUrl, ImageSource.camera);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library, color: Colors.green),
-              title: const Text("Choose from Gallery"),
-              onTap: () async {
-                Navigator.pop(context);
-                await _pickAndReplaceImage(noteId, oldImageUrl, ImageSource.gallery);
-              },
-            ),
-          ],
-        ),
-      );
-    },
-  );
-}
-
-Future<void> _pickAndReplaceImage(int noteId, String oldImageUrl, ImageSource source) async {
-  final XFile? newImage = await _picker.pickImage(source: source);
-
-  if (newImage == null) return; // User canceled
-
-  try {
-    Uri oldUri = Uri.parse(oldImageUrl);
-    String oldFileName = oldUri.pathSegments.last;
-
-    await supabase.storage.from('Notes_Image_Test').remove([oldFileName]);
-    print("Old image deleted from Supabase: $oldFileName");
-
-    File file = File(newImage.path);
-    String newFileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
-
-    await supabase.storage.from('Notes_Image_Test').upload(
-      newFileName,
-      file,
-      fileOptions: const FileOptions(upsert: true),
+  Future<void> _replaceNoteImage(int noteId, String oldImageUrl) async {
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.camera_alt, color: Colors.blue),
+                title: const Text("Take a Photo"),
+                onTap: () async {
+                  Navigator.pop(context);
+                  await _pickAndReplaceImage(
+                      noteId, oldImageUrl, ImageSource.camera);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library, color: Colors.green),
+                title: const Text("Choose from Gallery"),
+                onTap: () async {
+                  Navigator.pop(context);
+                  await _pickAndReplaceImage(
+                      noteId, oldImageUrl, ImageSource.gallery);
+                },
+              ),
+            ],
+          ),
+        );
+      },
     );
-
-    final String newImageUrl = supabase.storage.from('Notes_Image_Test').getPublicUrl(newFileName);
-    print("New image uploaded: $newImageUrl");
-
-    await supabase
-        .from('Notes_test_test')
-        .update({'picture': newImageUrl})
-        .eq('note_id', noteId);
-
-    print("Database updated with new image URL");
-
-    setState(() {
-      _notesFuture = fetchNotes(selectedContainerId!, _selectedDate);
-    });
-
-  } catch (e) {
-    print("Error replacing image: $e");
   }
-}
 
+  Future<void> _pickAndReplaceImage(
+      int noteId, String oldImageUrl, ImageSource source) async {
+    final XFile? newImage = await _picker.pickImage(source: source);
 
-Future<bool> _showDeleteImageDialog() async {
-  return await showDialog(
-    context: context,
-    builder: (BuildContext context) {
-      return AlertDialog(
-        title: const Text("Delete Image"),
-        content: const Text("Are you sure you want to delete this image? This action cannot be undone."),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false), // Cancel
-            child: const Text("Cancel"),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true), // Confirm delete
-            child: const Text("Delete", style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      );
-    },
-  ) ?? false; // Default to false if dialog is dismissed
-}
+    if (newImage == null) return; // User canceled
 
+    try {
+      Uri oldUri = Uri.parse(oldImageUrl);
+      String oldFileName = oldUri.pathSegments.last;
 
+      await supabase.storage.from('Notes_Image_Test').remove([oldFileName]);
+      print("Old image deleted from Supabase: $oldFileName");
 
+      File file = File(newImage.path);
+      String newFileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+      await supabase.storage.from('Notes_Image_Test').upload(
+            newFileName,
+            file,
+            fileOptions: const FileOptions(upsert: true),
+          );
+
+      final String newImageUrl =
+          supabase.storage.from('Notes_Image_Test').getPublicUrl(newFileName);
+      print("New image uploaded: $newImageUrl");
+
+      await supabase
+          .from('Notes_test_test')
+          .update({'picture': newImageUrl}).eq('note_id', noteId);
+
+      print("Database updated with new image URL");
+
+      setState(() {
+        _notesFuture = fetchNotes(selectedContainerId!, _selectedDate);
+      });
+    } catch (e) {
+      print("Error replacing image: $e");
+    }
+  }
+
+  Future<bool> _showDeleteImageDialog() async {
+    return await showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text("Delete Image"),
+              content: const Text(
+                  "Are you sure you want to delete this image? This action cannot be undone."),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false), // Cancel
+                  child: const Text("Cancel"),
+                ),
+                TextButton(
+                  onPressed: () =>
+                      Navigator.of(context).pop(true), // Confirm delete
+                  child:
+                      const Text("Delete", style: TextStyle(color: Colors.red)),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false; // Default to false if dialog is dismissed
+  }
 
   String _getLastRefreshedText() {
     if (_lastRefreshTime == null) return "Not refreshed yet";
@@ -352,9 +352,9 @@ Future<bool> _showDeleteImageDialog() async {
 
     setState(() {
       _notesFuture = fetchNotes(selectedContainerId!, _selectedDate);
-       // Clear image after saving
-        _selectedImage = null;
-        _imageUrl = null; // Reset image URL after adding the note
+      // Clear image after saving
+      _selectedImage = null;
+      _imageUrl = null; // Reset image URL after adding the note
     });
   }
 
@@ -386,105 +386,109 @@ Future<bool> _showDeleteImageDialog() async {
     setState(() {});
   }
 
-Widget buildNoteCard(Map<String, dynamic> note) {
-  return Card(
-    child: Padding(
-      padding: const EdgeInsets.all(10.0), // Better spacing
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Display Image if Available
-          if (note['picture'] != null && note['picture'].isNotEmpty)
-            Column(
-              children: [
-                GestureDetector(
-                  onTap: () => _showFullScreenImage(note['picture']), // Open fullscreen
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
-                      note['picture'], // ✅ Load image from Supabase URL
-                      width: double.infinity,
-                      height: 150,
-                      fit: BoxFit.cover,
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return const Center(child: CircularProgressIndicator());
-                      },
-                      errorBuilder: (context, error, stackTrace) {
-                        return const Center(child: Text("Image failed to load"));
-                      },
+  Widget buildNoteCard(Map<String, dynamic> note) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(10.0), // Better spacing
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Display Image if Available
+            if (note['picture'] != null && note['picture'].isNotEmpty)
+              Column(
+                children: [
+                  GestureDetector(
+                    onTap: () => _showFullScreenImage(
+                        note['picture']), // Open fullscreen
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        note['picture'], // ✅ Load image from Supabase URL
+                        width: double.infinity,
+                        height: 150,
+                        fit: BoxFit.cover,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return const Center(
+                              child: CircularProgressIndicator());
+                        },
+                        errorBuilder: (context, error, stackTrace) {
+                          return const Center(
+                              child: Text("Image failed to load"));
+                        },
+                      ),
                     ),
                   ),
+
+                  const SizedBox(height: 5),
+
+                  // Delete & Replace Image Buttons
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Delete Image Button
+                      TextButton.icon(
+                        onPressed: () =>
+                            _deleteNoteImage(note['note_id'], note['picture']),
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        label: const Text("Delete Image",
+                            style: TextStyle(color: Colors.red)),
+                      ),
+
+                      const SizedBox(width: 10), // Space between buttons
+
+                      // Replace Image Button
+                      TextButton.icon(
+                        onPressed: () =>
+                            _replaceNoteImage(note['note_id'], note['picture']),
+                        icon: const Icon(Icons.camera_alt, color: Colors.blue),
+                        label: const Text("Replace Image",
+                            style: TextStyle(color: Colors.blue)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+
+            const SizedBox(height: 8), // Spacing
+
+            // Display Note Text
+            Text(
+              note['note'] ?? 'No note available',
+              style: const TextStyle(fontSize: 16),
+            ),
+
+            // Timestamp
+            Text(
+              formatTimestamp(note['created_date']),
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+
+            const SizedBox(height: 5), // Spacing before buttons
+
+            // Edit & Delete Buttons
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.edit, color: Colors.blue),
+                  onPressed: () {
+                    _showEditDialog(note['note_id'], note['note']);
+                  },
                 ),
-
-                const SizedBox(height: 5),
-
-                // Delete & Replace Image Buttons
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Delete Image Button
-                    TextButton.icon(
-                      onPressed: () => _deleteNoteImage(note['note_id'], note['picture']),
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      label: const Text("Delete Image", style: TextStyle(color: Colors.red)),
-                    ),
-
-                    const SizedBox(width: 10), // Space between buttons
-
-                    // Replace Image Button
-                    TextButton.icon(
-                      onPressed: () => _replaceNoteImage(note['note_id'], note['picture']),
-                      icon: const Icon(Icons.camera_alt, color: Colors.blue),
-                      label: const Text("Replace Image", style: TextStyle(color: Colors.blue)),
-                    ),
-                  ],
+                IconButton(
+                  icon: const Icon(Icons.delete, color: Colors.red),
+                  onPressed: () {
+                    _showDeleteConfirmationDialog(note['note_id']);
+                  },
                 ),
               ],
             ),
-
-          const SizedBox(height: 8), // Spacing
-
-          // Display Note Text
-          Text(
-            note['note'] ?? 'No note available',
-            style: const TextStyle(fontSize: 16),
-          ),
-
-          // Timestamp
-          Text(
-            formatTimestamp(note['created_date']),
-            style: const TextStyle(fontSize: 12, color: Colors.grey),
-          ),
-
-          const SizedBox(height: 5), // Spacing before buttons
-
-          // Edit & Delete Buttons
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.edit, color: Colors.blue),
-                onPressed: () {
-                  _showEditDialog(note['note_id'], note['note']);
-                },
-              ),
-              IconButton(
-                icon: const Icon(Icons.delete, color: Colors.red),
-                onPressed: () {
-                  _showDeleteConfirmationDialog(note['note_id']);
-                },
-              ),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
-}
-
-
-
+    );
+  }
 
   String formatTimestamp(String timestamp) {
     try {
@@ -789,15 +793,21 @@ Widget buildNoteCard(Map<String, dynamic> note) {
     int days = difference.inDays;
     int weeks = (days / 7).floor(); // Always display as weeks
 
-    _containerAge = "$weeks ${weeks == 1 ? 'WEEK' : 'WEEKS'}";
-
-    // Set color based on compost age
-    if (weeks >= 12) {
-      _ageColor = Colors.green;
-    } else if (weeks >= 7) {
-      _ageColor = Colors.orange;
+    // Mark as "Over-composted" if 16 or more weeks
+    if (weeks > 16) {
+      _containerAge = "Over-composted";
+      _ageColor = Colors.grey; // Set a distinct color for over-composted
     } else {
-      _ageColor = Colors.red;
+      _containerAge = "$weeks ${weeks == 1 ? 'WEEK' : 'WEEKS'}";
+
+      // Set color based on compost age
+      if (weeks >= 12) {
+        _ageColor = Colors.green;
+      } else if (weeks >= 7) {
+        _ageColor = Colors.orange;
+      } else {
+        _ageColor = Colors.red;
+      }
     }
 
     if (mounted) {
@@ -810,125 +820,125 @@ Widget buildNoteCard(Map<String, dynamic> note) {
 
   final ImagePicker _picker = ImagePicker(); // ✅ Create instance
   File? _selectedImage; // Store selected image
-String? _imageUrl; // Store uploaded image URL
-
+  String? _imageUrl; // Store uploaded image URL
 
 // Show Bottom Sheet for Image Selection
-Future<void> _uploadPicture() async {
-  showModalBottomSheet(
-    context: context,
-    builder: (BuildContext context) {
-      return SafeArea(
-        child: Wrap(
-          children: [
-            ListTile(
-              leading: const Icon(Icons.camera_alt, color: Colors.blue),
-              title: const Text("Take a Photo"),
-              onTap: () async {
-                Navigator.pop(context); // Close modal
-                await _pickImage(ImageSource.camera);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library, color: Colors.green),
-              title: const Text("Choose from Gallery"),
-              onTap: () async {
-                Navigator.pop(context); // Close modal
-                await _pickImage(ImageSource.gallery);
-              },
-            ),
-          ],
-        ),
-      );
-    },
-  );
-}
+  Future<void> _uploadPicture() async {
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.camera_alt, color: Colors.blue),
+                title: const Text("Take a Photo"),
+                onTap: () async {
+                  Navigator.pop(context); // Close modal
+                  await _pickImage(ImageSource.camera);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library, color: Colors.green),
+                title: const Text("Choose from Gallery"),
+                onTap: () async {
+                  Navigator.pop(context); // Close modal
+                  await _pickImage(ImageSource.gallery);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
 // Pick Image and Upload to Supabase Storage
-Future<void> _pickImage(ImageSource source) async {
-  final XFile? image = await _picker.pickImage(source: source);
-  if (image != null) {
-    try {
-      File file = File(image.path);
-      String fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
+  Future<void> _pickImage(ImageSource source) async {
+    final XFile? image = await _picker.pickImage(source: source);
+    if (image != null) {
+      try {
+        File file = File(image.path);
+        String fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
 
-      // Upload image to Supabase Storage
-      await supabase.storage.from('Notes_Image_Test').upload(
-        fileName, 
-        file,
-        fileOptions: const FileOptions(upsert: true), // Allows overwriting
-      );
+        // Upload image to Supabase Storage
+        await supabase.storage.from('Notes_Image_Test').upload(
+              fileName,
+              file,
+              fileOptions:
+                  const FileOptions(upsert: true), // Allows overwriting
+            );
 
-      // Get Public URL of the uploaded image
-      final String imageUrl = supabase.storage.from('Notes_Image_Test').getPublicUrl(fileName);
+        // Get Public URL of the uploaded image
+        final String imageUrl =
+            supabase.storage.from('Notes_Image_Test').getPublicUrl(fileName);
 
-      setState(() {
-        _selectedImage = file;
-        _imageUrl = imageUrl; // Store the image URL
-      });
+        setState(() {
+          _selectedImage = file;
+          _imageUrl = imageUrl; // Store the image URL
+        });
 
-      print("Image uploaded successfully! URL: $_imageUrl");
-
-    } catch (e) {
-      print("Error uploading image: $e");
-    }
-  }
-}
-void _removeImage() async {
-  if (_imageUrl != null) {
-    try {
-      // Extract file name from the URL
-      Uri uri = Uri.parse(_imageUrl!);
-      String fileName = uri.pathSegments.last;
-
-      // Delete the file from Supabase Storage
-      await supabase.storage.from('Notes_Image_Test').remove([fileName]);
-
-      print("Image deleted from Supabase: $fileName");
-    } catch (e) {
-      print("Error deleting image: $e");
+        print("Image uploaded successfully! URL: $_imageUrl");
+      } catch (e) {
+        print("Error uploading image: $e");
+      }
     }
   }
 
-  // Clear the selected image from UI
-  setState(() {
-    _selectedImage = null;
-    _imageUrl = null;
-  });
-}
+  void _removeImage() async {
+    if (_imageUrl != null) {
+      try {
+        // Extract file name from the URL
+        Uri uri = Uri.parse(_imageUrl!);
+        String fileName = uri.pathSegments.last;
 
+        // Delete the file from Supabase Storage
+        await supabase.storage.from('Notes_Image_Test').remove([fileName]);
+
+        print("Image deleted from Supabase: $fileName");
+      } catch (e) {
+        print("Error deleting image: $e");
+      }
+    }
+
+    // Clear the selected image from UI
+    setState(() {
+      _selectedImage = null;
+      _imageUrl = null;
+    });
+  }
 
 // Show Image in Fullscreen
-void _showFullScreenImage(String imagePath) {
-  showDialog(
-    context: context,
-    builder: (BuildContext context) {
-      return Dialog(
-        backgroundColor: Colors.black, // Full black background
-        insetPadding: EdgeInsets.zero, // Remove extra padding
-        child: Stack(
-          children: [
-            Center(
-              child: imagePath.startsWith("http") // Check if it's a network image
-                  ? Image.network(imagePath, fit: BoxFit.contain)
-                  : Image.file(File(imagePath), fit: BoxFit.contain), // Local file
-            ),
-            Positioned(
-              top: 20,
-              right: 20,
-              child: IconButton(
-                icon: const Icon(Icons.close, color: Colors.white, size: 30),
-                onPressed: () => Navigator.pop(context), // Close fullscreen
+  void _showFullScreenImage(String imagePath) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.black, // Full black background
+          insetPadding: EdgeInsets.zero, // Remove extra padding
+          child: Stack(
+            children: [
+              Center(
+                child: imagePath
+                        .startsWith("http") // Check if it's a network image
+                    ? Image.network(imagePath, fit: BoxFit.contain)
+                    : Image.file(File(imagePath),
+                        fit: BoxFit.contain), // Local file
               ),
-            ),
-          ],
-        ),
-      );
-    },
-  );
-}
-
-
+              Positioned(
+                top: 20,
+                right: 20,
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                  onPressed: () => Navigator.pop(context), // Close fullscreen
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1153,10 +1163,11 @@ void _showFullScreenImage(String imagePath) {
                     const SizedBox(height: 10),
 
 // Show Image Above Text Field (if selected)
-                   if (_selectedImage != null)
-  GestureDetector(
-    onTap: () => _showFullScreenImage(_selectedImage!.path), // ✅ Pass file path as String
-    child: Stack(
+                    if (_selectedImage != null)
+                      GestureDetector(
+                        onTap: () => _showFullScreenImage(
+                            _selectedImage!.path), // ✅ Pass file path as String
+                        child: Stack(
                           alignment: Alignment.topRight,
                           children: [
                             ClipRRect(
@@ -1456,24 +1467,23 @@ Future<void> deleteNoteFromDatabase(int noteId) async {
 }
 
 //notes database
-Future<void> addNoteToDatabase(int containerId, String note, String? imageUrl) async {
+Future<void> addNoteToDatabase(
+    int containerId, String note, String? imageUrl) async {
   final supabase = Supabase.instance.client;
 
   try {
     await supabase.from('Notes_test_test').insert({
       'container_id': containerId,
       'note': note,
-      'picture': imageUrl,  // ✅ Store image URL in the 'picture' column
+      'picture': imageUrl, // ✅ Store image URL in the 'picture' column
       'created_date': DateTime.now().toIso8601String(),
     });
 
     print("Note added successfully with image URL: $imageUrl");
-
   } catch (error) {
     print("Error adding note: $error");
   }
 }
-
 
 Future<List<Map<String, dynamic>>> fetchNotes(
     int containerId, DateTime date) async {

@@ -381,7 +381,7 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  void _calculateContainerAge() {
+void _calculateContainerAge() {
     if (_containerAddedDate == null) {
       _containerAge = "Unknown";
       return;
@@ -391,21 +391,28 @@ class _DashboardPageState extends State<DashboardPage> {
     int days = difference.inDays;
     int weeks = (days / 7).floor(); // Always display as weeks
 
-    _containerAge = "$weeks ${weeks == 1 ? 'WEEK' : 'WEEKS'}";
-
-    // Set color based on compost age
-    if (weeks >= 12) {
-      _ageColor = Colors.green;
-    } else if (weeks >= 7) {
-      _ageColor = Colors.orange;
+    // Mark as "Over-composted" if 16 or more weeks
+    if (weeks > 16) {
+      _containerAge = "Over-composted";
+      _ageColor = Colors.grey; // Set a distinct color for over-composted
     } else {
-      _ageColor = Colors.red;
+      _containerAge = "$weeks ${weeks == 1 ? 'WEEK' : 'WEEKS'}";
+
+      // Set color based on compost age
+      if (weeks >= 12) {
+        _ageColor = Colors.green;
+      } else if (weeks >= 7) {
+        _ageColor = Colors.orange;
+      } else {
+        _ageColor = Colors.red;
+      }
     }
 
     if (mounted) {
       setState(() {}); // Update UI
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
