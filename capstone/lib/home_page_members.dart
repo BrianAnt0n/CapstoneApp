@@ -73,6 +73,13 @@ class HomePageMember extends StatefulWidget {
 class _HomePageMemberState extends State<HomePageMember> {
   int _currentIndex = 1; // Tracks the selected tab index
 
+
+  @override
+  void initState() {
+    super.initState();
+    _checkSelectedContainer();
+  }
+
   Future<void> _checkSelectedContainer() async {
     final prefs = await SharedPreferences.getInstance();
     final selectedContainerId = prefs.getInt('selected_container_id');
