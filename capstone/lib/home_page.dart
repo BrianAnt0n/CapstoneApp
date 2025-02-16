@@ -195,20 +195,47 @@ class _DashboardPageState extends State<DashboardPage> {
 }
 
 Future<void> _replaceNoteImage(int noteId, String oldImageUrl) async {
-  final XFile? newImage = await _picker.pickImage(source: ImageSource.camera);
+  showModalBottomSheet(
+    context: context,
+    builder: (BuildContext context) {
+      return SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt, color: Colors.blue),
+              title: const Text("Take a Photo"),
+              onTap: () async {
+                Navigator.pop(context);
+                await _pickAndReplaceImage(noteId, oldImageUrl, ImageSource.camera);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library, color: Colors.green),
+              title: const Text("Choose from Gallery"),
+              onTap: () async {
+                Navigator.pop(context);
+                await _pickAndReplaceImage(noteId, oldImageUrl, ImageSource.gallery);
+              },
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
 
-  if (newImage == null) return; // User canceled the camera
+Future<void> _pickAndReplaceImage(int noteId, String oldImageUrl, ImageSource source) async {
+  final XFile? newImage = await _picker.pickImage(source: source);
+
+  if (newImage == null) return; // User canceled
 
   try {
-    // Extract old file name from URL
     Uri oldUri = Uri.parse(oldImageUrl);
     String oldFileName = oldUri.pathSegments.last;
 
-    // Delete old image from Supabase Storage
     await supabase.storage.from('Notes_Image_Test').remove([oldFileName]);
     print("Old image deleted from Supabase: $oldFileName");
 
-    // Upload new image
     File file = File(newImage.path);
     String newFileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
 
@@ -218,12 +245,9 @@ Future<void> _replaceNoteImage(int noteId, String oldImageUrl) async {
       fileOptions: const FileOptions(upsert: true),
     );
 
-    // Get new image URL
     final String newImageUrl = supabase.storage.from('Notes_Image_Test').getPublicUrl(newFileName);
-
     print("New image uploaded: $newImageUrl");
 
-    // Update the database with the new image URL
     await supabase
         .from('Notes_test_test')
         .update({'picture': newImageUrl})
@@ -231,7 +255,6 @@ Future<void> _replaceNoteImage(int noteId, String oldImageUrl) async {
 
     print("Database updated with new image URL");
 
-    // Refresh the UI
     setState(() {
       _notesFuture = fetchNotes(selectedContainerId!, _selectedDate);
     });
