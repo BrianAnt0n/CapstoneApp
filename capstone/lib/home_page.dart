@@ -1820,8 +1820,12 @@ Future<void> deleteContainer(int containerId) async {
 
 Future<List<Map<String, dynamic>>> fetchContainers() async {
   final supabase = Supabase.instance.client;
+  String? storedString = await getStoredString("user_id_pref");
+
+  int storedInt = int.parse(storedString ?? "");
+
   try {
-    final response = await supabase.from('Containers_test').select('*');
+    final response = await supabase.from('Containers_test').select('*').eq('user_id', storedInt);
     print('Supabase Response: $response');
     return List<Map<String, dynamic>>.from(response);
   } catch (error) {
