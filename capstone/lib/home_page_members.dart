@@ -46,7 +46,7 @@ class HomePageMember extends StatefulWidget {
 }
 
 class _HomePageMemberState extends State<HomePageMember> {
-  int _currentIndex = 0; // Tracks the selected tab index
+  int _currentIndex = 1; // Tracks the selected tab index
 
   // Pages for bottom navigation
   final List<Widget> _pages = [
