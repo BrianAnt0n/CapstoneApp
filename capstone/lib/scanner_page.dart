@@ -33,12 +33,12 @@ class _ScannerPageState extends State<ScannerPage> {
         _selectedImage = File(image.path);
         isProcessingImage = true;
       });
-      
+
       await Future.delayed(const Duration(seconds: 1));
-      
+
       final BarcodeCapture? capture = await controller.analyzeImage(image.path);
       setState(() => isProcessingImage = false);
-      
+
       if (capture != null && capture.barcodes.isNotEmpty) {
         final String? result = capture.barcodes.first.rawValue;
         if (result != null) {
@@ -50,7 +50,7 @@ class _ScannerPageState extends State<ScannerPage> {
       _showDialog("No QR code found in the image.");
     }
   }
-  
+
   void _showDialog(String message) {
     showDialog(
       context: context,
@@ -85,7 +85,8 @@ class _ScannerPageState extends State<ScannerPage> {
       appBar: AppBar(title: const Text("Scan QR Code")),
       body: GestureDetector(
         onVerticalDragEnd: (details) {
-          if (details.primaryVelocity != null && details.primaryVelocity! < -500) {
+          if (details.primaryVelocity != null &&
+              details.primaryVelocity! < -500) {
             scanImageFromGallery();
           }
         },
@@ -134,7 +135,10 @@ class _ScannerPageState extends State<ScannerPage> {
                 padding: const EdgeInsets.all(16.0),
                 child: Text(
                   "Swipe up to scan from gallery",
-                  style: TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold),
                 ),
               ),
             ),
@@ -167,7 +171,7 @@ class ScanFramePainter extends CustomPainter {
     canvas.drawPath(dimPath, dimPaint);
 
     Path path = Path();
-    
+
     path.moveTo(scanWindow.left, scanWindow.top + cornerLength);
     path.lineTo(scanWindow.left, scanWindow.top);
     path.lineTo(scanWindow.left + cornerLength, scanWindow.top);
@@ -190,67 +194,3 @@ class ScanFramePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
-
-
-
-// import 'package:flutter/material.dart';
-// import 'package:intl/intl.dart';
-// import 'package:mobile_scanner/mobile_scanner.dart';
-// import 'package:shared_preferences/shared_preferences.dart';
-// import 'package:supabase_flutter/supabase_flutter.dart';
-// import 'package:qr_scanner_overlay/qr_scanner_overlay.dart';
-
-// class ScannerPage extends StatefulWidget {
-//   final Function(String) onScanned; // Callback to return scanned data
-
-//   const ScannerPage({Key? key, required this.onScanned}) : super(key: key);
-
-//   @override
-//   _ScannerPageState createState() => _ScannerPageState();
-// }
-
-// class _ScannerPageState extends State<ScannerPage> {
-//   bool isScanning = true; // Ensures it only scans once
-//   MobileScannerController controller = MobileScannerController();
-
-//   @override
-//   void dispose() {
-//     controller.dispose(); // Clean up the scanner when closing the page
-//     super.dispose();
-//   }
-
-
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       appBar: AppBar(title: const Text("Scan QR Code")),
-//       body: Stack(
-//         children: [MobileScanner(
-//           scanWindow: Rect.fromCenter(
-//             center: MediaQuery.of(context).size.center(Offset.zero),
-//             width: 250,
-//             height: 250,),
-//         controller: controller,
-//         onDetect: (capture) {
-//           if (!isScanning) return; // Ignore multiple scans
-
-//           final List<Barcode> barcodes = capture.barcodes;
-//           for (final barcode in barcodes) {
-//             if (barcode.rawValue != null) {
-//               setState(() => isScanning = false); // Stop scanning
-//               widget.onScanned(barcode.rawValue!);
-//               Navigator.pop(context); // Close scanner & go back
-//               break;
-//             }
-//           }
-//         },
-//       ),
-//       QRScannerOverlay(
-//             overlayColor: Colors.black.withOpacity(0.5),
-//           )
-//     ]
-//     )
-//     );
-//   }
-// }
