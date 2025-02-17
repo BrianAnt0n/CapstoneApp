@@ -179,28 +179,56 @@ class _DashboardPageState extends State<DashboardPage> {
   DateTime? _lastRefreshTime;
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final containerState = Provider.of<ContainerState>(context);
-    selectedContainerId = containerState.selectedContainerId;
+void didChangeDependencies() {
+  super.didChangeDependencies();
+  final containerState = Provider.of<ContainerState>(context);
+  selectedContainerId = containerState.selectedContainerId;
 
-    if (selectedContainerId != null) {
-      _sensorDataFuture = fetchSensorData(selectedContainerId!);
-      _notesFuture = fetchNotes(selectedContainerId!, _selectedDate);
-      _historyFuture = fetchHistoryData(selectedContainerId!);
-      fetchContainerDetails(selectedContainerId!);
-    }
+  if (selectedContainerId != null) {
+    // ✅ Get the correct hardware_id first
+    fetchHardwareId(selectedContainerId!).then((hardwareId) {
+      if (hardwareId != null) {
+        setState(() {
+          _sensorDataFuture = fetchSensorData(selectedContainerId!);
+          _notesFuture = fetchNotes(hardwareId, _selectedDate); // ✅ Use hardwareId
+          _historyFuture = fetchHistoryData(selectedContainerId!);
+          fetchContainerDetails(selectedContainerId!);
+        });
+      }
+    });
   }
+}
 
-  Future<void> _refreshData() async {
+Future<void> _refreshData() async {
+  setState(() {
+    _lastRefreshTime = DateTime.now();
+  });
+
+  // ✅ Get the correct hardware_id before refreshing notes
+  final hardwareId = await fetchHardwareId(selectedContainerId!);
+  if (hardwareId != null) {
     setState(() {
-      _lastRefreshTime = DateTime.now();
       _sensorDataFuture = fetchSensorData(selectedContainerId!);
-      _notesFuture = fetchNotes(selectedContainerId!, _selectedDate);
+      _notesFuture = fetchNotes(hardwareId, _selectedDate); // ✅ Use hardwareId
       _historyFuture = fetchHistoryData(selectedContainerId!);
     });
-    FocusScope.of(context).unfocus();
   }
+
+  FocusScope.of(context).unfocus();
+}
+
+// ✅ New function to fetch hardwareId from containerId
+Future<int?> fetchHardwareId(int containerId) async {
+  final supabase = Supabase.instance.client;
+  final containerResponse = await supabase
+      .from('Containers_test')
+      .select('hardware_id')
+      .eq('container_id', containerId)
+      .maybeSingle();
+
+  return containerResponse?['hardware_id']; // ✅ Returns correct hardware_id
+}
+
 
   Future<void> _deleteNoteImage(int noteId, String imageUrl) async {
     bool confirmDelete =
@@ -350,18 +378,102 @@ class _DashboardPageState extends State<DashboardPage> {
         : "Time Refreshed: Refresh Pending";
   }
 
+  // Future<List<Map<String, dynamic>>> fetchHistoryData(int containerId) async {
+  //   final supabase = Supabase.instance.client;
+
+  //   final containerResponse = await supabase
+  //     .from('Containers_test')
+  //     .select('hardware_id')
+  //     .eq('container_id', containerId)
+  //     .single();
+  // final hardwareId = containerResponse['hardware_id'];
+  //   try {
+  //     return await supabase
+  //         .from('History_Test')
+  //         .select('*')
+  //         .eq('hardware_id', hardwareId)
+  //         .order('timestamp', ascending: true);
+  //   } catch (error) {
+  //     return [];
+  //   }
+  // }
+
+  Future<int?> fetchHardwareIdFromContainer(int containerId) async {
+    final supabase = Supabase.instance.client;
+    try {
+      final response = await supabase
+          .from('Containers_test')
+          .select('hardware_id')
+          .eq('container_id', containerId)
+          .single(); // Ensures only one row is returned
+
+      if (response != null && response['hardware_id'] != null) {
+        return response['hardware_id'] as int;
+      } else {
+        print("No hardware_id found for container_id: $containerId");
+        return null;
+      }
+    } catch (error) {
+      print("Error fetching hardware_id: $error");
+      return null;
+    }
+  }
+
   Future<List<Map<String, dynamic>>> fetchHistoryData(int containerId) async {
     final supabase = Supabase.instance.client;
     try {
-      return await supabase
+      // Step 1: Fetch the correct hardware_id using container_id
+      final hardwareId = await fetchHardwareIdFromContainer(containerId);
+
+      if (hardwareId == null) {
+        print("Cannot fetch historical data because hardware_id is null.");
+        return [];
+      }
+
+      // Step 2: Fetch historical data using the correct hardware_id
+      final response = await supabase
           .from('History_Test')
-          .select('*')
-          .eq('container_id', containerId)
+          .select(
+              'historical_id, ph_level1, ph_level2, humidity, temperature, moisture, timestamp, container_id, hardware_id')
+          .eq('hardware_id', hardwareId)
           .order('timestamp', ascending: true);
+
+      if (response.isEmpty) {
+        print("No historical data found for hardware_id: $hardwareId");
+      } else {
+        print("Fetched Historical Data: $response");
+      }
+
+      return response;
     } catch (error) {
+      print("Error fetching historical data: $error");
       return [];
     }
   }
+
+
+
+  Future<Map<String, dynamic>> fetchSensorData(int containerId) async {
+  
+final supabase = Supabase.instance.client;
+  final containerResponse = await supabase
+      .from('Containers_test')
+      .select('hardware_id')
+      .eq('container_id', containerId)
+      .single();
+  final hardwareId = containerResponse['hardware_id'];
+
+  final sensorResponse = await supabase
+      .from('Hardware_Sensors_Test')
+      .select(
+          'temperature, moisture, ph_level, ph_level2, humidity, refreshed_date')
+      .eq('hardware_id', hardwareId)
+      .order('refreshed_date', ascending: false)
+      .limit(1)
+      .single();
+
+  return sensorResponse;
+}
 
   Widget buildSensorCard(
       IconData icon, String title, String value, Color color) {
@@ -1208,34 +1320,34 @@ class _DashboardPageState extends State<DashboardPage> {
                           return const Center(
                               child: CircularProgressIndicator());
                         } else if (snapshot.hasError) {
-                          return const Text('Error fetching data');
-                        } else {
-                          final sensorData =
-                              snapshot.data as Map<String, dynamic>;
-                          return Column(
-                            children: [
-                              buildSensorCard(
-                                  Icons.thermostat,
-                                  'Temperature Monitoring',
-                                  '${sensorData['temperature']}°C',
-                                  Colors.green),
-                              buildSensorCard(
-                                  Icons.water_drop,
-                                  'Moisture Level',
-                                  '${sensorData['moisture']}%',
-                                  Colors.blue),
-                              buildSensorCard(Icons.science, 'pH Level 1',
-                                  '${sensorData['ph_level']}', Colors.purple),
-                              buildSensorCard(
-                                  Icons.science_outlined,
-                                  'pH Level 2',
-                                  '${sensorData['ph_level2']}',
-                                  Colors.deepPurple),
-                              buildSensorCard(Icons.cloud, 'Humidity',
-                                  '${sensorData['humidity']}%', Colors.orange),
-                            ],
-                          );
+                          return const Center(
+                              child: Text('Error fetching data'));
+                        } else if (!snapshot.hasData || snapshot.data == null) {
+                          // ✅ Prevents the crash
+                          return const Center(child: Text('No data available'));
                         }
+
+                        final sensorData = snapshot.data!; // ✅ Now safe to use
+                        return Column(
+                          children: [
+                            buildSensorCard(
+                                Icons.thermostat,
+                                'Temperature Monitoring',
+                                '${sensorData['temperature']}°C',
+                                Colors.green),
+                            buildSensorCard(Icons.water_drop, 'Moisture Level',
+                                '${sensorData['moisture']}%', Colors.blue),
+                            buildSensorCard(Icons.science, 'pH Level 1',
+                                '${sensorData['ph_level']}', Colors.purple),
+                            buildSensorCard(
+                                Icons.science_outlined,
+                                'pH Level 2',
+                                '${sensorData['ph_level2']}',
+                                Colors.deepPurple),
+                            buildSensorCard(Icons.cloud, 'Humidity',
+                                '${sensorData['humidity']}%', Colors.orange),
+                          ],
+                        );
                       },
                     ),
 
@@ -1439,15 +1551,22 @@ class _DashboardPageState extends State<DashboardPage> {
                     FutureBuilder(
                       future: _notesFuture,
                       builder: (context, snapshot) {
+                        print(
+                            "Notes FutureBuilder State: ${snapshot.connectionState}");
+                        print("Notes Data: ${snapshot.data}");
+
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {
                           return const Center(
                               child: CircularProgressIndicator());
                         } else if (snapshot.hasError || snapshot.data == null) {
+                          print("Error fetching notes: ${snapshot.error}");
                           return const Text('No notes found.');
                         } else {
                           final notes =
                               snapshot.data as List<Map<String, dynamic>>;
+
+                          print("Fetched ${notes.length} notes.");
                           return Column(
                             children: notes
                                 .map((note) => buildNoteCard(note))
@@ -1492,14 +1611,37 @@ class _DashboardPageState extends State<DashboardPage> {
                                 scrollController.position.maxScrollExtent);
                           });
 
+                          Widget buildChartOrMessage(
+                              String title, String key, Color color) {
+                            if (historyData.length <= 1) {
+                              return Container(
+                                height: 250, // Adjust height as needed
+                                alignment: Alignment.center,
+                                child: const Text(
+                                  'Insufficient Data',
+                                  style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.red),
+                                ),
+                              );
+                            } else {
+                              return SingleChildScrollView(
+                                controller: scrollController,
+                                scrollDirection: Axis.horizontal,
+                                reverse: true,
+                                child: buildBarChart(
+                                    historyData, title, key, color),
+                              );
+                            }
+                          }
+
                           return SingleChildScrollView(
                             scrollDirection: Axis.vertical,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const SizedBox(height: 20),
-
-                                // Temperature Graph Section
                                 const Text(
                                   'Temperature Monitoring',
                                   style: TextStyle(
@@ -1511,23 +1653,12 @@ class _DashboardPageState extends State<DashboardPage> {
                                   style: TextStyle(
                                       fontSize: 14, color: Colors.grey),
                                 ),
-                                SingleChildScrollView(
-                                  controller: scrollController,
-                                  scrollDirection: Axis.horizontal,
-                                  reverse: true,
-                                  child: buildBarChart(
-                                      historyData,
-                                      'Temperature',
-                                      'temperature',
-                                      Colors.green),
-                                ),
+                                buildChartOrMessage(
+                                    'Temperature', 'temperature', Colors.green),
                                 const SizedBox(height: 20),
                                 Divider(
                                     thickness: 2, color: Colors.grey.shade400),
-
                                 const SizedBox(height: 20),
-
-                                // Moisture Graph Section
                                 const Text(
                                   'Moisture Level',
                                   style: TextStyle(
@@ -1539,20 +1670,12 @@ class _DashboardPageState extends State<DashboardPage> {
                                   style: TextStyle(
                                       fontSize: 14, color: Colors.grey),
                                 ),
-                                SingleChildScrollView(
-                                  controller: scrollController,
-                                  scrollDirection: Axis.horizontal,
-                                  reverse: true,
-                                  child: buildBarChart(historyData, 'Moisture',
-                                      'moisture', Colors.blue),
-                                ),
+                                buildChartOrMessage(
+                                    'Moisture', 'moisture', Colors.blue),
                                 const SizedBox(height: 20),
                                 Divider(
                                     thickness: 2, color: Colors.grey.shade400),
-
                                 const SizedBox(height: 20),
-
-                                // pH Level 1 Graph Section
                                 const Text(
                                   'pH Level 1',
                                   style: TextStyle(
@@ -1564,20 +1687,12 @@ class _DashboardPageState extends State<DashboardPage> {
                                   style: TextStyle(
                                       fontSize: 14, color: Colors.grey),
                                 ),
-                                SingleChildScrollView(
-                                  controller: scrollController,
-                                  scrollDirection: Axis.horizontal,
-                                  reverse: true,
-                                  child: buildBarChart(historyData,
-                                      'pH Level 1', 'ph_level1', Colors.purple),
-                                ),
+                                buildChartOrMessage(
+                                    'pH Level 1', 'ph_level1', Colors.purple),
                                 const SizedBox(height: 20),
                                 Divider(
                                     thickness: 2, color: Colors.grey.shade400),
-
                                 const SizedBox(height: 20),
-
-                                // pH Level 2 Graph Section
                                 const Text(
                                   'pH Level 2',
                                   style: TextStyle(
@@ -1589,23 +1704,12 @@ class _DashboardPageState extends State<DashboardPage> {
                                   style: TextStyle(
                                       fontSize: 14, color: Colors.grey),
                                 ),
-                                SingleChildScrollView(
-                                  controller: scrollController,
-                                  scrollDirection: Axis.horizontal,
-                                  reverse: true,
-                                  child: buildBarChart(
-                                      historyData,
-                                      'pH Level 2',
-                                      'ph_level2',
-                                      Colors.deepPurple),
-                                ),
+                                buildChartOrMessage('pH Level 2', 'ph_level2',
+                                    Colors.deepPurple),
                                 const SizedBox(height: 20),
                                 Divider(
                                     thickness: 2, color: Colors.grey.shade400),
-
                                 const SizedBox(height: 20),
-
-                                // Humidity Graph Section
                                 const Text(
                                   'Humidity Level',
                                   style: TextStyle(
@@ -1617,19 +1721,15 @@ class _DashboardPageState extends State<DashboardPage> {
                                   style: TextStyle(
                                       fontSize: 14, color: Colors.grey),
                                 ),
-                                SingleChildScrollView(
-                                  controller: scrollController,
-                                  scrollDirection: Axis.horizontal,
-                                  reverse: true,
-                                  child: buildBarChart(historyData, 'Humidity',
-                                      'humidity', Colors.orange),
-                                ),
+                                buildChartOrMessage(
+                                    'Humidity', 'humidity', Colors.orange),
                               ],
                             ),
                           );
                         }
                       },
                     ),
+
                   ],
                 ),
               ),
@@ -1662,50 +1762,94 @@ Future<void> deleteNoteFromDatabase(int noteId) async {
   }
 }
 
+// ✅ Function to get current time in UTC format
+String getLocalTimestamp() {
+  final now = DateTime.now().toUtc().add(const Duration(hours: 8)); // ✅ Convert to GMT+8
+  return now.toIso8601String();
+}
+
+
 //notes database
-Future<void> addNoteToDatabase(
-    int containerId, String note, String? imageUrl) async {
+Future<void> addNoteToDatabase(int containerId, String note, String? imageUrl) async {
   final supabase = Supabase.instance.client;
 
   try {
+    // ✅ Fetch the correct hardware_id from Containers_test
+    final containerResponse = await supabase
+        .from('Containers_test')
+        .select('hardware_id')
+        .eq('container_id', containerId)
+        .maybeSingle();
+
+    if (containerResponse == null || containerResponse['hardware_id'] == null) {
+      print("Error: No valid hardware_id found for container_id $containerId.");
+      return;
+    }
+
+    int hardwareId = containerResponse['hardware_id']; // ✅ Use correct hardware_id
+    print("Resolved Hardware ID for container_id $containerId: $hardwareId");
+
+    // ✅ Ensure hardware_id exists in Hardware_Sensors_Test before inserting
+    final checkHardware = await supabase
+        .from('Hardware_Sensors_Test')
+        .select('hardware_id')
+        .eq('hardware_id', hardwareId)
+        .maybeSingle();
+
+    if (checkHardware == null) {
+      print("Error: hardware_id $hardwareId does not exist in Hardware_Sensors_Test.");
+      return;
+    }
+
+    // ✅ Insert note with the correct hardware_id and use getUtcTimestamp()
     await supabase.from('Notes_test_test').insert({
-      'container_id': containerId,
+      'hardware_id': hardwareId,
       'note': note,
-      'picture': imageUrl, // ✅ Store image URL in the 'picture' column
-      'created_date': DateTime.now().toIso8601String(),
+      'picture': imageUrl,
+      'created_date': getLocalTimestamp(), // ✅ Now correctly using UTC function
     });
 
-    print("Note added successfully with image URL: $imageUrl");
+    print("Note added successfully for hardware ID: $hardwareId");
   } catch (error) {
     print("Error adding note: $error");
   }
 }
 
-Future<List<Map<String, dynamic>>> fetchNotes(
-    int containerId, DateTime date) async {
+
+
+
+Future<List<Map<String, dynamic>>> fetchNotes(int hardwareId, DateTime date) async {
   final supabase = Supabase.instance.client;
 
-  // Format date to 'YYYY-MM-DD'
-  String formattedDate = DateFormat('yyyy-MM-dd').format(date);
+  DateTime startOfDayUtc = DateTime(date.year, date.month, date.day).toUtc();
+  DateTime endOfDayUtc = startOfDayUtc.add(const Duration(hours: 23, minutes: 59, seconds: 59));
 
   try {
-    final List<Map<String, dynamic>> response = await supabase
+    print("Fetching notes for hardware_id: $hardwareId between $startOfDayUtc and $endOfDayUtc");
+
+    final response = await supabase
         .from('Notes_test_test')
-        .select()
-        .eq('container_id', containerId)
-        .gte('created_date',
-            '$formattedDate 00:00:00') // Start of the selected date
-        .lt('created_date',
-            '$formattedDate 23:59:59'); // End of the selected date
+        .select('*')
+        .eq('hardware_id', hardwareId)
+        .gte('created_date', startOfDayUtc.toIso8601String())
+        .lt('created_date', endOfDayUtc.toIso8601String());
 
-    print("Fetched notes for $formattedDate: $response"); // Debugging log
+    if (response == null) {
+      print("Supabase returned null for notes.");
+      return [];
+    }
 
-    return response;
+    print("Fetched notes: ${response.length} notes."); // Debug log
+    return List<Map<String, dynamic>>.from(response);
   } catch (error) {
     print("Error fetching notes: $error");
-    return [];
+    return []; // Return an empty list instead of failing
   }
 }
+
+
+
+
 
 //ending of notes section
 
@@ -1721,15 +1865,20 @@ Widget buildSensorCard(IconData icon, String title, String value, Color color) {
 }
 
 //Database Fetching: Fetch sensor data for a specific container
+// Fetch sensor data for a specific container & trigger alerts if needed
 Future<Map<String, dynamic>> fetchSensorData(int containerId) async {
   final supabase = Supabase.instance.client;
+
+  // 1️⃣ Get hardware_id from the container
   final containerResponse = await supabase
       .from('Containers_test')
       .select('hardware_id')
       .eq('container_id', containerId)
       .single();
+  
   final hardwareId = containerResponse['hardware_id'];
 
+  // 2️⃣ Fetch latest sensor data
   final sensorResponse = await supabase
       .from('Hardware_Sensors_Test')
       .select(
@@ -1739,10 +1888,59 @@ Future<Map<String, dynamic>> fetchSensorData(int containerId) async {
       .limit(1)
       .single();
 
+  // 3️⃣ Define acceptable sensor ranges
+  const double minTemp = 10.0, maxTemp = 54.0;
+  const double minMoisture = 50.0, maxMoisture = 60.0;
+  const double minPH = 6.0, maxPH = 8.0;
+  const double minHumidity = 40.0, maxHumidity = 60.0;
+
+  // 4️⃣ Extract sensor values
+  final double temp = sensorResponse['temperature'];
+  final double moisture = sensorResponse['moisture'];
+  final double ph1 = sensorResponse['ph_level'];
+  final double ph2 = sensorResponse['ph_level2'];
+  final double humidity = sensorResponse['humidity'];
+
+  // 5️⃣ Check for alerts & insert into Notifications_Test table
+  Future<void> logNotification(String title, String message) async {
+    await supabase.from('Notifications_Test').insert({
+      'container_id': containerId,
+      'title': title,
+      'message': message,
+      'timestamp': DateTime.now().toIso8601String(),
+    });
+  }
+
+  if (temp < minTemp) {
+    await logNotification("Temperature Alert", "Temperature is $temp°C, below normal range.");
+  } else if (temp > maxTemp) {
+    await logNotification("Temperature Alert", "Temperature is $temp°C, above normal range.");
+  }
+
+  if (moisture < minMoisture) {
+    await logNotification("Moisture Alert", "Moisture level is $moisture%, below normal range.");
+  } else if (moisture > maxMoisture) {
+    await logNotification("Moisture Alert", "Moisture level is $moisture%, above normal range.");
+  }
+
+  if (ph1 < minPH || ph1 > maxPH) {
+    await logNotification("pH Level 1 Alert", "pH Level 1 is $ph1, out of range.");
+  }
+
+  if (ph2 < minPH || ph2 > maxPH) {
+    await logNotification("pH Level 2 Alert", "pH Level 2 is $ph2, out of range.");
+  }
+
+  if (humidity < minHumidity) {
+    await logNotification("Humidity Alert", "Humidity is $humidity%, below normal range.");
+  } else if (humidity > maxHumidity) {
+    await logNotification("Humidity Alert", "Humidity is $humidity%, above normal range.");
+  }
+
   return sensorResponse;
 }
 
-//Container Page : Displays a list of available containers
+// Container Page : Displays a list of available containers
 
 class ContainerPage extends StatefulWidget {
   const ContainerPage({super.key});
@@ -1766,6 +1964,7 @@ class _ContainerPageState extends State<ContainerPage> {
     });
   }
 
+  //Fetches the container data when scanned
   Future<void> fetchData(int storedInt, String scannedCode) async {
     final contSupabase = Supabase.instance.client;
 
@@ -1917,7 +2116,7 @@ class _ContainerPageState extends State<ContainerPage> {
                             ),
                             onTap: () {
                               if (isSelected) {
-                                containerState.selectContainer(0);
+                                containerState.selectContainer(0); 
                               } else {
                                 containerState
                                     .selectContainer(container['container_id']);
