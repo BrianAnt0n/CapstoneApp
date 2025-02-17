@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'add_account_page.dart';
 import 'account_settings_page.dart';
+import 'package:flutter/services.dart';
+
 
 class AccountManagementPage extends StatefulWidget {
   const AccountManagementPage({super.key});
@@ -29,7 +31,7 @@ class _AccountManagementPageState extends State<AccountManagementPage> {
     final supabase = Supabase.instance.client;
     final response = await supabase
         .from('Users')
-        .select('user_id, user_level, fullname, email')
+        .select('user_id, user_level, fullname, email, reset_requested')
         .order('user_id', ascending: true);
     return List<Map<String, dynamic>>.from(response);
   }
@@ -55,6 +57,21 @@ class _AccountManagementPageState extends State<AccountManagementPage> {
     await supabase.from('Users').delete().eq('user_id', userId);
     _fetchAccounts(); // Refresh the list
   }
+
+  Future<void> resetPassword(int userId) async {
+  final supabase = Supabase.instance.client;
+  const String defaultPassword = "Temp1234!"; // Default reset password
+
+  await supabase.from('Users').update({'password': defaultPassword}).eq('user_id', userId);
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text("Password reset successfully! New password: Temp1234!"),
+      backgroundColor: Colors.orange,
+    ),
+  );
+}
+
 
   void _showEditDialog(BuildContext context, int userId, String currentName) {
     TextEditingController nameController = TextEditingController(text: currentName);
@@ -106,6 +123,75 @@ class _AccountManagementPageState extends State<AccountManagementPage> {
       ),
     );
   }
+
+  void _showResetPasswordDialog(BuildContext context, int userId) {
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text("Reset Password"),
+      content: const Text("Are you sure you want to reset this user's password?"),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text("Cancel"),
+        ),
+        TextButton(
+  onPressed: () async {
+    await resetPassword(userId);
+    Navigator.pop(context);
+    
+    // Show new password and copy button
+    _showPasswordCopiedDialog(context);
+  },
+  child: const Text("Reset", style: TextStyle(color: Colors.orange)),
+
+        ),
+      ],
+    ),
+  );
+}
+
+void _showPasswordCopiedDialog(BuildContext context) {
+  const String newPassword = "Temp1234!"; // Same default password
+
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text("Password Reset Successful"),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text("New password:"),
+          const SizedBox(height: 8),
+          SelectableText(
+            newPassword,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          ),
+          const SizedBox(height: 12),
+          ElevatedButton.icon(
+            onPressed: () {
+              Clipboard.setData(const ClipboardData(text: newPassword));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("Password copied to clipboard!")),
+              );
+            },
+            icon: const Icon(Icons.copy),
+            label: const Text("Copy Password"),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text("Close"),
+        ),
+      ],
+    ),
+  );
+}
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -195,16 +281,41 @@ class _AccountManagementPageState extends State<AccountManagementPage> {
                               trailing: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
+                                  // ✅ Show Reset Password button **ONLY** if reset_requested is true and user is not an Admin
+                                  if (account['reset_requested'] == true &&
+                                      account['user_level'] != 'Admin')
+                                    IconButton(
+                                      icon: const Icon(Icons.lock_reset,
+                                          color: Colors.orange),
+                                      onPressed: () {
+                                        _showResetPasswordDialog(
+                                            context, account['user_id']);
+                                      },
+                                    ),
+
+                                  // ✅ Edit button (always available)
                                   IconButton(
-                                    icon: const Icon(Icons.edit, color: Colors.blue),
+                                    icon: const Icon(Icons.edit,
+                                        color: Colors.blue),
                                     onPressed: () {
-                                      _showEditDialog(context, account['user_id'], account['fullname']);
+                                      _showEditDialog(
+                                          context,
+                                          account['user_id'],
+                                          account['fullname']);
                                     },
                                   ),
-                                  IconButton(
-                                    icon: const Icon(Icons.delete, color: Colors.red),
-                                    onPressed: () {
-                                      _showDeleteConfirmation(context, account['user_id'], account['user_level']);
+
+                                  // ✅ Delete button (Admins cannot delete other Admins)
+                                  //if (account['user_level'] != 'Admin')
+                                    IconButton(
+                                      icon: const Icon(Icons.delete,
+                                          color: Colors.red),
+                                      onPressed: () {
+                                        _showDeleteConfirmation(
+                                            context,
+                                            account['user_id'],
+                                            account['user_level']);
+
                                     },
                                   ),
                                 ],
