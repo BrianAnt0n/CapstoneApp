@@ -179,56 +179,57 @@ class _DashboardPageState extends State<DashboardPage> {
   DateTime? _lastRefreshTime;
 
   @override
-void didChangeDependencies() {
-  super.didChangeDependencies();
-  final containerState = Provider.of<ContainerState>(context);
-  selectedContainerId = containerState.selectedContainerId;
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final containerState = Provider.of<ContainerState>(context);
+    selectedContainerId = containerState.selectedContainerId;
 
-  if (selectedContainerId != null) {
-    // ✅ Get the correct hardware_id first
-    fetchHardwareId(selectedContainerId!).then((hardwareId) {
-      if (hardwareId != null) {
-        setState(() {
-          _sensorDataFuture = fetchSensorData(selectedContainerId!);
-          _notesFuture = fetchNotes(hardwareId, _selectedDate); // ✅ Use hardwareId
-          _historyFuture = fetchHistoryData(selectedContainerId!);
-          fetchContainerDetails(selectedContainerId!);
-        });
-      }
-    });
+    if (selectedContainerId != null) {
+      // ✅ Get the correct hardware_id first
+      fetchHardwareId(selectedContainerId!).then((hardwareId) {
+        if (hardwareId != null) {
+          setState(() {
+            _sensorDataFuture = fetchSensorData(selectedContainerId!);
+            _notesFuture =
+                fetchNotes(hardwareId, _selectedDate); // ✅ Use hardwareId
+            _historyFuture = fetchHistoryData(selectedContainerId!);
+            fetchContainerDetails(selectedContainerId!);
+          });
+        }
+      });
+    }
   }
-}
 
-Future<void> _refreshData() async {
-  setState(() {
-    _lastRefreshTime = DateTime.now();
-  });
-
-  // ✅ Get the correct hardware_id before refreshing notes
-  final hardwareId = await fetchHardwareId(selectedContainerId!);
-  if (hardwareId != null) {
+  Future<void> _refreshData() async {
     setState(() {
-      _sensorDataFuture = fetchSensorData(selectedContainerId!);
-      _notesFuture = fetchNotes(hardwareId, _selectedDate); // ✅ Use hardwareId
-      _historyFuture = fetchHistoryData(selectedContainerId!);
+      _lastRefreshTime = DateTime.now();
     });
-  }
 
-  FocusScope.of(context).unfocus();
-}
+    // ✅ Get the correct hardware_id before refreshing notes
+    final hardwareId = await fetchHardwareId(selectedContainerId!);
+    if (hardwareId != null) {
+      setState(() {
+        _sensorDataFuture = fetchSensorData(selectedContainerId!);
+        _notesFuture =
+            fetchNotes(hardwareId, _selectedDate); // ✅ Use hardwareId
+        _historyFuture = fetchHistoryData(selectedContainerId!);
+      });
+    }
+
+    FocusScope.of(context).unfocus();
+  }
 
 // ✅ New function to fetch hardwareId from containerId
-Future<int?> fetchHardwareId(int containerId) async {
-  final supabase = Supabase.instance.client;
-  final containerResponse = await supabase
-      .from('Containers_test')
-      .select('hardware_id')
-      .eq('container_id', containerId)
-      .maybeSingle();
+  Future<int?> fetchHardwareId(int containerId) async {
+    final supabase = Supabase.instance.client;
+    final containerResponse = await supabase
+        .from('Containers_test')
+        .select('hardware_id')
+        .eq('container_id', containerId)
+        .maybeSingle();
 
-  return containerResponse?['hardware_id']; // ✅ Returns correct hardware_id
-}
-
+    return containerResponse?['hardware_id']; // ✅ Returns correct hardware_id
+  }
 
   Future<void> _deleteNoteImage(int noteId, String imageUrl) async {
     bool confirmDelete =
@@ -451,30 +452,29 @@ Future<int?> fetchHardwareId(int containerId) async {
     }
   }
 
-
-
   Future<Map<String, dynamic>> fetchSensorData(int containerId) async {
-  final supabase = Supabase.instance.client;
+    final supabase = Supabase.instance.client;
 
-  // Fetch hardware_id from Containers_test
-  final containerResponse = await supabase
-      .from('Containers_test')
-      .select('hardware_id')
-      .eq('container_id', containerId)
-      .single();
-  final hardwareId = containerResponse['hardware_id'];
+    // Fetch hardware_id from Containers_test
+    final containerResponse = await supabase
+        .from('Containers_test')
+        .select('hardware_id')
+        .eq('container_id', containerId)
+        .single();
+    final hardwareId = containerResponse['hardware_id'];
 
-  // Fetch latest sensor data and start_date
-  final sensorResponse = await supabase
-      .from('Hardware_Sensors_Test')
-      .select('temperature, moisture, ph_level, ph_level2, humidity, refreshed_date, start_date')
-      .eq('hardware_id', hardwareId)
-      .order('refreshed_date', ascending: false)
-      .limit(1)
-      .single();
+    // Fetch latest sensor data and start_date
+    final sensorResponse = await supabase
+        .from('Hardware_Sensors_Test')
+        .select(
+            'temperature, moisture, ph_level, ph_level2, humidity, refreshed_date, start_date')
+        .eq('hardware_id', hardwareId)
+        .order('refreshed_date', ascending: false)
+        .limit(1)
+        .single();
 
-  return sensorResponse;
-}
+    return sensorResponse;
+  }
 
   Widget buildSensorCard(
       IconData icon, String title, String value, Color color) {
@@ -656,7 +656,7 @@ Future<int?> fetchHardwareId(int containerId) async {
   Widget buildBarChart(
       List<Map<String, dynamic>> data, String title, String key, Color color) {
     try {
-      print("Building chart for $title with ${data.length} data points.");
+      // print("Building chart for $title with ${data.length} data points.");
 
       double fixedMaxY;
       if (key.contains('temperature')) {
@@ -945,8 +945,7 @@ Future<int?> fetchHardwareId(int containerId) async {
     }
 
     final difference = _selectedDate.difference(_containerAddedDate!);
-    int days = difference.inDays;
-    int weeks = (days / 7).floor(); // Always display in weeks
+    int weeks = (difference.inDays / 7).floor(); // Always display in weeks
 
     if (weeks > 16) {
       _containerAge = "Over-composted";
@@ -967,7 +966,7 @@ Future<int?> fetchHardwareId(int containerId) async {
       setState(() {}); // Update UI
     }
 
-    return weeks; // ✅ Returns weeks for other functions to use
+    return weeks; // ✅ Returns weeks for other functions
   }
 
 //notes image section
@@ -1095,8 +1094,6 @@ Future<int?> fetchHardwareId(int containerId) async {
     );
   }
 
-  
-
 // Helper function for legend items
   Widget _buildLegendItem(Color color, String label) {
     return Row(
@@ -1113,10 +1110,7 @@ Future<int?> fetchHardwareId(int containerId) async {
     );
   }
 
-
-
-
-    int? selectedHardwareId; // ✅ Global variable to store hardware_id
+  int? selectedHardwareId; // ✅ Global variable to store hardware_id
 
   Future<void> _fetchAndSetHardwareId(int containerId) async {
     final supabase = Supabase.instance.client;
@@ -1131,12 +1125,14 @@ Future<int?> fetchHardwareId(int containerId) async {
           .eq('container_id', containerId)
           .maybeSingle();
 
-      if (containerResponse == null || containerResponse['hardware_id'] == null) {
+      if (containerResponse == null ||
+          containerResponse['hardware_id'] == null) {
         print("⚠️ No hardware_id found for container_id: $containerId");
         return;
       }
 
-      int hardwareId = containerResponse['hardware_id']; // ✅ Extract hardware_id
+      int hardwareId =
+          containerResponse['hardware_id']; // ✅ Extract hardware_id
 
       // ✅ Fetch start_date from Hardware_Sensors_Test using the retrieved hardware_id
       final hardwareResponse = await supabase
@@ -1147,211 +1143,234 @@ Future<int?> fetchHardwareId(int containerId) async {
 
       setState(() {
         selectedHardwareId = hardwareId; // ✅ Store hardware_id globally
-        _containerAddedDate = hardwareResponse?['start_date']; // ✅ Store start_date
+        _containerAddedDate =
+            hardwareResponse?['start_date']; // ✅ Store start_date
       });
 
       print("✅ Hardware ID set: $selectedHardwareId");
       print("✅ Start date retrieved: $_containerAddedDate");
-      
     } catch (error) {
       print("❌ Error fetching hardware_id: $error");
     }
-}
-
-
-
-Future<void> _retrieveCompost() async {
-  final supabase = Supabase.instance.client;
-
-  // ✅ Ensure selectedContainerId is not null before using it
-  if (selectedContainerId == null) {
-    print("❌ Error: selectedContainerId is null. Cannot fetch hardware_id.");
-    return;
   }
 
-  final containerResponse = await supabase
-      .from('Containers_test')
-      .select('hardware_id')
-      .eq('container_id', selectedContainerId!) // ✅ Safe usage now
-      .maybeSingle();
+  Future<void> _retrieveCompost() async {
+    final supabase = Supabase.instance.client;
 
-  if (containerResponse == null || containerResponse['hardware_id'] == null) {
-    print("❌ Error: No hardware_id found for container_id $selectedContainerId.");
-    return;
-  }
-
-  final hardwareId = containerResponse['hardware_id'];
-  print("✅ Resolved hardware_id: $hardwareId");
-
-  try {
-    final response = await supabase
-        .from('Hardware_Sensors_Test')
-        .select('start_date')
-        .eq('hardware_id', hardwareId)
-        .maybeSingle();
-
-    if (response == null || response['start_date'] == null) {
-      print("⚠️ No compost start date found for hardware ID: $hardwareId");
+    if (selectedContainerId == null) {
+      print("❌ Error: selectedContainerId is null. Cannot fetch hardware_id.");
       return;
     }
 
-    setState(() {
-  _containerAddedDate = DateTime.parse(response['start_date']); // ✅ Convert String to DateTime
-});
-
-    print("✅ Compost start date retrieved: $_containerAddedDate");
-
-  } catch (error) {
-    print("❌ Error retrieving compost start date: $error");
-  }
-}
-
-
-
-
-
-
-void _startCompost() async {
-  DateTime tempDate = DateTime.now();
-  TimeOfDay tempTime = TimeOfDay.now();
-  DateTime? selectedDate;
-
-  await showModalBottomSheet(
-    context: context,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-    ),
-    builder: (BuildContext context) {
-      return StatefulBuilder(
-        builder: (context, setState) {
-          return Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Center(
-                  child: Text(
-                    "Start Composting",
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                ListTile(
-                  leading: const Icon(Icons.calendar_today, color: Colors.blue),
-                  title: const Text("Select Date",
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
-                  subtitle: Text(DateFormat.yMMMMd().format(tempDate)),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 18),
-                  onTap: () async {
-                    DateTime? pickedDate = await showDatePicker(
-                      context: context,
-                      initialDate: tempDate,
-                      firstDate: DateTime(2000),
-                      lastDate: DateTime(2100),
-                    );
-                    if (pickedDate != null) {
-                      setState(() => tempDate = pickedDate);
-                    }
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.access_time, color: Colors.orange),
-                  title: const Text("Select Time",
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
-                  subtitle: Text(tempTime.format(context)),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 18),
-                  onTap: () async {
-                    TimeOfDay? pickedTime = await showTimePicker(
-                      context: context,
-                      initialTime: tempTime,
-                    );
-                    if (pickedTime != null) {
-                      setState(() => tempTime = pickedTime);
-                    }
-                  },
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text("Cancel", style: TextStyle(fontSize: 16)),
-                    ),
-                    ElevatedButton(
-                      onPressed: () {
-                        selectedDate = DateTime(
-                          tempDate.year,
-                          tempDate.month,
-                          tempDate.day,
-                          tempTime.hour,
-                          tempTime.minute,
-                        );
-                        Navigator.pop(context);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
-                        backgroundColor: Colors.green,
-                      ),
-                      child: const Text("Confirm",
-                          style: TextStyle(fontSize: 16, color: Colors.white)),
-                    ),
-                  ],
-                ),
-              ],
+    // Show confirmation dialog before proceeding
+    bool confirm = await showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Confirm Compost Retrieval"),
+          content: const Text(
+              "Are you sure you want to retrieve the compost? This will reset the compost start date."),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false), // Cancel
+              child: const Text("Cancel"),
             ),
-          );
-        },
-      );
-    },
-  );
+            TextButton(
+              onPressed: () => Navigator.pop(context, true), // Confirm
+              child: const Text("Retrieve"),
+            ),
+          ],
+        );
+      },
+    );
 
-  // ✅ Ensure user selected a date
-  if (selectedDate == null) {
-    print("⚠️ No date selected. Compost start cancelled.");
-    return;
+    if (!confirm) return; // User canceled
+
+    try {
+      // Get hardware_id from Containers_test
+      final containerResponse = await supabase
+          .from('Containers_test')
+          .select('hardware_id')
+          .eq('container_id', selectedContainerId!)
+          .maybeSingle();
+
+      if (containerResponse == null ||
+          containerResponse['hardware_id'] == null) {
+        print(
+            "❌ Error: No hardware_id found for container_id $selectedContainerId.");
+        return;
+      }
+
+      final hardwareId = containerResponse['hardware_id'];
+      print("✅ Resolved hardware_id: $hardwareId");
+
+      // Update Hardware_Sensors_Test to set start_date as NULL
+      final updateResponse = await supabase
+          .from('Hardware_Sensors_Test')
+          .update({'start_date': null}) // ✅ Set start_date to NULL
+          .eq('hardware_id', hardwareId);
+
+      print("✅ Compost start date reset in database.");
+
+      setState(() {
+        _containerAddedDate = null; // Reset UI state
+        _containerAge = "Empty"; // Update display
+        _ageColor = Colors.black;
+      });
+    } catch (error) {
+      print("❌ Error resetting compost start date: $error");
+    }
   }
 
-  try {
-    // ✅ Ensure selectedHardwareId is set
-    if (selectedHardwareId == null) {
-      print("🔍 Fetching hardware ID...");
-      await _fetchAndSetHardwareId(selectedContainerId!);
-    }
+  void _startCompost() async {
+    DateTime tempDate = DateTime.now();
+    TimeOfDay tempTime = TimeOfDay.now();
+    DateTime? selectedDate;
 
-    if (selectedHardwareId == null) {
-      print("❌ Error: No hardware_id found for container.");
+    await showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Center(
+                    child: Text(
+                      "Start Composting",
+                      style:
+                          TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  ListTile(
+                    leading:
+                        const Icon(Icons.calendar_today, color: Colors.blue),
+                    title: const Text("Select Date",
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w500)),
+                    subtitle: Text(DateFormat.yMMMMd().format(tempDate)),
+                    trailing: const Icon(Icons.arrow_forward_ios, size: 18),
+                    onTap: () async {
+                      DateTime? pickedDate = await showDatePicker(
+                        context: context,
+                        initialDate: tempDate,
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime(2100),
+                      );
+                      if (pickedDate != null) {
+                        setState(() => tempDate = pickedDate);
+                      }
+                    },
+                  ),
+                  ListTile(
+                    leading:
+                        const Icon(Icons.access_time, color: Colors.orange),
+                    title: const Text("Select Time",
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w500)),
+                    subtitle: Text(tempTime.format(context)),
+                    trailing: const Icon(Icons.arrow_forward_ios, size: 18),
+                    onTap: () async {
+                      TimeOfDay? pickedTime = await showTimePicker(
+                        context: context,
+                        initialTime: tempTime,
+                      );
+                      if (pickedTime != null) {
+                        setState(() => tempTime = pickedTime);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text("Cancel",
+                            style: TextStyle(fontSize: 16)),
+                      ),
+                      ElevatedButton(
+                        onPressed: () {
+                          selectedDate = DateTime(
+                            tempDate.year,
+                            tempDate.month,
+                            tempDate.day,
+                            tempTime.hour,
+                            tempTime.minute,
+                          );
+                          Navigator.pop(context);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 24, vertical: 12),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8)),
+                          backgroundColor: Colors.green,
+                        ),
+                        child: const Text("Confirm",
+                            style:
+                                TextStyle(fontSize: 16, color: Colors.white)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    // ✅ Ensure user selected a date
+    if (selectedDate == null) {
+      print("⚠️ No date selected. Compost start cancelled.");
       return;
     }
 
-    String formattedDate = selectedDate!.toIso8601String();
+    try {
+      // ✅ Ensure selectedHardwareId is set
+      if (selectedHardwareId == null) {
+        print("🔍 Fetching hardware ID...");
+        await _fetchAndSetHardwareId(selectedContainerId!);
+      }
 
-    // ✅ Update `start_date` in `Hardware_Sensors_Test`
-    final updateResponse = await Supabase.instance.client
-        .from('Hardware_Sensors_Test')
-        .update({'start_date': formattedDate})
-        .eq('hardware_id', selectedHardwareId!)
-        .select()
-        .single();
+      if (selectedHardwareId == null) {
+        print("❌ Error: No hardware_id found for container.");
+        return;
+      }
 
-    if (updateResponse == null) {
-      print("❌ Error: Update failed, no rows affected.");
-      return;
+      String formattedDate = selectedDate!.toIso8601String();
+
+      // ✅ Update `start_date` in `Hardware_Sensors_Test`
+      final updateResponse = await Supabase.instance.client
+          .from('Hardware_Sensors_Test')
+          .update({'start_date': formattedDate})
+          .eq('hardware_id', selectedHardwareId!)
+          .select()
+          .single();
+
+      if (updateResponse == null) {
+        print("❌ Error: Update failed, no rows affected.");
+        return;
+      }
+
+      setState(() {
+        _containerAddedDate = selectedDate;
+        _calculateContainerAge();
+      });
+
+      print("✅ Compost start date updated successfully!");
+    } catch (error) {
+      print("🚨 Error starting compost: $error");
     }
-
-    setState(() {
-      _containerAddedDate = selectedDate;
-      _calculateContainerAge();
-    });
-
-    print("✅ Compost start date updated successfully!");
-  } catch (error) {
-    print("🚨 Error starting compost: $error");
   }
-}
 
   Widget _buildCompostButtons() {
     int weeks =
@@ -1413,13 +1432,13 @@ void _startCompost() async {
                         style: TextStyle(
                             fontSize: 24, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 5),
-                   
+
                     // Text(
                     //   _getTimeRefreshed(),
                     //   style: const TextStyle(fontSize: 14, color: Colors.grey),
                     // ),
                     const SizedBox(height: 20),
-                    FutureBuilder(
+                    FutureBuilder<Map<String, dynamic>>(
                       future: _sensorDataFuture,
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
@@ -1434,11 +1453,25 @@ void _startCompost() async {
                         }
 
                         final sensorData = snapshot.data!;
-                        String compostStartDate =
-                            sensorData['start_date'] != null
-                                ? DateFormat('yyyy-MM-dd').format(
-                                    DateTime.parse(sensorData['start_date']))
-                                : "Not Set"; // ✅ Displays "Not Set" if null
+                        String compostStartDate = "Not Set";
+                        DateTime? fetchedStartDate;
+
+                        if (sensorData['start_date'] != null) {
+                          fetchedStartDate =
+                              DateTime.parse(sensorData['start_date']);
+                          compostStartDate =
+                              DateFormat('yyyy-MM-dd').format(fetchedStartDate);
+                        }
+
+                        // Avoid redundant setState calls during the build phase
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (_containerAddedDate != fetchedStartDate) {
+                            setState(() {
+                              _containerAddedDate = fetchedStartDate;
+                              _calculateContainerAge();
+                            });
+                          }
+                        });
 
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1471,7 +1504,6 @@ void _startCompost() async {
                         );
                       },
                     ),
-
 
                     const SizedBox(height: 20),
                     const Divider(thickness: 2),
@@ -1851,7 +1883,6 @@ void _startCompost() async {
                         }
                       },
                     ),
-
                   ],
                 ),
               ),
@@ -1886,13 +1917,15 @@ Future<void> deleteNoteFromDatabase(int noteId) async {
 
 // ✅ Function to get current time in UTC format
 String getLocalTimestamp() {
-  final now = DateTime.now().toUtc().add(const Duration(hours: 8)); // ✅ Convert to GMT+8
+  final now = DateTime.now()
+      .toUtc()
+      .add(const Duration(hours: 8)); // ✅ Convert to GMT+8
   return now.toIso8601String();
 }
 
-
 //notes database
-Future<void> addNoteToDatabase(int containerId, String note, String? imageUrl) async {
+Future<void> addNoteToDatabase(
+    int containerId, String note, String? imageUrl) async {
   final supabase = Supabase.instance.client;
 
   try {
@@ -1908,7 +1941,8 @@ Future<void> addNoteToDatabase(int containerId, String note, String? imageUrl) a
       return;
     }
 
-    int hardwareId = containerResponse['hardware_id']; // ✅ Use correct hardware_id
+    int hardwareId =
+        containerResponse['hardware_id']; // ✅ Use correct hardware_id
     print("Resolved Hardware ID for container_id $containerId: $hardwareId");
 
     // ✅ Ensure hardware_id exists in Hardware_Sensors_Test before inserting
@@ -1919,7 +1953,8 @@ Future<void> addNoteToDatabase(int containerId, String note, String? imageUrl) a
         .maybeSingle();
 
     if (checkHardware == null) {
-      print("Error: hardware_id $hardwareId does not exist in Hardware_Sensors_Test.");
+      print(
+          "Error: hardware_id $hardwareId does not exist in Hardware_Sensors_Test.");
       return;
     }
 
@@ -1937,17 +1972,17 @@ Future<void> addNoteToDatabase(int containerId, String note, String? imageUrl) a
   }
 }
 
-
-
-
-Future<List<Map<String, dynamic>>> fetchNotes(int hardwareId, DateTime date) async {
+Future<List<Map<String, dynamic>>> fetchNotes(
+    int hardwareId, DateTime date) async {
   final supabase = Supabase.instance.client;
 
   DateTime startOfDayUtc = DateTime(date.year, date.month, date.day).toUtc();
-  DateTime endOfDayUtc = startOfDayUtc.add(const Duration(hours: 23, minutes: 59, seconds: 59));
+  DateTime endOfDayUtc =
+      startOfDayUtc.add(const Duration(hours: 23, minutes: 59, seconds: 59));
 
   try {
-    print("Fetching notes for hardware_id: $hardwareId between $startOfDayUtc and $endOfDayUtc");
+    print(
+        "Fetching notes for hardware_id: $hardwareId between $startOfDayUtc and $endOfDayUtc");
 
     final response = await supabase
         .from('Notes_test_test')
@@ -1969,10 +2004,6 @@ Future<List<Map<String, dynamic>>> fetchNotes(int hardwareId, DateTime date) asy
   }
 }
 
-
-
-
-
 //ending of notes section
 
 Widget buildSensorCard(IconData icon, String title, String value, Color color) {
@@ -1991,75 +2022,99 @@ Widget buildSensorCard(IconData icon, String title, String value, Color color) {
 Future<Map<String, dynamic>> fetchSensorData(int containerId) async {
   final supabase = Supabase.instance.client;
 
-  // 1️⃣ Get hardware_id from the container
-  final containerResponse = await supabase
-      .from('Containers_test')
-      .select('hardware_id')
-      .eq('container_id', containerId)
-      .single();
-  
-  final hardwareId = containerResponse['hardware_id'];
+  try {
+    // ✅ Fetch hardware_id from Containers_test
+    final containerResponse = await supabase
+        .from('Containers_test')
+        .select('hardware_id')
+        .eq('container_id', containerId)
+        .maybeSingle();
 
-  // 2️⃣ Fetch latest sensor data
-  final sensorResponse = await supabase
-      .from('Hardware_Sensors_Test')
-      .select(
-          'temperature, moisture, ph_level, ph_level2, humidity, refreshed_date')
-      .eq('hardware_id', hardwareId)
-      .order('refreshed_date', ascending: false)
-      .limit(1)
-      .single();
+    if (containerResponse == null || containerResponse['hardware_id'] == null) {
+      print("⚠️ No hardware_id found for container_id: $containerId");
+      return {};
+    }
 
-  // 3️⃣ Define acceptable sensor ranges
-  const double minTemp = 10.0, maxTemp = 54.0;
-  const double minMoisture = 50.0, maxMoisture = 60.0;
-  const double minPH = 6.0, maxPH = 8.0;
-  const double minHumidity = 40.0, maxHumidity = 60.0;
+    int hardwareId = containerResponse['hardware_id'];
 
-  // 4️⃣ Extract sensor values
-  final double temp = sensorResponse['temperature'];
-  final double moisture = sensorResponse['moisture'];
-  final double ph1 = sensorResponse['ph_level'];
-  final double ph2 = sensorResponse['ph_level2'];
-  final double humidity = sensorResponse['humidity'];
+    // ✅ Fetch latest sensor data from Hardware_Sensors_Test
+    final sensorResponse = await supabase
+        .from('Hardware_Sensors_Test')
+        .select(
+            'temperature, moisture, ph_level, ph_level2, humidity, refreshed_date')
+        .eq('hardware_id', hardwareId)
+        .order('refreshed_date', ascending: false)
+        .limit(1)
+        .maybeSingle();
 
-  // 5️⃣ Check for alerts & insert into Notifications_Test table
-  Future<void> logNotification(String title, String message) async {
-    await supabase.from('Notifications_Test').insert({
-      'container_id': containerId,
-      'title': title,
-      'message': message,
-      'timestamp': DateTime.now().toIso8601String(),
-    });
+    if (sensorResponse == null) {
+      print("⚠️ No sensor data found for hardware_id: $hardwareId");
+      return {};
+    }
+
+    // ✅ Extract sensor values with safe defaults
+    double temp = (sensorResponse['temperature'] as num?)?.toDouble() ?? 0.0;
+    double moisture = (sensorResponse['moisture'] as num?)?.toDouble() ?? 0.0;
+    double ph1 = (sensorResponse['ph_level'] as num?)?.toDouble() ?? 0.0;
+    double ph2 = (sensorResponse['ph_level2'] as num?)?.toDouble() ?? 0.0;
+    double humidity = (sensorResponse['humidity'] as num?)?.toDouble() ?? 0.0;
+
+    // ✅ Define sensor thresholds
+    const double minTemp = 10.0, maxTemp = 54.0;
+    const double minMoisture = 50.0, maxMoisture = 60.0;
+    const double minPH = 6.0, maxPH = 8.0;
+    const double minHumidity = 40.0, maxHumidity = 60.0;
+
+    // ✅ Function to log notifications
+    Future<void> logNotification(String title, String message) async {
+      await supabase.from('Notifications_Test').insert({
+        'container_id': containerId,
+        'title': title,
+        'message': message,
+        'timestamp': DateTime.now().toIso8601String(),
+      });
+    }
+
+    // ✅ Check sensor values and log alerts
+    if (temp < minTemp) {
+      await logNotification(
+          "Temperature Alert", "Temperature is $temp°C, below normal range.");
+    } else if (temp > maxTemp) {
+      await logNotification(
+          "Temperature Alert", "Temperature is $temp°C, above normal range.");
+    }
+
+    if (moisture < minMoisture) {
+      await logNotification("Moisture Alert",
+          "Moisture level is $moisture%, below normal range.");
+    } else if (moisture > maxMoisture) {
+      await logNotification("Moisture Alert",
+          "Moisture level is $moisture%, above normal range.");
+    }
+
+    if (ph1 < minPH || ph1 > maxPH) {
+      await logNotification(
+          "pH Level 1 Alert", "pH Level 1 is $ph1, out of range.");
+    }
+
+    if (ph2 < minPH || ph2 > maxPH) {
+      await logNotification(
+          "pH Level 2 Alert", "pH Level 2 is $ph2, out of range.");
+    }
+
+    if (humidity < minHumidity) {
+      await logNotification(
+          "Humidity Alert", "Humidity is $humidity%, below normal range.");
+    } else if (humidity > maxHumidity) {
+      await logNotification(
+          "Humidity Alert", "Humidity is $humidity%, above normal range.");
+    }
+
+    return sensorResponse; // ✅ Return sensor data
+  } catch (error) {
+    print("❌ Error fetching sensor data: $error");
+    return {};
   }
-
-  if (temp < minTemp) {
-    await logNotification("Temperature Alert", "Temperature is $temp°C, below normal range.");
-  } else if (temp > maxTemp) {
-    await logNotification("Temperature Alert", "Temperature is $temp°C, above normal range.");
-  }
-
-  if (moisture < minMoisture) {
-    await logNotification("Moisture Alert", "Moisture level is $moisture%, below normal range.");
-  } else if (moisture > maxMoisture) {
-    await logNotification("Moisture Alert", "Moisture level is $moisture%, above normal range.");
-  }
-
-  if (ph1 < minPH || ph1 > maxPH) {
-    await logNotification("pH Level 1 Alert", "pH Level 1 is $ph1, out of range.");
-  }
-
-  if (ph2 < minPH || ph2 > maxPH) {
-    await logNotification("pH Level 2 Alert", "pH Level 2 is $ph2, out of range.");
-  }
-
-  if (humidity < minHumidity) {
-    await logNotification("Humidity Alert", "Humidity is $humidity%, below normal range.");
-  } else if (humidity > maxHumidity) {
-    await logNotification("Humidity Alert", "Humidity is $humidity%, above normal range.");
-  }
-
-  return sensorResponse;
 }
 
 // Container Page : Displays a list of available containers
@@ -2239,7 +2294,7 @@ class _ContainerPageState extends State<ContainerPage> {
                             ),
                             onTap: () {
                               if (isSelected) {
-                                containerState.selectContainer(0); 
+                                containerState.selectContainer(0);
                               } else {
                                 containerState
                                     .selectContainer(container['container_id']);
@@ -2339,10 +2394,10 @@ Future<void> deleteContainer(int containerId) async {
       .eq('container_id', containerId);
 }
 
-  void _removeSelectedContainer() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('selected_container_id');
-  }
+void _removeSelectedContainer() async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.remove('selected_container_id');
+}
 
 Future<List<Map<String, dynamic>>> fetchContainers() async {
   final supabase = Supabase.instance.client;
