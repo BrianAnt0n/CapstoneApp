@@ -347,16 +347,24 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Future<List<Map<String, dynamic>>> fetchHistoryData(int containerId) async {
     final supabase = Supabase.instance.client;
+
+    final containerResponse = await supabase
+      .from('Containers_test')
+      .select('hardware_id')
+      .eq('container_id', containerId)
+      .single();
+  final hardwareId = containerResponse['hardware_id'];
     try {
       return await supabase
           .from('History_Test')
           .select('*')
-          .eq('container_id', containerId)
+          .eq('hardware_id', hardwareId)
           .order('timestamp', ascending: true);
     } catch (error) {
       return [];
     }
   }
+
 
   Widget buildSensorCard(
       IconData icon, String title, String value, Color color) {
@@ -1683,11 +1691,17 @@ Future<List<Map<String, dynamic>>> fetchNotes(
   // Format date to 'YYYY-MM-DD'
   String formattedDate = DateFormat('yyyy-MM-dd').format(date);
 
+  final containerResponse = await supabase
+      .from('Containers_test')
+      .select('hardware_id')
+      .eq('container_id', containerId)
+      .single();
+  final hardwareId = containerResponse['hardware_id'];
   try {
     final List<Map<String, dynamic>> response = await supabase
         .from('Notes_test_test')
         .select()
-        .eq('container_id', containerId)
+        .eq('hardware_id', hardwareId)
         .gte('created_date',
             '$formattedDate 00:00:00') // Start of the selected date
         .lt('created_date',

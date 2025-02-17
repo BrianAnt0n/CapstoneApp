@@ -352,16 +352,46 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Future<List<Map<String, dynamic>>> fetchHistoryData(int containerId) async {
     final supabase = Supabase.instance.client;
+
+    final containerResponse = await supabase
+      .from('Containers_test')
+      .select('hardware_id')
+      .eq('container_id', containerId)
+      .single();
+  final hardwareId = containerResponse['hardware_id'];
     try {
       return await supabase
           .from('History_Test')
           .select('*')
-          .eq('container_id', containerId)
+          .eq('hardware_id', hardwareId)
           .order('timestamp', ascending: true);
     } catch (error) {
       return [];
     }
   }
+
+
+  Future<Map<String, dynamic>> fetchSensorData(int containerId) async {
+  
+final supabase = Supabase.instance.client;
+  final containerResponse = await supabase
+      .from('Containers_test')
+      .select('hardware_id')
+      .eq('container_id', containerId)
+      .single();
+  final hardwareId = containerResponse['hardware_id'];
+
+  final sensorResponse = await supabase
+      .from('Hardware_Sensors_Test')
+      .select(
+          'temperature, moisture, ph_level, ph_level2, humidity, refreshed_date')
+      .eq('hardware_id', hardwareId)
+      .order('refreshed_date', ascending: false)
+      .limit(1)
+      .single();
+
+  return sensorResponse;
+}
 
   Widget buildSensorCard(
       IconData icon, String title, String value, Color color) {
@@ -1688,11 +1718,17 @@ Future<List<Map<String, dynamic>>> fetchNotes(
   // Format date to 'YYYY-MM-DD'
   String formattedDate = DateFormat('yyyy-MM-dd').format(date);
 
+  final containerResponse = await supabase
+      .from('Containers_test')
+      .select('hardware_id')
+      .eq('container_id', containerId)
+      .single();
+  final hardwareId = containerResponse['hardware_id'];
   try {
     final List<Map<String, dynamic>> response = await supabase
         .from('Notes_test_test')
         .select()
-        .eq('container_id', containerId)
+        .eq('hardware_id', hardwareId)
         .gte('created_date',
             '$formattedDate 00:00:00') // Start of the selected date
         .lt('created_date',
@@ -1721,15 +1757,20 @@ Widget buildSensorCard(IconData icon, String title, String value, Color color) {
 }
 
 //Database Fetching: Fetch sensor data for a specific container
+// Fetch sensor data for a specific container & trigger alerts if needed
 Future<Map<String, dynamic>> fetchSensorData(int containerId) async {
   final supabase = Supabase.instance.client;
+
+  // 1️⃣ Get hardware_id from the container
   final containerResponse = await supabase
       .from('Containers_test')
       .select('hardware_id')
       .eq('container_id', containerId)
       .single();
+  
   final hardwareId = containerResponse['hardware_id'];
 
+  // 2️⃣ Fetch latest sensor data
   final sensorResponse = await supabase
       .from('Hardware_Sensors_Test')
       .select(
@@ -1738,6 +1779,55 @@ Future<Map<String, dynamic>> fetchSensorData(int containerId) async {
       .order('refreshed_date', ascending: false)
       .limit(1)
       .single();
+
+  // 3️⃣ Define acceptable sensor ranges
+  const double minTemp = 10.0, maxTemp = 54.0;
+  const double minMoisture = 50.0, maxMoisture = 60.0;
+  const double minPH = 6.0, maxPH = 8.0;
+  const double minHumidity = 40.0, maxHumidity = 60.0;
+
+  // 4️⃣ Extract sensor values
+  final double temp = sensorResponse['temperature'];
+  final double moisture = sensorResponse['moisture'];
+  final double ph1 = sensorResponse['ph_level'];
+  final double ph2 = sensorResponse['ph_level2'];
+  final double humidity = sensorResponse['humidity'];
+
+  // 5️⃣ Check for alerts & insert into Notifications_Test table
+  Future<void> logNotification(String title, String message) async {
+    await supabase.from('Notifications_Test').insert({
+      'container_id': containerId,
+      'title': title,
+      'message': message,
+      'timestamp': DateTime.now().toIso8601String(),
+    });
+  }
+
+  if (temp < minTemp) {
+    await logNotification("Temperature Alert", "Temperature is $temp°C, below normal range.");
+  } else if (temp > maxTemp) {
+    await logNotification("Temperature Alert", "Temperature is $temp°C, above normal range.");
+  }
+
+  if (moisture < minMoisture) {
+    await logNotification("Moisture Alert", "Moisture level is $moisture%, below normal range.");
+  } else if (moisture > maxMoisture) {
+    await logNotification("Moisture Alert", "Moisture level is $moisture%, above normal range.");
+  }
+
+  if (ph1 < minPH || ph1 > maxPH) {
+    await logNotification("pH Level 1 Alert", "pH Level 1 is $ph1, out of range.");
+  }
+
+  if (ph2 < minPH || ph2 > maxPH) {
+    await logNotification("pH Level 2 Alert", "pH Level 2 is $ph2, out of range.");
+  }
+
+  if (humidity < minHumidity) {
+    await logNotification("Humidity Alert", "Humidity is $humidity%, below normal range.");
+  } else if (humidity > maxHumidity) {
+    await logNotification("Humidity Alert", "Humidity is $humidity%, above normal range.");
+  }
 
   return sensorResponse;
 }
@@ -1766,6 +1856,7 @@ class _ContainerPageState extends State<ContainerPage> {
     });
   }
 
+  //Fetches the container data when scanned
   Future<void> fetchData(int storedInt, String scannedCode) async {
     final contSupabase = Supabase.instance.client;
 
@@ -1917,7 +2008,7 @@ class _ContainerPageState extends State<ContainerPage> {
                             ),
                             onTap: () {
                               if (isSelected) {
-                                containerState.selectContainer(0);
+                                containerState.selectContainer(0); 
                               } else {
                                 containerState
                                     .selectContainer(container['container_id']);
