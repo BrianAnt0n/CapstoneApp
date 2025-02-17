@@ -381,7 +381,7 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-void _calculateContainerAge() {
+  void _calculateContainerAge() {
     if (_containerAddedDate == null) {
       _containerAge = "Unknown";
       return;
@@ -412,7 +412,6 @@ void _calculateContainerAge() {
       setState(() {}); // Update UI
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -480,7 +479,7 @@ void _calculateContainerAge() {
                         }
                       },
                     ),
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 20),
                     const Divider(thickness: 2),
                     const SizedBox(height: 10),
 
@@ -863,9 +862,10 @@ Future<Map<String, dynamic>> fetchSensorData(int containerId) async {
 
   final sensorResponse = await supabase
       .from('Hardware_Sensors_Test')
-      .select('temperature, moisture, ph_level, ph_level2, humidity, timestamp')
+      .select(
+          'temperature, moisture, ph_level, ph_level2, humidity, refreshed_date')
       .eq('hardware_id', hardwareId)
-      .order('timestamp', ascending: false)
+      .order('refreshed_date', ascending: false)
       .limit(1)
       .single();
 

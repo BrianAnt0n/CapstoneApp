@@ -73,7 +73,6 @@ class HomePageMember extends StatefulWidget {
 class _HomePageMemberState extends State<HomePageMember> {
   int _currentIndex = 1; // Tracks the selected tab index
 
-
   @override
   void initState() {
     super.initState();
@@ -820,24 +819,23 @@ class _DashboardPageState extends State<DashboardPage> {
     });
   }
 
-  void _calculateContainerAge() {
+  int _calculateContainerAge() {
     if (_containerAddedDate == null) {
       _containerAge = "Unknown";
-      return;
+      _ageColor = Colors.black;
+      return 0; // Default to 0 when no date is available
     }
 
     final difference = _selectedDate.difference(_containerAddedDate!);
     int days = difference.inDays;
-    int weeks = (days / 7).floor(); // Always display as weeks
+    int weeks = (days / 7).floor(); // Always display in weeks
 
-    // Mark as "Over-composted" if 16 or more weeks
     if (weeks > 16) {
       _containerAge = "Over-composted";
-      _ageColor = Colors.grey; // Set a distinct color for over-composted
+      _ageColor = Colors.grey;
     } else {
       _containerAge = "$weeks ${weeks == 1 ? 'WEEK' : 'WEEKS'}";
 
-      // Set color based on compost age
       if (weeks >= 12) {
         _ageColor = Colors.green;
       } else if (weeks >= 7) {
@@ -850,6 +848,8 @@ class _DashboardPageState extends State<DashboardPage> {
     if (mounted) {
       setState(() {}); // Update UI
     }
+
+    return weeks; // ✅ Returns weeks for other functions to use
   }
 
 //notes image section
@@ -977,6 +977,196 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
+  void _retrieveCompost() {
+    setState(() {
+      _containerAddedDate = null; // Clear timestamp
+      _containerAge = "Empty"; // Reset compost age
+      _ageColor = Colors.black;
+    });
+  }
+
+  void _startCompost() async {
+    DateTime tempDate = DateTime.now();
+    TimeOfDay tempTime = TimeOfDay.now();
+    DateTime? selectedDate;
+
+    await showModalBottomSheet(
+      context: context,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Text(
+                      "Start Composting",
+                      style:
+                          TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Date Picker
+                  ListTile(
+                    leading: Icon(Icons.calendar_today, color: Colors.blue),
+                    title: Text(
+                      "Select Date",
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                    ),
+                    subtitle: Text(DateFormat.yMMMMd().format(tempDate)),
+                    trailing: Icon(Icons.arrow_forward_ios, size: 18),
+                    onTap: () async {
+                      DateTime? pickedDate = await showDatePicker(
+                        context: context,
+                        initialDate: tempDate,
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime(2100),
+                      );
+                      if (pickedDate != null) {
+                        setState(() => tempDate = pickedDate);
+                      }
+                    },
+                  ),
+
+                  // Time Picker
+                  ListTile(
+                    leading: Icon(Icons.access_time, color: Colors.orange),
+                    title: Text(
+                      "Select Time",
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                    ),
+                    subtitle: Text(tempTime.format(context)),
+                    trailing: Icon(Icons.arrow_forward_ios, size: 18),
+                    onTap: () async {
+                      TimeOfDay? pickedTime = await showTimePicker(
+                        context: context,
+                        initialTime: tempTime,
+                      );
+                      if (pickedTime != null) {
+                        setState(() => tempTime = pickedTime);
+                      }
+                    },
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Buttons (Cancel & Confirm)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: Text("Cancel", style: TextStyle(fontSize: 16)),
+                      ),
+                      ElevatedButton(
+                        onPressed: () {
+                          selectedDate = DateTime(
+                            tempDate.year,
+                            tempDate.month,
+                            tempDate.day,
+                            tempTime.hour,
+                            tempTime.minute,
+                          );
+                          Navigator.pop(context);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 24, vertical: 12),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8)),
+                          backgroundColor: Colors.green,
+                        ),
+                        child: Text("Confirm",
+                            style:
+                                TextStyle(fontSize: 16, color: Colors.white)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (selectedDate != null) {
+      await Supabase.instance.client
+          .from('Containers_test')
+          .update({'start_date': selectedDate!.toIso8601String()}).eq(
+              'container_id', selectedContainerId!);
+
+      setState(() {
+        _containerAddedDate = selectedDate;
+        _calculateContainerAge();
+      });
+    }
+  }
+
+// Helper function for legend items
+  Widget _buildLegendItem(Color color, String label) {
+    return Row(
+      children: [
+        Container(
+          width: 16,
+          height: 16,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 8),
+        Text(label, style: const TextStyle(fontSize: 14)),
+        const SizedBox(width: 16),
+      ],
+    );
+  }
+
+  Widget _buildCompostButtons() {
+    int weeks = _calculateContainerAge(); // ✅ Now it gets the actual weeks
+
+    return Column(
+      children: [
+        if (weeks >= 12 && weeks <= 16)
+          ElevatedButton(
+            onPressed: _retrieveCompost,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              "Retrieve Compost",
+              style: TextStyle(fontSize: 18, color: Colors.white),
+            ),
+          ),
+        if (weeks == 0) // Compost is empty
+          ElevatedButton(
+            onPressed: _startCompost,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              "Start Compost",
+              style: TextStyle(fontSize: 18, color: Colors.white),
+            ),
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return selectedContainerId == null
@@ -1043,11 +1233,10 @@ class _DashboardPageState extends State<DashboardPage> {
                         }
                       },
                     ),
-                    const SizedBox(height: 30),
+
+                    const SizedBox(height: 20),
                     const Divider(thickness: 2),
                     const SizedBox(height: 10),
-
-// TableCalendar with Compost Age and Built-in Navigation
                     Column(
                       children: [
                         // Weekly Calendar
@@ -1055,8 +1244,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           focusedDay: _selectedDate,
                           firstDay: DateTime(2000),
                           lastDay: DateTime(2100),
-                          calendarFormat:
-                              CalendarFormat.week, // Show only one week
+                          calendarFormat: CalendarFormat.week,
                           headerStyle: HeaderStyle(
                             titleCentered: true,
                             formatButtonVisible: false,
@@ -1089,7 +1277,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                   IconButton(
                                     icon: const Icon(Icons.calendar_month),
                                     onPressed: () {
-                                      _openFullCalendar(); // Open full calendar
+                                      _openFullCalendar();
                                     },
                                   ),
                                 ],
@@ -1103,13 +1291,12 @@ class _DashboardPageState extends State<DashboardPage> {
                               _selectedDate = selectedDay;
                               _notesFuture = fetchNotes(
                                   selectedContainerId!, _selectedDate);
-                              _calculateContainerAge(); //  Update age dynamically
+                              _calculateContainerAge();
                             });
                           },
                         ),
 
-                        const SizedBox(
-                            height: 16), // Space between calendar and age text
+                        const SizedBox(height: 16),
 
                         // Container Age Display
                         Column(
@@ -1125,61 +1312,28 @@ class _DashboardPageState extends State<DashboardPage> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              _containerAge, // ✅ Show container age
+                              _containerAge,
                               style: TextStyle(
-                                fontSize: 26, // Large Text
+                                fontSize: 26,
                                 fontWeight: FontWeight.bold,
-                                color: _ageColor, // ✅ Color dynamically updates
+                                color: _ageColor,
                               ),
                             ),
 
-                            const SizedBox(height: 30), // Space before legend
+                            const SizedBox(height: 20),
+
+                            // Compost Action Button (Retrieve Compost / Start Compost)
+                            _buildCompostButtons(), // ✅ This ensures the button is always rendered in place
+
+                            const SizedBox(height: 30),
 
                             // Legend
                             Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                // Red (Not Ready)
-                                Container(
-                                  width: 16,
-                                  height: 16,
-                                  decoration: BoxDecoration(
-                                      color: Colors.red,
-                                      shape: BoxShape.circle),
-                                ),
-                                const SizedBox(width: 8),
-                                const Text("Not Ready",
-                                    style: TextStyle(fontSize: 14)),
-
-                                const SizedBox(
-                                    width: 16), // Space between legends
-
-                                // Yellow (Decomposing)
-                                Container(
-                                  width: 16,
-                                  height: 16,
-                                  decoration: BoxDecoration(
-                                      color: Colors.orange,
-                                      shape: BoxShape.circle),
-                                ),
-                                const SizedBox(width: 8),
-                                const Text("Decomposing",
-                                    style: TextStyle(fontSize: 14)),
-
-                                const SizedBox(
-                                    width: 16), // Space between legends
-
-                                // Green (Ready)
-                                Container(
-                                  width: 16,
-                                  height: 16,
-                                  decoration: BoxDecoration(
-                                      color: Colors.green,
-                                      shape: BoxShape.circle),
-                                ),
-                                const SizedBox(width: 8),
-                                const Text("Ready",
-                                    style: TextStyle(fontSize: 14)),
+                                _buildLegendItem(Colors.red, "Not Ready"),
+                                _buildLegendItem(Colors.orange, "Decomposing"),
+                                _buildLegendItem(Colors.green, "Ready"),
                               ],
                             ),
                           ],
@@ -1573,9 +1727,10 @@ Future<Map<String, dynamic>> fetchSensorData(int containerId) async {
 
   final sensorResponse = await supabase
       .from('Hardware_Sensors_Test')
-      .select('temperature, moisture, ph_level, ph_level2, humidity, timestamp')
+      .select(
+          'temperature, moisture, ph_level, ph_level2, humidity, refreshed_date')
       .eq('hardware_id', hardwareId)
-      .order('timestamp', ascending: false)
+      .order('refreshed_date', ascending: false)
       .limit(1)
       .single();
 
