@@ -1989,7 +1989,8 @@ class _ContainerPageState extends State<ContainerPage> {
       await contSupabase.from('Containers_test').insert({
         'hardware_id': checkHardwareTableResponse?['hardware_id'],
         'user_id': storedInt,
-        'date_added': DateFormat('yyyy-MM-dd kk:mm:ss').format(DateTime.now()),
+        'container_name': 'Container',
+        'date_added': DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
       });
       _fetchContainers();
       showToast("Container addded");
@@ -2189,6 +2190,8 @@ class _ContainerPageState extends State<ContainerPage> {
           TextButton(
             onPressed: () {
               deleteContainer(containerId);
+              _removeSelectedContainer();
+              _fetchContainers();
               Navigator.pop(context);
             },
             child: const Text("Delete"),
@@ -2213,6 +2216,11 @@ Future<void> deleteContainer(int containerId) async {
       .delete()
       .eq('container_id', containerId);
 }
+
+  void _removeSelectedContainer() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('selected_container_id');
+  }
 
 Future<List<Map<String, dynamic>>> fetchContainers() async {
   final supabase = Supabase.instance.client;
