@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'login_page.dart';
@@ -16,12 +17,21 @@ import 'package:fl_chart/fl_chart.dart';
 // State Management: Tracks the selected container
 class ContainerState extends ChangeNotifier {
   int? selectedContainerId;
+  final List<Map<String, dynamic>> guestContainers = []; // Persist scanned containers
 
   void selectContainer(int containerId) {
     selectedContainerId = containerId;
     notifyListeners();
   }
+
+  void addContainer(Map<String, dynamic> container) {
+    if (!guestContainers.any((c) => c['hardware_id'] == container['hardware_id'])) {
+      guestContainers.add(container);
+      notifyListeners();
+    }
+  }
 }
+
 
 class HomePageGuest extends StatefulWidget {
   const HomePageGuest({super.key});
@@ -33,7 +43,6 @@ class HomePageGuest extends StatefulWidget {
 class _HomePageGuestState extends State<HomePageGuest> {
   int _currentIndex = 1; // Tracks the selected tab index
 
-  // Pages for bottom navigation
   final List<Widget> _pages = [
     const DashboardPage(),
     const ContainerPage(),
@@ -46,20 +55,16 @@ class _HomePageGuestState extends State<HomePageGuest> {
       create: (_) => ContainerState(),
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('E-ComposThink Home - Guest'), // AppBar title
+          title: const Text('E-ComposThink Home - Guest'),
         ),
-        body: _pages[_currentIndex], // Show the selected page
-
-        // Updated Bottom Navigation Bar with green theme
+        body: _pages[_currentIndex],
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: _currentIndex,
-          selectedItemColor:
-              Colors.green, // Change selected icon color to green
-          unselectedItemColor:
-              Colors.green[300], // Light green for unselected icons
+          selectedItemColor: Colors.green,
+          unselectedItemColor: Colors.green[300],
           onTap: (index) {
             setState(() {
-              _currentIndex = index; // Update the selected tab
+              _currentIndex = index;
             });
           },
           items: const [
@@ -151,7 +156,7 @@ class _DashboardPageState extends State<DashboardPage> {
       return await supabase
           .from('History_Test')
           .select('*')
-          .eq('container_id', containerId)
+          .eq('hardware_id', containerId)
           .order('timestamp', ascending: true);
     } catch (error) {
       return [];
@@ -319,15 +324,15 @@ class _DashboardPageState extends State<DashboardPage> {
     final supabase = Supabase.instance.client;
     try {
       final response = await supabase
-          .from('Containers_test')
-          .select('date_added')
-          .eq('container_id', containerId)
+          .from('Hardware_Sensors_Test')
+          .select('start_date')
+          .eq('hardware_id', containerId)
           .single();
 
-      if (response['date_added'] != null) {
+      if (response['start_date'] != null) {
         setState(() {
           _containerAddedDate =
-              DateTime.parse(response['date_added']); // ✅ Store the date
+              DateTime.parse(response['start_date']); // ✅ Store the date
           _calculateContainerAge(); // ✅ Call the function without arguments
         });
       }
@@ -803,68 +808,14 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 }
 
-Future<void> updateNoteInDatabase(int noteId, String updatedNote) async {
-  final supabase = Supabase.instance.client;
-
-  try {
-    await supabase
-        .from('Notes_test_test')
-        .update({'note': updatedNote}).eq('note_id', noteId);
-    print('Note updated successfully');
-  } catch (error) {
-    print('Error updating note: $error');
-  }
-}
-
-Future<void> deleteNoteFromDatabase(int noteId) async {
-  final supabase = Supabase.instance.client;
-
-  try {
-    await supabase.from('Notes_test_test').delete().eq('note_id', noteId);
-    print('Note deleted successfully');
-  } catch (error) {
-    print('Error deleting note: $error');
-  }
-}
-
-//notes database
-Future<void> addNoteToDatabase(int containerId, String note) async {
-  final supabase = Supabase.instance.client;
-  await supabase.from('Notes_test_test').insert({
-    'container_id': containerId,
-    'note': note,
-    'created_date': DateTime.now().toIso8601String(), // ✅ Use ISO format
-  });
-}
-
-//ending of notes section
-
-Widget buildSensorCard(IconData icon, String title, String value, Color color) {
-  return Card(
-    elevation: 4,
-    child: ListTile(
-      leading: Icon(icon, color: color),
-      title: Text(title),
-      subtitle: Text(value),
-    ),
-  );
-}
-
 //Database Fetching: Fetch sensor data for a specific container
 Future<Map<String, dynamic>> fetchSensorData(int containerId) async {
   final supabase = Supabase.instance.client;
-  final containerResponse = await supabase
-      .from('Containers_test')
-      .select('hardware_id')
-      .eq('container_id', containerId)
-      .single();
-  final hardwareId = containerResponse['hardware_id'];
-
   final sensorResponse = await supabase
       .from('Hardware_Sensors_Test')
       .select(
           'temperature, moisture, ph_level, ph_level2, humidity, refreshed_date')
-      .eq('hardware_id', hardwareId)
+      .eq('hardware_id', containerId)
       .order('refreshed_date', ascending: false)
       .limit(1)
       .single();
@@ -882,223 +833,93 @@ class ContainerPage extends StatefulWidget {
 }
 
 class _ContainerPageState extends State<ContainerPage> {
-  late Future<List<Map<String, dynamic>>> _containersFuture;
+  void fetchData(String scannedCode) async {
+    final supabase = Supabase.instance.client;
+    final containerState = Provider.of<ContainerState>(context, listen: false);
 
-  @override
-  void initState() {
-    super.initState();
-    _fetchContainers();
+    final response = await supabase
+        .from('Hardware_Sensors_Test')
+        .select('*')
+        .eq('qr_value', scannedCode)
+        .maybeSingle();
+
+    if (response == null) {
+      showToast("QR code not linked to any container.");
+      return;
+    }
+
+    containerState.addContainer(response);
+    showToast("Container added to session.");
   }
 
-  Future<void> _fetchContainers() async {
-    // ✅ Updated for Pull-to-Refresh
-    setState(() {
-      _containersFuture = fetchContainers();
-    });
+  void showToast(String message) {
+    Fluttertoast.showToast(
+      msg: message,
+      toastLength: Toast.LENGTH_SHORT,
+      gravity: ToastGravity.BOTTOM,
+      backgroundColor: const Color(0xAA000000),
+      textColor: const Color(0xFFFFFFFF),
+      fontSize: 16.0,
+    );
+  }
+
+  void performQuery(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ScannerPage(
+          onScanned: (scannedCode) {
+            fetchData(scannedCode);
+          },
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final containerState = Provider.of<ContainerState>(context);
 
-    return FutureBuilder(
-      future: _containersFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        } else if (snapshot.hasError) {
-          return Center(
-              child: Text('Error fetching containers: ${snapshot.error}'));
-        } else {
-          final containers = snapshot.data as List<Map<String, dynamic>>;
-
-          return Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              children: [
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    minimumSize: const Size(double.infinity, 50),
-                  ),
-                  onPressed: () {
-                    // Navigator.push(
-                    //   context,
-                    //   MaterialPageRoute(
-                    //       builder: (context) =>
-                    //           ScannerPage()), // Navigate to ScannerPage
-                    // );
-                  },
-                  icon: const Icon(Icons.add, color: Colors.white),
-                  label: const Text('New container',
-                      style: TextStyle(color: Colors.white)),
-                ),
-                const SizedBox(height: 16),
-
-                // ✅ Added Pull-to-Refresh
-                Expanded(
-                  child: RefreshIndicator(
-                    onRefresh: _fetchContainers,
-                    child: ListView.builder(
-                      itemCount: containers.length,
-                      itemBuilder: (context, index) {
-                        final container = containers[index];
-                        final isSelected = container['container_id'] ==
-                            containerState.selectedContainerId;
-
-                        return Card(
-                          color: isSelected ? Colors.green[100] : null,
-                          child: ListTile(
-                            title: Text('${container['container_name']}'),
-                            subtitle: Text(
-                              'Date Added: ${_formatDate(container['date_added'])}',
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (isSelected)
-                                  const Icon(Icons.check_circle,
-                                      color: Colors.green),
-                                IconButton(
-                                  icon: const Icon(Icons.info,
-                                      color: Colors.blueAccent),
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            const ContainerDetails(),
-                                      ),
-                                    );
-                                  },
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.edit,
-                                      color: Colors.blue),
-                                  onPressed: () {
-                                    _showRenameContainerDialog(
-                                        context, container['container_id']);
-                                  },
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete,
-                                      color: Colors.red),
-                                  onPressed: () {
-                                    _showDeleteConfirmationDialog(
-                                        context, container['container_id']);
-                                  },
-                                ),
-                              ],
-                            ),
-                            onTap: () {
-                              if (isSelected) {
-                                containerState.selectContainer(0);
-                              } else {
-                                containerState
-                                    .selectContainer(container['container_id']);
-                              }
-                            },
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-              ],
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        children: [
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              minimumSize: const Size(double.infinity, 50),
             ),
-          );
-        }
-      },
-    );
-  }
-
-  String _formatDate(String dateString) {
-    try {
-      DateTime dateTime = DateTime.parse(dateString);
-      return DateFormat('yyyy-MM-dd hh:mm a').format(dateTime);
-    } catch (e) {
-      return 'Invalid date';
-    }
-  }
-
-  void _showRenameContainerDialog(BuildContext context, int containerId) {
-    TextEditingController renameController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Rename Container"),
-        content: TextField(
-          controller: renameController,
-          decoration:
-              const InputDecoration(hintText: "Enter new container name"),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
+            onPressed: () => performQuery(context),
+            icon: const Icon(Icons.add, color: Colors.white),
+            label: const Text('Scan Container',
+                style: TextStyle(color: Colors.white)),
           ),
-          TextButton(
-            onPressed: () async {
-              await renameContainer(containerId, renameController.text);
-              Navigator.pop(context);
-              _fetchContainers(); // 🔄 Refresh UI after renaming
-            },
-            child: const Text("Rename"),
+          const SizedBox(height: 16),
+          Expanded(
+            child: ListView.builder(
+              itemCount: containerState.guestContainers.length,
+              itemBuilder: (context, index) {
+                final container = containerState.guestContainers[index];
+                final isSelected =
+                    containerState.selectedContainerId == container['hardware_id'];
+                    DateTime dateTime = DateTime.parse(container['start_date']);
+    String formattedDate = DateFormat('yyyy-MM-dd').format(dateTime);
+                return Card(
+                  color: isSelected ? Colors.green[100] : null,
+                  child: ListTile(
+                    title: Text('Container: ${container['hardware_id']}'),
+                    subtitle: Text('Date Started: $formattedDate'),
+                    onTap: () {
+                      containerState.selectContainer(container['hardware_id']);
+                    },
+                  ),
+                );
+              },
+            ),
           ),
         ],
       ),
     );
-  }
-
-  void _showDeleteConfirmationDialog(BuildContext context, int containerId) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Delete Container"),
-        content: const Text("Are you sure you want to delete this container?"),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
-          ),
-          TextButton(
-            onPressed: () {
-              deleteContainer(containerId);
-              Navigator.pop(context);
-            },
-            child: const Text("Delete"),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-Future<void> renameContainer(int containerId, String newName) async {
-  final supabase = Supabase.instance.client;
-  await supabase
-      .from('Containers_test')
-      .update({'container_name': newName}).eq('container_id', containerId);
-}
-
-Future<void> deleteContainer(int containerId) async {
-  final supabase = Supabase.instance.client;
-  await supabase
-      .from('Containers_test')
-      .delete()
-      .eq('container_id', containerId);
-}
-
-Future<List<Map<String, dynamic>>> fetchContainers() async {
-  final supabase = Supabase.instance.client;
-  try {
-    final response = await supabase.from('Containers_test').select('*');
-    print('Supabase Response: $response');
-    return List<Map<String, dynamic>>.from(response);
-  } catch (error) {
-    print('Error fetching containers: $error');
-    throw Exception('Error fetching containers: $error');
   }
 }
 
@@ -1142,16 +963,16 @@ class OthersPage extends StatelessWidget {
         ),
         */
         // App Guide
-        ListTile(
-          leading: const Icon(Icons.help_outline, color: Colors.orange),
-          title: const Text('App Guide'),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const AppGuidePage()),
-            );
-          },
-        ),
+        // ListTile(
+        //   leading: const Icon(Icons.help_outline, color: Colors.orange),
+        //   title: const Text('App Guide'),
+        //   onTap: () {
+        //     Navigator.push(
+        //       context,
+        //       MaterialPageRoute(builder: (context) => const AppGuidePage()),
+        //     );
+        //   },
+        // ),
         /*
         // Log Out (Hidden for guests)
         ListTile(
