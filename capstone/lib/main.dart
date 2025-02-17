@@ -5,6 +5,7 @@ import 'onboarding_page.dart';
 import 'login_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'constants.dart';
+import 'reset_password.dart';
 
 
 void main() async {
@@ -30,8 +31,40 @@ void main() async {
   runApp(MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  _MyAppState createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  @override
+  void initState() {
+    super.initState();
+    _handleDeepLinks();
+  }
+
+  void _handleDeepLinks() {
+    Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      final session = data.session;
+      if (session != null && session.accessToken.isNotEmpty) {
+        final Uri uri = Uri.parse(session.providerRefreshToken ?? '');
+        if (uri.queryParameters.containsKey('token')) {
+          String? resetToken = uri.queryParameters['token'];
+          if (resetToken != null) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ResetPasswordPage(resetToken: resetToken),
+              ),
+            );
+          }
+        }
+      }
+    });
+  }
+
 
 
   @override

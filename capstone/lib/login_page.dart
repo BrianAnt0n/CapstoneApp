@@ -4,6 +4,7 @@ import 'home_page.dart';
 import 'home_page_members.dart';
 import 'home_page_guest.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'forgot_password.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -202,10 +203,14 @@ class _LoginPageState extends State<LoginPage> {
 
                   const SizedBox(height: 20),
 
-                  // Forgot Password Link
+                 // Forgot Password Link
                   GestureDetector(
                     onTap: () {
-                      // Navigate to Forgot Password page or perform an action
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const ForgotPasswordPage()),
+                      );
                     },
                     child: const Text(
                       'Forgot Your Password? Click Here',
@@ -214,6 +219,7 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   const SizedBox(
                       height: 40), // Add some spacing before the guest button
+
 
                   // Continue as Guest Button (Yellow Theme)
                   GestureDetector(
