@@ -457,8 +457,9 @@ Future<int?> fetchHardwareId(int containerId) async {
 
 
   Future<Map<String, dynamic>> fetchSensorData(int containerId) async {
-  
-final supabase = Supabase.instance.client;
+  final supabase = Supabase.instance.client;
+
+  // Fetch hardware_id from Containers_test
   final containerResponse = await supabase
       .from('Containers_test')
       .select('hardware_id')
@@ -466,10 +467,10 @@ final supabase = Supabase.instance.client;
       .single();
   final hardwareId = containerResponse['hardware_id'];
 
+  // Fetch latest sensor data and start_date
   final sensorResponse = await supabase
       .from('Hardware_Sensors_Test')
-      .select(
-          'temperature, moisture, ph_level, ph_level2, humidity, refreshed_date')
+      .select('temperature, moisture, ph_level, ph_level2, humidity, refreshed_date, start_date')
       .eq('hardware_id', hardwareId)
       .order('refreshed_date', ascending: false)
       .limit(1)
@@ -1305,15 +1306,11 @@ final supabase = Supabase.instance.client;
                         style: TextStyle(
                             fontSize: 24, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 5),
+                   
                     // Text(
-                    //  _getLastRefreshedText(),
-                    // style: const TextStyle(
-                    //   fontSize: 16, fontWeight: FontWeight.w500),
-                    //),
-                    Text(
-                      _getTimeRefreshed(),
-                      style: const TextStyle(fontSize: 14, color: Colors.grey),
-                    ),
+                    //   _getTimeRefreshed(),
+                    //   style: const TextStyle(fontSize: 14, color: Colors.grey),
+                    // ),
                     const SizedBox(height: 20),
                     FutureBuilder(
                       future: _sensorDataFuture,
@@ -1326,13 +1323,27 @@ final supabase = Supabase.instance.client;
                           return const Center(
                               child: Text('Error fetching data'));
                         } else if (!snapshot.hasData || snapshot.data == null) {
-                          // ✅ Prevents the crash
                           return const Center(child: Text('No data available'));
                         }
 
-                        final sensorData = snapshot.data!; // ✅ Now safe to use
+                        final sensorData = snapshot.data!;
+                        String compostStartDate =
+                            sensorData['start_date'] != null
+                                ? DateFormat('yyyy-MM-dd').format(
+                                    DateTime.parse(sensorData['start_date']))
+                                : "Not Set"; // ✅ Displays "Not Set" if null
+
                         return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            Text("Compost Start Date: $compostStartDate",
+                                style: const TextStyle(
+                                    fontSize: 16, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 5),
+                            Text(_getTimeRefreshed(),
+                                style: const TextStyle(
+                                    fontSize: 14, color: Colors.grey)),
+                            const SizedBox(height: 10),
                             buildSensorCard(
                                 Icons.thermostat,
                                 'Temperature Monitoring',
