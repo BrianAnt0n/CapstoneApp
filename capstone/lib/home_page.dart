@@ -1096,140 +1096,7 @@ Future<int?> fetchHardwareId(int containerId) async {
     );
   }
 
-  void _retrieveCompost() {
-    setState(() {
-      _containerAddedDate = null; // Clear timestamp
-      _containerAge = "Empty"; // Reset compost age
-      _ageColor = Colors.black;
-    });
-  }
-
-  void _startCompost() async {
-    DateTime tempDate = DateTime.now();
-    TimeOfDay tempTime = TimeOfDay.now();
-    DateTime? selectedDate;
-
-    await showModalBottomSheet(
-      context: context,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Text(
-                      "Start Composting",
-                      style:
-                          TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Date Picker
-                  ListTile(
-                    leading: Icon(Icons.calendar_today, color: Colors.blue),
-                    title: Text(
-                      "Select Date",
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-                    ),
-                    subtitle: Text(DateFormat.yMMMMd().format(tempDate)),
-                    trailing: Icon(Icons.arrow_forward_ios, size: 18),
-                    onTap: () async {
-                      DateTime? pickedDate = await showDatePicker(
-                        context: context,
-                        initialDate: tempDate,
-                        firstDate: DateTime(2000),
-                        lastDate: DateTime(2100),
-                      );
-                      if (pickedDate != null) {
-                        setState(() => tempDate = pickedDate);
-                      }
-                    },
-                  ),
-
-                  // Time Picker
-                  ListTile(
-                    leading: Icon(Icons.access_time, color: Colors.orange),
-                    title: Text(
-                      "Select Time",
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-                    ),
-                    subtitle: Text(tempTime.format(context)),
-                    trailing: Icon(Icons.arrow_forward_ios, size: 18),
-                    onTap: () async {
-                      TimeOfDay? pickedTime = await showTimePicker(
-                        context: context,
-                        initialTime: tempTime,
-                      );
-                      if (pickedTime != null) {
-                        setState(() => tempTime = pickedTime);
-                      }
-                    },
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // Buttons (Cancel & Confirm)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: Text("Cancel", style: TextStyle(fontSize: 16)),
-                      ),
-                      ElevatedButton(
-                        onPressed: () {
-                          selectedDate = DateTime(
-                            tempDate.year,
-                            tempDate.month,
-                            tempDate.day,
-                            tempTime.hour,
-                            tempTime.minute,
-                          );
-                          Navigator.pop(context);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          padding: EdgeInsets.symmetric(
-                              horizontal: 24, vertical: 12),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8)),
-                          backgroundColor: Colors.green,
-                        ),
-                        child: Text("Confirm",
-                            style:
-                                TextStyle(fontSize: 16, color: Colors.white)),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-
-    if (selectedDate != null) {
-      await Supabase.instance.client
-          .from('Containers_test')
-          .update({'start_date': selectedDate!.toIso8601String()}).eq(
-              'container_id', selectedContainerId!);
-
-      setState(() {
-        _containerAddedDate = selectedDate;
-        _calculateContainerAge();
-      });
-    }
-  }
+  
 
 // Helper function for legend items
   Widget _buildLegendItem(Color color, String label) {
@@ -1247,11 +1114,253 @@ Future<int?> fetchHardwareId(int containerId) async {
     );
   }
 
+
+
+
+    int? selectedHardwareId; // ✅ Global variable to store hardware_id
+
+  Future<void> _fetchAndSetHardwareId(int containerId) async {
+    final supabase = Supabase.instance.client;
+
+    try {
+      print("Fetching hardware_id for container_id: $containerId");
+
+      // ✅ Fetch hardware_id using container_id
+      final containerResponse = await supabase
+          .from('Containers_test')
+          .select('hardware_id')
+          .eq('container_id', containerId)
+          .maybeSingle();
+
+      if (containerResponse == null || containerResponse['hardware_id'] == null) {
+        print("⚠️ No hardware_id found for container_id: $containerId");
+        return;
+      }
+
+      int hardwareId = containerResponse['hardware_id']; // ✅ Extract hardware_id
+
+      // ✅ Fetch start_date from Hardware_Sensors_Test using the retrieved hardware_id
+      final hardwareResponse = await supabase
+          .from('Hardware_Sensors_Test')
+          .select('start_date')
+          .eq('hardware_id', hardwareId)
+          .maybeSingle();
+
+      setState(() {
+        selectedHardwareId = hardwareId; // ✅ Store hardware_id globally
+        _containerAddedDate = hardwareResponse?['start_date']; // ✅ Store start_date
+      });
+
+      print("✅ Hardware ID set: $selectedHardwareId");
+      print("✅ Start date retrieved: $_containerAddedDate");
+      
+    } catch (error) {
+      print("❌ Error fetching hardware_id: $error");
+    }
+}
+
+
+
+Future<void> _retrieveCompost() async {
+  final supabase = Supabase.instance.client;
+
+  // ✅ Ensure selectedContainerId is not null before using it
+  if (selectedContainerId == null) {
+    print("❌ Error: selectedContainerId is null. Cannot fetch hardware_id.");
+    return;
+  }
+
+  final containerResponse = await supabase
+      .from('Containers_test')
+      .select('hardware_id')
+      .eq('container_id', selectedContainerId!) // ✅ Safe usage now
+      .maybeSingle();
+
+  if (containerResponse == null || containerResponse['hardware_id'] == null) {
+    print("❌ Error: No hardware_id found for container_id $selectedContainerId.");
+    return;
+  }
+
+  final hardwareId = containerResponse['hardware_id'];
+  print("✅ Resolved hardware_id: $hardwareId");
+
+  try {
+    final response = await supabase
+        .from('Hardware_Sensors_Test')
+        .select('start_date')
+        .eq('hardware_id', hardwareId)
+        .maybeSingle();
+
+    if (response == null || response['start_date'] == null) {
+      print("⚠️ No compost start date found for hardware ID: $hardwareId");
+      return;
+    }
+
+    setState(() {
+  _containerAddedDate = DateTime.parse(response['start_date']); // ✅ Convert String to DateTime
+});
+
+    print("✅ Compost start date retrieved: $_containerAddedDate");
+
+  } catch (error) {
+    print("❌ Error retrieving compost start date: $error");
+  }
+}
+
+
+
+
+
+
+void _startCompost() async {
+  DateTime tempDate = DateTime.now();
+  TimeOfDay tempTime = TimeOfDay.now();
+  DateTime? selectedDate;
+
+  await showModalBottomSheet(
+    context: context,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (BuildContext context) {
+      return StatefulBuilder(
+        builder: (context, setState) {
+          return Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Center(
+                  child: Text(
+                    "Start Composting",
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                ListTile(
+                  leading: const Icon(Icons.calendar_today, color: Colors.blue),
+                  title: const Text("Select Date",
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+                  subtitle: Text(DateFormat.yMMMMd().format(tempDate)),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 18),
+                  onTap: () async {
+                    DateTime? pickedDate = await showDatePicker(
+                      context: context,
+                      initialDate: tempDate,
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime(2100),
+                    );
+                    if (pickedDate != null) {
+                      setState(() => tempDate = pickedDate);
+                    }
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.access_time, color: Colors.orange),
+                  title: const Text("Select Time",
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+                  subtitle: Text(tempTime.format(context)),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 18),
+                  onTap: () async {
+                    TimeOfDay? pickedTime = await showTimePicker(
+                      context: context,
+                      initialTime: tempTime,
+                    );
+                    if (pickedTime != null) {
+                      setState(() => tempTime = pickedTime);
+                    }
+                  },
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text("Cancel", style: TextStyle(fontSize: 16)),
+                    ),
+                    ElevatedButton(
+                      onPressed: () {
+                        selectedDate = DateTime(
+                          tempDate.year,
+                          tempDate.month,
+                          tempDate.day,
+                          tempTime.hour,
+                          tempTime.minute,
+                        );
+                        Navigator.pop(context);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                        backgroundColor: Colors.green,
+                      ),
+                      child: const Text("Confirm",
+                          style: TextStyle(fontSize: 16, color: Colors.white)),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    },
+  );
+
+  // ✅ Ensure user selected a date
+  if (selectedDate == null) {
+    print("⚠️ No date selected. Compost start cancelled.");
+    return;
+  }
+
+  try {
+    // ✅ Ensure selectedHardwareId is set
+    if (selectedHardwareId == null) {
+      print("🔍 Fetching hardware ID...");
+      await _fetchAndSetHardwareId(selectedContainerId!);
+    }
+
+    if (selectedHardwareId == null) {
+      print("❌ Error: No hardware_id found for container.");
+      return;
+    }
+
+    String formattedDate = selectedDate!.toIso8601String();
+
+    // ✅ Update `start_date` in `Hardware_Sensors_Test`
+    final updateResponse = await Supabase.instance.client
+        .from('Hardware_Sensors_Test')
+        .update({'start_date': formattedDate})
+        .eq('hardware_id', selectedHardwareId!)
+        .select()
+        .single();
+
+    if (updateResponse == null) {
+      print("❌ Error: Update failed, no rows affected.");
+      return;
+    }
+
+    setState(() {
+      _containerAddedDate = selectedDate;
+      _calculateContainerAge();
+    });
+
+    print("✅ Compost start date updated successfully!");
+  } catch (error) {
+    print("🚨 Error starting compost: $error");
+  }
+}
+
   Widget _buildCompostButtons() {
-    int weeks = _calculateContainerAge(); // ✅ Now it gets the actual weeks
+    int weeks =
+        _calculateContainerAge(); // This should calculate based on the actual date.
 
     return Column(
       children: [
+        // "Retrieve Compost" button for compost between 12 and 16 weeks
         if (weeks >= 12 && weeks <= 16)
           ElevatedButton(
             onPressed: _retrieveCompost,
@@ -1267,7 +1376,8 @@ Future<int?> fetchHardwareId(int containerId) async {
               style: TextStyle(fontSize: 18, color: Colors.white),
             ),
           ),
-        if (weeks == 0) // Compost is empty
+        // "Start Compost" button should be shown when the state is "Empty"
+        if (_containerAge == "Empty" || _containerAddedDate == null)
           ElevatedButton(
             onPressed: _startCompost,
             style: ElevatedButton.styleFrom(
