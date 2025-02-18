@@ -442,10 +442,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     // style: const TextStyle(
                     //   fontSize: 16, fontWeight: FontWeight.w500),
                     //),
-                    Text(
-                      _getTimeRefreshed(),
-                      style: const TextStyle(fontSize: 14, color: Colors.grey),
-                    ),
+
                     const SizedBox(height: 20),
                     FutureBuilder(
                       future: _sensorDataFuture,
@@ -459,8 +456,26 @@ class _DashboardPageState extends State<DashboardPage> {
                         } else {
                           final sensorData =
                               snapshot.data as Map<String, dynamic>;
+
+                          String compostStartDate =
+                              sensorData['start_date'] != null
+                                  ? DateFormat('yyyy-MM-dd').format(
+                                      DateTime.parse(sensorData['start_date']))
+                                  : "Not Set"; // ✅ Displays "Not Set" if null
+
                           return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              Text("Compost Start Date: $compostStartDate",
+                                  style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 5),
+                              Text(
+                                _getTimeRefreshed(),
+                                style: const TextStyle(
+                                    fontSize: 14, color: Colors.grey),
+                              ),
                               buildSensorCard(
                                   Icons.thermostat,
                                   'Temperature Monitoring',
@@ -815,7 +830,7 @@ Future<Map<String, dynamic>> fetchSensorData(int containerId) async {
   final sensorResponse = await supabase
       .from('Hardware_Sensors_Test')
       .select(
-          'temperature, moisture, ph_level, ph_level2, humidity, refreshed_date')
+          'temperature, moisture, ph_level, ph_level2, humidity, refreshed_date, start_date')
       .eq('hardware_id', containerId)
       .order('refreshed_date', ascending: false)
       .limit(1)
@@ -907,15 +922,30 @@ class _ContainerPageState extends State<ContainerPage> {
                 String formattedDate =
                     DateFormat('yyyy-MM-dd').format(dateTime);
                 return Card(
-                  color: isSelected ? Colors.green[100] : null,
-                  child: ListTile(
-                    title: Text('Container: ${container['hardware_id']}'),
-                    subtitle: Text('Date Started: $formattedDate'),
-                    onTap: () {
-                      containerState.selectContainer(container['hardware_id']);
-                    },
-                  ),
-                );
+                    color: isSelected ? Colors.green[100] : null,
+                    child: ListTile(
+                      title: Text('Container: ${container['hardware_id']}'),
+                      subtitle: Text('Date Started: $formattedDate'),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (isSelected)
+                            const Icon(Icons.check_circle, color: Colors.green),
+                            // IconButton(
+                            //       icon: const Icon(Icons.delete,
+                            //           color: Colors.red),
+                            //       onPressed: () {
+                            //         _showDeleteConfirmationDialog(
+                            //             context, container['container_id']);
+                            //       },
+                            //     ),
+                        ],
+                      ),
+                      onTap: () {
+                        containerState
+                            .selectContainer(container['hardware_id']);
+                      },
+                    ));
               },
             ),
           ),
@@ -923,6 +953,38 @@ class _ContainerPageState extends State<ContainerPage> {
       ),
     );
   }
+
+void _showDeleteConfirmationDialog(BuildContext context, int containerId) {
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text("Delete Container"),
+      content: const Text("Are you sure you want to delete this container?"),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text("Cancel"),
+        ),
+        TextButton(
+          onPressed: () {
+            final containerState = Provider.of<ContainerState>(context, listen: false);
+            containerState.guestContainers.removeWhere((container) => container['hardware_id'] == containerId);
+
+            // Reset selected container if it's deleted
+            if (containerState.selectedContainerId == containerId) {
+              containerState.selectedContainerId = null;
+            }
+
+            containerState.notifyListeners();
+            Navigator.pop(context); // Close the dialog
+          },
+          child: const Text("Delete"),
+        ),
+      ],
+    ),
+  );
+}
+
 }
 
 // Others Page: Displays options like Sign In and App Guide
