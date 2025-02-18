@@ -17,7 +17,8 @@ import 'package:fl_chart/fl_chart.dart';
 // State Management: Tracks the selected container
 class ContainerState extends ChangeNotifier {
   int? selectedContainerId;
-  final List<Map<String, dynamic>> guestContainers = []; // Persist scanned containers
+  final List<Map<String, dynamic>> guestContainers =
+      []; // Persist scanned containers
 
   void selectContainer(int containerId) {
     selectedContainerId = containerId;
@@ -25,13 +26,13 @@ class ContainerState extends ChangeNotifier {
   }
 
   void addContainer(Map<String, dynamic> container) {
-    if (!guestContainers.any((c) => c['hardware_id'] == container['hardware_id'])) {
+    if (!guestContainers
+        .any((c) => c['hardware_id'] == container['hardware_id'])) {
       guestContainers.add(container);
       notifyListeners();
     }
   }
 }
-
 
 class HomePageGuest extends StatefulWidget {
   const HomePageGuest({super.key});
@@ -900,10 +901,11 @@ class _ContainerPageState extends State<ContainerPage> {
               itemCount: containerState.guestContainers.length,
               itemBuilder: (context, index) {
                 final container = containerState.guestContainers[index];
-                final isSelected =
-                    containerState.selectedContainerId == container['hardware_id'];
-                    DateTime dateTime = DateTime.parse(container['start_date']);
-    String formattedDate = DateFormat('yyyy-MM-dd').format(dateTime);
+                final isSelected = containerState.selectedContainerId ==
+                    container['hardware_id'];
+                DateTime dateTime = DateTime.parse(container['start_date']);
+                String formattedDate =
+                    DateFormat('yyyy-MM-dd').format(dateTime);
                 return Card(
                   color: isSelected ? Colors.green[100] : null,
                   child: ListTile(
