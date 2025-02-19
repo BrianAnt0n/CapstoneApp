@@ -184,25 +184,30 @@ class _DashboardPageState extends State<DashboardPage> {
 
   @override
   void didChangeDependencies() {
-    super.didChangeDependencies();
-    final containerState = Provider.of<ContainerState>(context);
-    selectedContainerId = containerState.selectedContainerId;
+  super.didChangeDependencies();
+  final containerState = Provider.of<ContainerState>(context);
+  selectedContainerId = containerState.selectedContainerId;
 
-    if (selectedContainerId != null) {
-      // ✅ Get the correct hardware_id first
-      fetchHardwareId(selectedContainerId!).then((hardwareId) {
-        if (hardwareId != null) {
+  if (selectedContainerId != null) {
+    // ✅ Fetch the correct hardware_id first
+    fetchHardwareId(selectedContainerId!).then((hardwareId) {
+      if (hardwareId != null) {
+        if (mounted) { // ✅ Prevent setState() if the widget was disposed
           setState(() {
             _sensorDataFuture = fetchSensorData(selectedContainerId!);
-            _notesFuture =
-                fetchNotes(hardwareId, _selectedDate); // ✅ Use hardwareId
+            _notesFuture = fetchNotes(hardwareId, _selectedDate); // ✅ Use hardwareId
             _historyFuture = fetchHistoryData(selectedContainerId!);
             fetchContainerDetails(selectedContainerId!);
           });
         }
-      });
-    }
+      } else {
+        print("⚠️ Warning: No valid hardware_id found for container $selectedContainerId!");
+      }
+    }).catchError((error) {
+      print("❌ Error fetching hardware_id: $error");
+    });
   }
+}
 
   Future<void> _refreshData() async {
     setState(() {
@@ -492,29 +497,51 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  Future<void> _addNote() async {
-    if (selectedContainerId == null) return;
+bool _isLoading = false; // ✅ Track loading state
 
-    // Trim the note to remove leading/trailing spaces
-    String trimmedNote = _notesController.text.trim();
+Future<void> _addNote() async {
+  if (selectedContainerId == null) return;
 
-    // Validate if the note is empty
-    if (trimmedNote.isEmpty) {
-      _showErrorDialog("Please provide notes."); // Show popup for empty input
+  String trimmedNote = _notesController.text.trim();
+  if (trimmedNote.isEmpty) {
+    _showErrorDialog("Please provide notes.");
+    return;
+  }
+
+  setState(() {
+    _isLoading = true; // ✅ Show loading state
+  });
+
+  try {
+    // ✅ Get the correct hardware_id before inserting the note
+    int? hardwareId = await fetchHardwareId(selectedContainerId!);
+    if (hardwareId == null) {
+      print("Error: No hardware ID found for container $selectedContainerId!");
       return;
     }
 
-    // Save valid note to database
+    // ✅ Add note with the correct hardware_id
     await addNoteToDatabase(selectedContainerId!, trimmedNote, _imageUrl);
     _notesController.clear();
 
+    // ✅ Small delay to ensure Supabase updates before fetching notes
+    await Future.delayed(const Duration(milliseconds: 500));
+
     setState(() {
-      _notesFuture = fetchNotes(selectedContainerId!, _selectedDate);
-      // Clear image after saving
+      _notesFuture = fetchNotes(hardwareId, _selectedDate); // ✅ Use hardwareId
       _selectedImage = null;
-      _imageUrl = null; // Reset image URL after adding the note
+      _imageUrl = null;
+    });
+
+    print("✅ Note added and refreshed successfully!");
+  } catch (e) {
+    print("Error adding note: $e");
+  } finally {
+    setState(() {
+      _isLoading = false; // ✅ Hide loading state
     });
   }
+}
 
 // Function to Show Error Popup
   void _showErrorDialog(String message) {
@@ -1686,11 +1713,16 @@ class _DashboardPageState extends State<DashboardPage> {
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
                               IconButton(
-                                onPressed: _addNote,
-                                icon: const Icon(Icons.add_comment_outlined),
+                                onPressed: _isLoading
+                                    ? null
+                                    : _addNote, // ✅ Disable button when loading
+                                icon: _isLoading
+                                    ? const CircularProgressIndicator() // ✅ Show loading animation
+                                    : const Icon(Icons.add_comment_outlined),
                                 color: Colors.green,
                                 tooltip: "Add Note",
                               ),
+
                               IconButton(
                                 onPressed: _uploadPicture,
                                 icon: const Icon(Icons.image),
