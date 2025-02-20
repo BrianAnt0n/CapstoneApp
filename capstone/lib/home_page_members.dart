@@ -648,6 +648,12 @@ class _DashboardPageState extends State<DashboardPage> {
               style: const TextStyle(fontSize: 12, color: Colors.grey),
             ),
 
+            if (note['date_modified'] != null) // Show only if not null
+              Text(
+                "Date modified: ${formatTimestamp(note['date_modified'])}",
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+
             const SizedBox(height: 5),
 
             // ✅ Fetch `created_by` and display Fullname properly
@@ -658,26 +664,10 @@ class _DashboardPageState extends State<DashboardPage> {
                   fontWeight: FontWeight.bold,
                   color: Colors.blue),
             ),
-            Text(
-              "Date added: ${note['created_date'] ?? 'Unknown Date'}",
-              style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blue),
-            ),
 
             if (note['last_modified_by'] != null) // Show only if not null
               Text(
                 "Last modified by: ${note['last_modified_by']}",
-                style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue),
-              ),
-
-            if (note['date_modified'] != null) // Show only if not null
-              Text(
-                "Date modified: ${note['date_modified']}",
                 style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
