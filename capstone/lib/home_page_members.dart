@@ -184,30 +184,33 @@ class _DashboardPageState extends State<DashboardPage> {
 
   @override
   void didChangeDependencies() {
-  super.didChangeDependencies();
-  final containerState = Provider.of<ContainerState>(context);
-  selectedContainerId = containerState.selectedContainerId;
+    super.didChangeDependencies();
+    final containerState = Provider.of<ContainerState>(context);
+    selectedContainerId = containerState.selectedContainerId;
 
-  if (selectedContainerId != null) {
-    // ✅ Fetch the correct hardware_id first
-    fetchHardwareId(selectedContainerId!).then((hardwareId) {
-      if (hardwareId != null) {
-        if (mounted) { // ✅ Prevent setState() if the widget was disposed
-          setState(() {
-            _sensorDataFuture = fetchSensorData(selectedContainerId!);
-            _notesFuture = fetchNotes(hardwareId, _selectedDate); // ✅ Use hardwareId
-            _historyFuture = fetchHistoryData(selectedContainerId!);
-            fetchContainerDetails(selectedContainerId!);
-          });
+    if (selectedContainerId != null) {
+      // ✅ Fetch the correct hardware_id first
+      fetchHardwareId(selectedContainerId!).then((hardwareId) {
+        if (hardwareId != null) {
+          if (mounted) {
+            // ✅ Prevent setState() if the widget was disposed
+            setState(() {
+              _sensorDataFuture = fetchSensorData(selectedContainerId!);
+              _notesFuture =
+                  fetchNotes(hardwareId, _selectedDate); // ✅ Use hardwareId
+              _historyFuture = fetchHistoryData(selectedContainerId!);
+              fetchContainerDetails(selectedContainerId!);
+            });
+          }
+        } else {
+          print(
+              "⚠️ Warning: No valid hardware_id found for container $selectedContainerId!");
         }
-      } else {
-        print("⚠️ Warning: No valid hardware_id found for container $selectedContainerId!");
-      }
-    }).catchError((error) {
-      print("❌ Error fetching hardware_id: $error");
-    });
+      }).catchError((error) {
+        print("❌ Error fetching hardware_id: $error");
+      });
+    }
   }
-}
 
   Future<void> _refreshData() async {
     setState(() {
@@ -497,51 +500,53 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-bool _isLoading = false; // ✅ Track loading state
+  bool _isLoading = false; // ✅ Track loading state
 
-Future<void> _addNote() async {
-  if (selectedContainerId == null) return;
+  Future<void> _addNote() async {
+    if (selectedContainerId == null) return;
 
-  String trimmedNote = _notesController.text.trim();
-  if (trimmedNote.isEmpty) {
-    _showErrorDialog("Please provide notes.");
-    return;
-  }
-
-  setState(() {
-    _isLoading = true; // ✅ Show loading state
-  });
-
-  try {
-    // ✅ Get the correct hardware_id before inserting the note
-    int? hardwareId = await fetchHardwareId(selectedContainerId!);
-    if (hardwareId == null) {
-      print("Error: No hardware ID found for container $selectedContainerId!");
+    String trimmedNote = _notesController.text.trim();
+    if (trimmedNote.isEmpty) {
+      _showErrorDialog("Please provide notes.");
       return;
     }
 
-    // ✅ Add note with the correct hardware_id
-    await addNoteToDatabase(selectedContainerId!, trimmedNote, _imageUrl);
-    _notesController.clear();
-
-    // ✅ Small delay to ensure Supabase updates before fetching notes
-    await Future.delayed(const Duration(milliseconds: 500));
-
     setState(() {
-      _notesFuture = fetchNotes(hardwareId, _selectedDate); // ✅ Use hardwareId
-      _selectedImage = null;
-      _imageUrl = null;
+      _isLoading = true; // ✅ Show loading state
     });
 
-    print("✅ Note added and refreshed successfully!");
-  } catch (e) {
-    print("Error adding note: $e");
-  } finally {
-    setState(() {
-      _isLoading = false; // ✅ Hide loading state
-    });
+    try {
+      // ✅ Get the correct hardware_id before inserting the note
+      int? hardwareId = await fetchHardwareId(selectedContainerId!);
+      if (hardwareId == null) {
+        print(
+            "Error: No hardware ID found for container $selectedContainerId!");
+        return;
+      }
+
+      // ✅ Add note with the correct hardware_id
+      await addNoteToDatabase(selectedContainerId!, trimmedNote, _imageUrl);
+      _notesController.clear();
+
+      // ✅ Small delay to ensure Supabase updates before fetching notes
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      setState(() {
+        _notesFuture =
+            fetchNotes(hardwareId, _selectedDate); // ✅ Use hardwareId
+        _selectedImage = null;
+        _imageUrl = null;
+      });
+
+      print("✅ Note added and refreshed successfully!");
+    } catch (e) {
+      print("Error adding note: $e");
+    } finally {
+      setState(() {
+        _isLoading = false; // ✅ Hide loading state
+      });
+    }
   }
-}
 
 // Function to Show Error Popup
   void _showErrorDialog(String message) {
@@ -1722,7 +1727,6 @@ Future<void> _addNote() async {
                                 color: Colors.green,
                                 tooltip: "Add Note",
                               ),
-
                               IconButton(
                                 onPressed: _uploadPicture,
                                 icon: const Icon(Icons.image),
@@ -1994,12 +1998,16 @@ Future<void> addNoteToDatabase(
       return;
     }
 
-    // ✅ Insert note with the correct hardware_id and use getUtcTimestamp()
+    String? authorName =
+        await getStoredString('fullname'); // ✅ Store author name
+
+    // ✅ Insert note with user full name
     await supabase.from('Notes_test_test').insert({
       'hardware_id': hardwareId,
+      'created_by': authorName, // ✅ Store creator's name
       'note': note,
       'picture': imageUrl,
-      'created_date': getLocalTimestamp(), // ✅ Now correctly using UTC function
+      'created_date': getLocalTimestamp(),
     });
 
     print("Note added successfully for hardware ID: $hardwareId");
