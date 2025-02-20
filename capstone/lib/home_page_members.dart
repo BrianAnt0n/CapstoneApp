@@ -576,110 +576,6 @@ class _DashboardPageState extends State<DashboardPage> {
     setState(() {});
   }
 
-  Widget buildNoteCard(Map<String, dynamic> note) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(10.0), // Better spacing
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Display Image if Available
-            if (note['picture'] != null && note['picture'].isNotEmpty)
-              Column(
-                children: [
-                  GestureDetector(
-                    onTap: () => _showFullScreenImage(
-                        note['picture']), // Open fullscreen
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.network(
-                        note['picture'], // ✅ Load image from Supabase URL
-                        width: double.infinity,
-                        height: 150,
-                        fit: BoxFit.cover,
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return const Center(
-                              child: CircularProgressIndicator());
-                        },
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Center(
-                              child: Text("Image failed to load"));
-                        },
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 5),
-
-                  // Delete & Replace Image Buttons
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // Delete Image Button
-                      TextButton.icon(
-                        onPressed: () =>
-                            _deleteNoteImage(note['note_id'], note['picture']),
-                        icon: const Icon(Icons.delete, color: Colors.red),
-                        label: const Text("Delete Image",
-                            style: TextStyle(color: Colors.red)),
-                      ),
-
-                      const SizedBox(width: 10), // Space between buttons
-
-                      // Replace Image Button
-                      TextButton.icon(
-                        onPressed: () =>
-                            _replaceNoteImage(note['note_id'], note['picture']),
-                        icon: const Icon(Icons.camera_alt, color: Colors.blue),
-                        label: const Text("Replace Image",
-                            style: TextStyle(color: Colors.blue)),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-
-            const SizedBox(height: 8), // Spacing
-
-            // Display Note Text
-            Text(
-              note['note'] ?? 'No note available',
-              style: const TextStyle(fontSize: 16),
-            ),
-
-            // Timestamp
-            Text(
-              formatTimestamp(note['created_date']),
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
-            ),
-
-            const SizedBox(height: 5), // Spacing before buttons
-
-            // Edit & Delete Buttons
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.edit, color: Colors.blue),
-                  onPressed: () {
-                    _showEditDialog(note['note_id'], note['note']);
-                  },
-                ),
-                IconButton(
-                  icon: const Icon(Icons.delete, color: Colors.red),
-                  onPressed: () {
-                    _showDeleteConfirmationDialog(note['note_id']);
-                  },
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   String formatTimestamp(String timestamp) {
     try {
       DateTime parsedDate = DateTime.parse(timestamp);
@@ -687,6 +583,94 @@ class _DashboardPageState extends State<DashboardPage> {
     } catch (e) {
       return 'Invalid Date';
     }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchNotes(
+      int hardwareId, DateTime date) async {
+    final supabase = Supabase.instance.client;
+
+    DateTime startOfDayUtc = DateTime(date.year, date.month, date.day).toUtc();
+    DateTime endOfDayUtc =
+        startOfDayUtc.add(const Duration(hours: 23, minutes: 59, seconds: 59));
+
+    try {
+      print(
+          "Fetching notes for hardware_id: $hardwareId between $startOfDayUtc and $endOfDayUtc");
+
+      final response = await supabase
+          .from('Notes_test_test')
+          .select(
+              'note_id, note, created_date, picture, created_by') // ✅ Correct relationship fetching
+          .eq('hardware_id', hardwareId)
+          .gte('created_date', startOfDayUtc.toIso8601String())
+          .lt('created_date', endOfDayUtc.toIso8601String());
+
+      if (response == null || response.isEmpty) {
+        print("No notes found for this date.");
+        return [];
+      }
+
+      print("Fetched ${response.length} notes.");
+      return List<Map<String, dynamic>>.from(response);
+    } catch (error) {
+      print("Error fetching notes: $error");
+      return [];
+    }
+  }
+
+  Widget buildNoteCard(Map<String, dynamic> note) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(10.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (note['picture'] != null && note['picture'].isNotEmpty)
+              Image.network(note['picture'],
+                  width: double.infinity, height: 150, fit: BoxFit.cover),
+
+            const SizedBox(height: 5),
+
+            Text(
+              note['note'] ?? 'No note available',
+              style: const TextStyle(fontSize: 16),
+            ),
+
+            Text(
+              formatTimestamp(note['created_date']),
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+
+            const SizedBox(height: 5),
+
+            // ✅ Fetch `created_by` and display Fullname properly
+            Text(
+              "Added by: ${note['created_by'] ?? 'Unknown User'}",
+              style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue),
+            ),
+
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.edit, color: Colors.blue),
+                  onPressed: () =>
+                      _showEditDialog(note['note_id'], note['note']),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete, color: Colors.red),
+                  onPressed: () =>
+                      _showDeleteConfirmationDialog(note['note_id']),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget buildBarChart(
@@ -2013,38 +1997,6 @@ Future<void> addNoteToDatabase(
     print("Note added successfully for hardware ID: $hardwareId");
   } catch (error) {
     print("Error adding note: $error");
-  }
-}
-
-Future<List<Map<String, dynamic>>> fetchNotes(
-    int hardwareId, DateTime date) async {
-  final supabase = Supabase.instance.client;
-
-  DateTime startOfDayUtc = DateTime(date.year, date.month, date.day).toUtc();
-  DateTime endOfDayUtc =
-      startOfDayUtc.add(const Duration(hours: 23, minutes: 59, seconds: 59));
-
-  try {
-    print(
-        "Fetching notes for hardware_id: $hardwareId between $startOfDayUtc and $endOfDayUtc");
-
-    final response = await supabase
-        .from('Notes_test_test')
-        .select('*')
-        .eq('hardware_id', hardwareId)
-        .gte('created_date', startOfDayUtc.toIso8601String())
-        .lt('created_date', endOfDayUtc.toIso8601String());
-
-    if (response == null) {
-      print("Supabase returned null for notes.");
-      return [];
-    }
-
-    print("Fetched notes: ${response.length} notes."); // Debug log
-    return List<Map<String, dynamic>>.from(response);
-  } catch (error) {
-    print("Error fetching notes: $error");
-    return []; // Return an empty list instead of failing
   }
 }
 

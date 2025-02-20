@@ -628,7 +628,15 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
-// ✅ Fetch notes with user info
+  String formatTimestamp(String timestamp) {
+    try {
+      DateTime parsedDate = DateTime.parse(timestamp);
+      return DateFormat('yyyy-MM-dd hh:mm a').format(parsedDate);
+    } catch (e) {
+      return 'Invalid Date';
+    }
+  }
+
   Future<List<Map<String, dynamic>>> fetchNotes(
       int hardwareId, DateTime date) async {
     final supabase = Supabase.instance.client;
@@ -644,29 +652,21 @@ class _DashboardPageState extends State<DashboardPage> {
       final response = await supabase
           .from('Notes_test_test')
           .select(
-              'note_id, note, created_date, picture, created_by') // ✅ Correct way to join Users
+              'note_id, note, created_date, picture, created_by') // ✅ Correct relationship fetching
           .eq('hardware_id', hardwareId)
           .gte('created_date', startOfDayUtc.toIso8601String())
           .lt('created_date', endOfDayUtc.toIso8601String());
-      if (response == null) {
-        print("Supabase returned null for notes.");
+
+      if (response == null || response.isEmpty) {
+        print("No notes found for this date.");
         return [];
       }
 
-      print("Fetched notes: ${response.length} notes.");
+      print("Fetched ${response.length} notes.");
       return List<Map<String, dynamic>>.from(response);
     } catch (error) {
       print("Error fetching notes: $error");
       return [];
-    }
-  }
-
-  String formatTimestamp(String timestamp) {
-    try {
-      DateTime parsedDate = DateTime.parse(timestamp);
-      return DateFormat('yyyy-MM-dd hh:mm a').format(parsedDate);
-    } catch (e) {
-      return 'Invalid Date';
     }
   }
 
@@ -695,15 +695,14 @@ class _DashboardPageState extends State<DashboardPage> {
 
             const SizedBox(height: 5),
 
-            // ✅ Display User's Fullname
-            if (note['Users'] != null && note['Users']['fullname'] != null)
-              Text(
-                "Added by: ${note['Users']['fullname']}",
-                style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue),
-              ),
+            // ✅ Fetch `created_by` and display Fullname properly
+            Text(
+              "Added by: ${note['created_by'] ?? 'Unknown User'}",
+              style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue),
+            ),
 
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
