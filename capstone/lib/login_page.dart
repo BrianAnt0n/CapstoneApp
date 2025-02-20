@@ -1,5 +1,6 @@
 import 'package:capstone/shared_prefs_helper.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'home_page.dart';
 import 'home_page_members.dart';
 import 'home_page_guest.dart';
@@ -91,23 +92,25 @@ class _LoginPageState extends State<LoginPage> {
       String storedPassword = response['password'];
       int storedUserId = response['user_id'];
       String storedUserLevel = response['user_level'];
-      String storedEmail = response['email'];
       String storedFullName = response['fullname'];
+      String storedEmail = response['email'];
 
       String userIdString = storedUserId.toString();
 
       if (storedPassword == password) {
-        await SharedPrefsHelper.saveUserLogin(userIdString, storedUserLevel, storedEmail, storedFullName);
+        await SharedPrefsHelper.saveUserLogin(
+            userIdString, storedUserLevel, storedFullName, storedEmail);
+
         if (storedUserLevel == "Admin") {
-          Navigator.pushReplacement(
-              context, MaterialPageRoute(builder: (context) => const HomePage()));
+          Navigator.pushReplacement(context,
+              MaterialPageRoute(builder: (context) => const HomePage()));
         } else {
-          Navigator.pushReplacement(
-              context, MaterialPageRoute(builder: (context) => const HomePageMember()));
+          Navigator.pushReplacement(context,
+              MaterialPageRoute(builder: (context) => const HomePageMember()));
         }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Incorrect password. Please try again.")));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text("Incorrect password. Please try again.")));
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -151,7 +154,8 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
 
-                  const SizedBox(height: 40), // Spacing between logo and text fields
+                  const SizedBox(
+                      height: 40), // Spacing between logo and text fields
 
                   // Email Field
                   TextField(
@@ -203,7 +207,7 @@ class _LoginPageState extends State<LoginPage> {
 
                   const SizedBox(height: 20),
 
-                 // Forgot Password Link
+                  // Forgot Password Link
                   GestureDetector(
                     onTap: () {
                       Navigator.push(
@@ -220,7 +224,6 @@ class _LoginPageState extends State<LoginPage> {
                   const SizedBox(
                       height: 40), // Add some spacing before the guest button
 
-
                   // Continue as Guest Button (Yellow Theme)
                   GestureDetector(
                     onTap: () {
@@ -230,7 +233,8 @@ class _LoginPageState extends State<LoginPage> {
 
                       Navigator.pushReplacement(
                         context,
-                        MaterialPageRoute(builder: (context) => const HomePageGuest()),
+                        MaterialPageRoute(
+                            builder: (context) => const HomePageGuest()),
                       );
                     },
                     child: Container(
