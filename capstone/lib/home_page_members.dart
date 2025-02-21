@@ -258,10 +258,14 @@ class _DashboardPageState extends State<DashboardPage> {
       await supabase.storage.from('Notes_Image_Test').remove([fileName]);
       print("Image deleted from Supabase: $fileName");
 
+      String? editorName = await getStoredString("fullname");
+
       // Remove image URL from the database (set `picture` column to NULL)
-      await supabase
-          .from('Notes_test_test')
-          .update({'picture': null}).eq('note_id', noteId);
+      await supabase.from('Notes_test_test').update({
+        'picture': null,
+        'date_modified': getLocalTimestamp(),
+        'last_modified_by': editorName,
+      }).eq('note_id', noteId);
 
       print("Image removed from note in database");
 
@@ -332,10 +336,13 @@ class _DashboardPageState extends State<DashboardPage> {
           supabase.storage.from('Notes_Image_Test').getPublicUrl(newFileName);
       print("New image uploaded: $newImageUrl");
 
-      await supabase
-          .from('Notes_test_test')
-          .update({'picture': newImageUrl}).eq('note_id', noteId);
+      String? editorName = await getStoredString("fullname");
 
+      await supabase.from('Notes_test_test').update({
+        'picture': newImageUrl,
+        'date_modified': getLocalTimestamp(),
+        'last_modified_by': editorName,
+      }).eq('note_id', noteId);
       print("Database updated with new image URL");
 
       setState(() {
@@ -600,7 +607,7 @@ class _DashboardPageState extends State<DashboardPage> {
       final response = await supabase
           .from('Notes_test_test')
           .select(
-              'note_id, note, created_date, picture, created_by') // ✅ Correct relationship fetching
+              'note_id, note, created_date, picture, created_by, date_modified, last_modified_by') // ✅ Correct relationship fetching
           .eq('hardware_id', hardwareId)
           .gte('created_date', startOfDayUtc.toIso8601String())
           .lt('created_date', endOfDayUtc.toIso8601String());
@@ -641,6 +648,12 @@ class _DashboardPageState extends State<DashboardPage> {
               style: const TextStyle(fontSize: 12, color: Colors.grey),
             ),
 
+            if (note['date_modified'] != null) // Show only if not null
+              Text(
+                "Date modified: ${formatTimestamp(note['date_modified'])}",
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+
             const SizedBox(height: 5),
 
             // ✅ Fetch `created_by` and display Fullname properly
@@ -652,6 +665,14 @@ class _DashboardPageState extends State<DashboardPage> {
                   color: Colors.blue),
             ),
 
+            if (note['last_modified_by'] != null) // Show only if not null
+              Text(
+                "Last modified by: ${note['last_modified_by']}",
+                style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue),
+              ),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
@@ -1918,10 +1939,14 @@ class _DashboardPageState extends State<DashboardPage> {
 Future<void> updateNoteInDatabase(int noteId, String updatedNote) async {
   final supabase = Supabase.instance.client;
 
+  String? editorName = await getStoredString("fullname");
+
   try {
-    await supabase
-        .from('Notes_test_test')
-        .update({'note': updatedNote}).eq('note_id', noteId);
+    await supabase.from('Notes_test_test').update({
+      'note': updatedNote,
+      'date_modified': getLocalTimestamp(),
+      'last_modified_by': editorName,
+    }).eq('note_id', noteId);
     print('Note updated successfully');
   } catch (error) {
     print('Error updating note: $error');
