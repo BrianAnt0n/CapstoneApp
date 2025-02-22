@@ -1590,11 +1590,20 @@ Future<void> _addNote() async {
                           onDaySelected: (selectedDay, focusedDay) {
                             setState(() {
                               _selectedDate = selectedDay;
-                              _notesFuture = fetchNotes(
-                                  selectedContainerId!, _selectedDate);
+                              _notesFuture = fetchNotes(selectedContainerId!,
+                                  _selectedDate); // ✅ Ensure refresh
                               _calculateContainerAge();
                             });
+
+                            // ✅ Add a slight delay to ensure Supabase updates before UI refresh
+                            Future.delayed(const Duration(milliseconds: 300),
+                                () {
+                              setState(
+                                  () {}); // ✅ Force UI to update with new notes
+                            });
                           },
+
+
                         ),
 
                         const SizedBox(height: 16),
@@ -2055,6 +2064,7 @@ Widget buildSensorCard(IconData icon, String title, String value, Color color) {
 
 //Database Fetching: Fetch sensor data for a specific container
 // Fetch sensor data for a specific container & trigger alerts if needed
+//Notification?
 Future<Map<String, dynamic>> fetchSensorData(int containerId) async {
   final supabase = Supabase.instance.client;
 

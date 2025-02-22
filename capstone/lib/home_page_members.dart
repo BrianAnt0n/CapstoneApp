@@ -939,13 +939,18 @@ Future<void> _addNote() async {
                         onDaySelected: (selectedDay, focusedDay) {
                           setState(() {
                             _selectedDate = selectedDay;
-                            _notesFuture =
-                                fetchNotes(selectedContainerId!, _selectedDate);
-                            _calculateContainerAge(); // Update the age when a date is selected
+                            _notesFuture = fetchNotes(selectedContainerId!,
+                                _selectedDate); // ✅ Ensure refresh
+                            _calculateContainerAge();
                           });
-                          Navigator.pop(
-                              context); // Close the popup after selection
+
+                          // ✅ Add a slight delay to ensure Supabase updates before UI refresh
+                          Future.delayed(const Duration(milliseconds: 300), () {
+                            setState(
+                                () {}); // ✅ Force UI to update with new notes
+                          });
                         },
+
                         headerStyle: const HeaderStyle(
                           formatButtonVisible:
                               false, // Hide the week toggle button
