@@ -191,20 +191,22 @@ class _DashboardPageState extends State<DashboardPage> {
     if (selectedContainerId != null) {
       // ✅ Fetch the correct hardware_id first
       fetchHardwareId(selectedContainerId!).then((hardwareId) {
-        if (hardwareId != null) {
-          if (mounted) {
-            // ✅ Prevent setState() if the widget was disposed
-            setState(() {
-              _sensorDataFuture = fetchSensorData(selectedContainerId!);
-              _notesFuture =
-                  fetchNotes(hardwareId, _selectedDate); // ✅ Use hardwareId
-              _historyFuture = fetchHistoryData(selectedContainerId!);
-              fetchContainerDetails(selectedContainerId!);
-            });
-          }
-        } else {
-          print(
-              "⚠️ Warning: No valid hardware_id found for container $selectedContainerId!");
+        if (selectedContainerId != null) {
+          fetchHardwareId(selectedContainerId!).then((hardwareId) {
+            if (hardwareId != null) {
+              if (mounted) {
+                setState(() {
+                  _notesFuture = fetchNotes(
+                      hardwareId, _selectedDate); // ✅ Ensure correct ID is used
+                });
+              }
+            } else {
+              print(
+                  "⚠️ No valid hardware_id found for container $selectedContainerId!");
+            }
+          }).catchError((error) {
+            print("❌ Error fetching hardware_id: $error");
+          });
         }
       }).catchError((error) {
         print("❌ Error fetching hardware_id: $error");
@@ -212,19 +214,33 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _refreshData(); // ✅ Automatically refresh data when opening the dashboard
+    });
+  }
+
   Future<void> _refreshData() async {
+    if (selectedContainerId == null) {
+      print("⚠️ No selected container. Cannot refresh data.");
+      return;
+    }
+
     setState(() {
       _lastRefreshTime = DateTime.now();
     });
 
-    // ✅ Get the correct hardware_id before refreshing notes
+    // ✅ Ensure correct hardware_id is fetched before refreshing notes
     final hardwareId = await fetchHardwareId(selectedContainerId!);
     if (hardwareId != null) {
       setState(() {
-        _sensorDataFuture = fetchSensorData(selectedContainerId!);
-        _notesFuture =
-            fetchNotes(hardwareId, _selectedDate); // ✅ Use hardwareId
-        _historyFuture = fetchHistoryData(selectedContainerId!);
+        _sensorDataFuture = fetchSensorData(
+            selectedContainerId!); // ✅ Ensuring sensor data fetch
+        _notesFuture = fetchNotes(hardwareId, _selectedDate); // ✅ Fetch notes
+        _historyFuture =
+            fetchHistoryData(selectedContainerId!); // ✅ Fetch history
       });
     }
 
@@ -343,6 +359,7 @@ class _DashboardPageState extends State<DashboardPage> {
         'date_modified': getLocalTimestamp(),
         'last_modified_by': editorName,
       }).eq('note_id', noteId);
+
       print("Database updated with new image URL");
 
       setState(() {
@@ -583,6 +600,61 @@ class _DashboardPageState extends State<DashboardPage> {
     setState(() {});
   }
 
+  Future<void> addNoteToDatabase(
+      int containerId, String note, String? imageUrl) async {
+    final supabase = Supabase.instance.client;
+
+    try {
+      // ✅ Fetch the correct hardware_id from Containers_test
+      final containerResponse = await supabase
+          .from('Containers_test')
+          .select('hardware_id, user_id')
+          .eq('container_id', containerId)
+          .maybeSingle();
+
+      if (containerResponse == null ||
+          containerResponse['hardware_id'] == null) {
+        print(
+            "Error: No valid hardware_id found for container_id $containerId.");
+        return;
+      }
+
+      int hardwareId = containerResponse['hardware_id'];
+      int userId = containerResponse['user_id']; // ✅ Fetch user ID
+      print("Resolved Hardware ID: $hardwareId, User ID: $userId");
+
+      // ✅ Fetch user full name from Users table
+      final userResponse = await supabase
+          .from('Users')
+          .select('fullname')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+      if (userResponse == null || userResponse['fullname'] == null) {
+        print("Error: No user found with ID $userId.");
+        return;
+      }
+
+      //String authorName = userResponse['fullname']; // ✅ Store author name
+
+      String? authorName =
+          await getStoredString('fullname'); // ✅ Store author name
+
+      // ✅ Insert note with user full name
+      await supabase.from('Notes_test_test').insert({
+        'hardware_id': hardwareId,
+        'created_by': authorName, // ✅ Store creator's name
+        'note': note,
+        'picture': imageUrl,
+        'created_date': getLocalTimestamp(),
+      });
+
+      print("Note added successfully by $authorName!");
+    } catch (error) {
+      print("Error adding note: $error");
+    }
+  }
+
   String formatTimestamp(String timestamp) {
     try {
       DateTime parsedDate = DateTime.parse(timestamp);
@@ -596,7 +668,11 @@ class _DashboardPageState extends State<DashboardPage> {
       int hardwareId, DateTime date) async {
     final supabase = Supabase.instance.client;
 
-    DateTime startOfDayUtc = DateTime(date.year, date.month, date.day).toUtc();
+    // ✅ Convert selected date to UTC
+    DateTime selectedDateUtc = DateTime.utc(date.year, date.month, date.day);
+
+    // ✅ Ensure full-day range in UTC
+    DateTime startOfDayUtc = selectedDateUtc;
     DateTime endOfDayUtc =
         startOfDayUtc.add(const Duration(hours: 23, minutes: 59, seconds: 59));
 
@@ -607,9 +683,10 @@ class _DashboardPageState extends State<DashboardPage> {
       final response = await supabase
           .from('Notes_test_test')
           .select(
-              'note_id, note, created_date, picture, created_by, date_modified, last_modified_by') // ✅ Correct relationship fetching
+              'note_id, note, created_date, picture, created_by, date_modified, last_modified_by')
           .eq('hardware_id', hardwareId)
-          .gte('created_date', startOfDayUtc.toIso8601String())
+          .gte('created_date',
+              startOfDayUtc.toIso8601String()) // ✅ Ensures correct filtering
           .lt('created_date', endOfDayUtc.toIso8601String());
 
       if (response == null || response.isEmpty) {
@@ -633,8 +710,30 @@ class _DashboardPageState extends State<DashboardPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (note['picture'] != null && note['picture'].isNotEmpty)
-              Image.network(note['picture'],
-                  width: double.infinity, height: 150, fit: BoxFit.cover),
+              GestureDetector(
+                onTap: () {
+                  print(
+                      "🖼 Note Image Clicked: ${note['picture']}"); // ✅ Debugging log
+                  _showFullScreenImage(
+                      note['picture']); // ✅ Opens fullscreen image
+                },
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(
+                    note['picture'],
+                    width: double.infinity,
+                    height: 150,
+                    fit: BoxFit.cover,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return const Center(child: CircularProgressIndicator());
+                    },
+                    errorBuilder: (context, error, stackTrace) {
+                      return const Center(child: Text("Image failed to load"));
+                    },
+                  ),
+                ),
+              ),
 
             const SizedBox(height: 5),
 
@@ -673,6 +772,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     fontWeight: FontWeight.bold,
                     color: Colors.blue),
               ),
+
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
@@ -1056,26 +1156,25 @@ class _DashboardPageState extends State<DashboardPage> {
         File file = File(image.path);
         String fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
 
-        // Upload image to Supabase Storage
+        // ✅ Upload image to Supabase Storage
         await supabase.storage.from('Notes_Image_Test').upload(
               fileName,
               file,
-              fileOptions:
-                  const FileOptions(upsert: true), // Allows overwriting
+              fileOptions: const FileOptions(upsert: true),
             );
 
-        // Get Public URL of the uploaded image
+        // ✅ Get Public URL of the uploaded image
         final String imageUrl =
             supabase.storage.from('Notes_Image_Test').getPublicUrl(fileName);
 
         setState(() {
-          _selectedImage = file;
-          _imageUrl = imageUrl; // Store the image URL
+          _selectedImage = file; // ✅ Store local file for preview
+          _imageUrl = imageUrl; // ✅ Store public URL for display
         });
 
-        print("Image uploaded successfully! URL: $_imageUrl");
+        print("✅ Image uploaded successfully! URL: $_imageUrl");
       } catch (e) {
-        print("Error uploading image: $e");
+        print("❌ Error uploading image: $e");
       }
     }
   }
@@ -1104,28 +1203,27 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
 // Show Image in Fullscreen
-  void _showFullScreenImage(String imagePath) {
+  void _showFullScreenImage(String imageUrl) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return Dialog(
-          backgroundColor: Colors.black, // Full black background
-          insetPadding: EdgeInsets.zero, // Remove extra padding
+          backgroundColor: Colors.black,
+          insetPadding: EdgeInsets.zero,
           child: Stack(
             children: [
               Center(
-                child: imagePath
-                        .startsWith("http") // Check if it's a network image
-                    ? Image.network(imagePath, fit: BoxFit.contain)
-                    : Image.file(File(imagePath),
-                        fit: BoxFit.contain), // Local file
+                child: imageUrl
+                        .startsWith("http") // ✅ Handle network & local images
+                    ? Image.network(imageUrl, fit: BoxFit.contain)
+                    : Image.file(File(imageUrl), fit: BoxFit.contain),
               ),
               Positioned(
                 top: 20,
                 right: 20,
                 child: IconButton(
                   icon: const Icon(Icons.close, color: Colors.white, size: 30),
-                  onPressed: () => Navigator.pop(context), // Close fullscreen
+                  onPressed: () => Navigator.pop(context), // ✅ Close fullscreen
                 ),
               ),
             ],
@@ -1598,13 +1696,19 @@ class _DashboardPageState extends State<DashboardPage> {
                           ),
                           selectedDayPredicate: (day) =>
                               isSameDay(_selectedDate, day),
-                          onDaySelected: (selectedDay, focusedDay) {
+                          onDaySelected: (selectedDay, focusedDay) async {
                             setState(() {
                               _selectedDate = selectedDay;
-                              _notesFuture = fetchNotes(
-                                  selectedContainerId!, _selectedDate);
-                              _calculateContainerAge();
                             });
+
+                            int? hardwareId =
+                                await fetchHardwareId(selectedContainerId!);
+                            if (hardwareId != null) {
+                              setState(() {
+                                _notesFuture =
+                                    fetchNotes(hardwareId, _selectedDate);
+                              });
+                            }
                           },
                         ),
 
@@ -1668,8 +1772,14 @@ class _DashboardPageState extends State<DashboardPage> {
 // Show Image Above Text Field (if selected)
                     if (_selectedImage != null)
                       GestureDetector(
-                        onTap: () => _showFullScreenImage(
-                            _selectedImage!.path), // ✅ Pass file path as String
+                        onTap: () {
+                          if (_selectedImage != null) {
+                            print(
+                                "🖼 Image Clicked: ${_selectedImage!.path}"); // ✅ Debug log
+                            _showFullScreenImage(
+                                _selectedImage!.path); // ✅ Ensure valid path
+                          }
+                        },
                         child: Stack(
                           alignment: Alignment.topRight,
                           children: [
@@ -1682,9 +1792,14 @@ class _DashboardPageState extends State<DashboardPage> {
                                 fit: BoxFit.cover,
                               ),
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.cancel, color: Colors.red),
-                              onPressed: _removeImage,
+                            Positioned(
+                              right: 5,
+                              top: 5,
+                              child: IconButton(
+                                icon:
+                                    const Icon(Icons.cancel, color: Colors.red),
+                                onPressed: _removeImage,
+                              ),
                             ),
                           ],
                         ),
@@ -1723,11 +1838,9 @@ class _DashboardPageState extends State<DashboardPage> {
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
                               IconButton(
-                                onPressed: _isLoading
-                                    ? null
-                                    : _addNote, // ✅ Disable button when loading
+                                onPressed: _isLoading ? null : _addNote,
                                 icon: _isLoading
-                                    ? const CircularProgressIndicator() // ✅ Show loading animation
+                                    ? const CircularProgressIndicator()
                                     : const Icon(Icons.add_comment_outlined),
                                 color: Colors.green,
                                 tooltip: "Add Note",
