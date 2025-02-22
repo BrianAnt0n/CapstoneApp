@@ -188,24 +188,28 @@ class _DashboardPageState extends State<DashboardPage> {
   final containerState = Provider.of<ContainerState>(context);
   selectedContainerId = containerState.selectedContainerId;
 
-  if (selectedContainerId != null) {
-    // ✅ Fetch the correct hardware_id first
-    fetchHardwareId(selectedContainerId!).then((hardwareId) {
-      if (hardwareId != null) {
-        if (mounted) { // ✅ Prevent setState() if the widget was disposed
-          setState(() {
-            _sensorDataFuture = fetchSensorData(selectedContainerId!);
-            _notesFuture = fetchNotes(hardwareId, _selectedDate); // ✅ Use hardwareId
-            _historyFuture = fetchHistoryData(selectedContainerId!);
-            fetchContainerDetails(selectedContainerId!);
-          });
+    if (selectedContainerId != null) {
+      // ✅ Fetch the correct hardware_id first
+      fetchHardwareId(selectedContainerId!).then((hardwareId) {
+        if (hardwareId != null) {
+          if (mounted) {
+            // ✅ Prevent setState() if the widget was disposed
+            setState(() {
+              _sensorDataFuture = fetchSensorData(selectedContainerId!);
+              _notesFuture =
+                  fetchNotes(hardwareId, _selectedDate); // ✅ Use hardwareId
+              _historyFuture = fetchHistoryData(selectedContainerId!);
+              fetchContainerDetails(selectedContainerId!);
+            });
+          }
+        } else {
+          print(
+              "⚠️ Warning: No valid hardware_id found for container $selectedContainerId!");
         }
-      } else {
-        print("⚠️ Warning: No valid hardware_id found for container $selectedContainerId!");
-      }
-    }).catchError((error) {
-      print("❌ Error fetching hardware_id: $error");
-    });
+      }).catchError((error) {
+        print("❌ Error fetching hardware_id: $error");
+      });
+    }
   }
 }
 
@@ -255,10 +259,14 @@ class _DashboardPageState extends State<DashboardPage> {
       await supabase.storage.from('Notes_Image_Test').remove([fileName]);
       print("Image deleted from Supabase: $fileName");
 
+      String? editorName = await getStoredString("fullname");
+
       // Remove image URL from the database (set `picture` column to NULL)
-      await supabase
-          .from('Notes_test_test')
-          .update({'picture': null}).eq('note_id', noteId);
+      await supabase.from('Notes_test_test').update({
+        'picture': null,
+        'date_modified': getLocalTimestamp(),
+        'last_modified_by': editorName,
+      }).eq('note_id', noteId);
 
       print("Image removed from note in database");
 
@@ -329,10 +337,13 @@ class _DashboardPageState extends State<DashboardPage> {
           supabase.storage.from('Notes_Image_Test').getPublicUrl(newFileName);
       print("New image uploaded: $newImageUrl");
 
-      await supabase
-          .from('Notes_test_test')
-          .update({'picture': newImageUrl}).eq('note_id', noteId);
+      String? editorName = await getStoredString("fullname");
 
+      await supabase.from('Notes_test_test').update({
+        'picture': newImageUrl,
+        'date_modified': getLocalTimestamp(),
+        'last_modified_by': editorName,
+      }).eq('note_id', noteId);
       print("Database updated with new image URL");
 
       setState(() {
@@ -497,49 +508,52 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-bool _isLoading = false; // ✅ Track loading state
+  bool _isLoading = false; // ✅ Track loading state
 
-Future<void> _addNote() async {
-  if (selectedContainerId == null) return;
+  Future<void> _addNote() async {
+    if (selectedContainerId == null) return;
 
-  String trimmedNote = _notesController.text.trim();
-  if (trimmedNote.isEmpty) {
-    _showErrorDialog("Please provide notes.");
-    return;
-  }
-
-  setState(() {
-    _isLoading = true; // ✅ Show loading state
-  });
-
-  try {
-    // ✅ Get the correct hardware_id before inserting the note
-    int? hardwareId = await fetchHardwareId(selectedContainerId!);
-    if (hardwareId == null) {
-      print("Error: No hardware ID found for container $selectedContainerId!");
+    String trimmedNote = _notesController.text.trim();
+    if (trimmedNote.isEmpty) {
+      _showErrorDialog("Please provide notes.");
       return;
     }
 
-    // ✅ Add note with the correct hardware_id
-    await addNoteToDatabase(selectedContainerId!, trimmedNote, _imageUrl);
-    _notesController.clear();
-
-    // ✅ Small delay to ensure Supabase updates before fetching notes
-    await Future.delayed(const Duration(milliseconds: 500));
-
     setState(() {
-      _notesFuture = fetchNotes(hardwareId, _selectedDate); // ✅ Use hardwareId
-      _selectedImage = null;
-      _imageUrl = null;
+      _isLoading = true; // ✅ Show loading state
     });
 
-    print("✅ Note added and refreshed successfully!");
-  } catch (e) {
-    print("Error adding note: $e");
-  } finally {
-    setState(() {
-      _isLoading = false; // ✅ Hide loading state
-    });
+    try {
+      // ✅ Get the correct hardware_id before inserting the note
+      int? hardwareId = await fetchHardwareId(selectedContainerId!);
+      if (hardwareId == null) {
+        print(
+            "Error: No hardware ID found for container $selectedContainerId!");
+        return;
+      }
+
+      // ✅ Add note with the correct hardware_id
+      await addNoteToDatabase(selectedContainerId!, trimmedNote, _imageUrl);
+      _notesController.clear();
+
+      // ✅ Small delay to ensure Supabase updates before fetching notes
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      setState(() {
+        _notesFuture =
+            fetchNotes(hardwareId, _selectedDate); // ✅ Use hardwareId
+        _selectedImage = null;
+        _imageUrl = null;
+      });
+
+      print("✅ Note added and refreshed successfully!");
+    } catch (e) {
+      print("Error adding note: $e");
+    } finally {
+      setState(() {
+        _isLoading = false; // ✅ Hide loading state
+      });
+    }
   }
 }
 
@@ -571,110 +585,6 @@ Future<void> _addNote() async {
     setState(() {});
   }
 
-  Widget buildNoteCard(Map<String, dynamic> note) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(10.0), // Better spacing
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Display Image if Available
-            if (note['picture'] != null && note['picture'].isNotEmpty)
-              Column(
-                children: [
-                  GestureDetector(
-                    onTap: () => _showFullScreenImage(
-                        note['picture']), // Open fullscreen
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.network(
-                        note['picture'], // ✅ Load image from Supabase URL
-                        width: double.infinity,
-                        height: 150,
-                        fit: BoxFit.cover,
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return const Center(
-                              child: CircularProgressIndicator());
-                        },
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Center(
-                              child: Text("Image failed to load"));
-                        },
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 5),
-
-                  // Delete & Replace Image Buttons
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // Delete Image Button
-                      TextButton.icon(
-                        onPressed: () =>
-                            _deleteNoteImage(note['note_id'], note['picture']),
-                        icon: const Icon(Icons.delete, color: Colors.red),
-                        label: const Text("Delete Image",
-                            style: TextStyle(color: Colors.red)),
-                      ),
-
-                      const SizedBox(width: 10), // Space between buttons
-
-                      // Replace Image Button
-                      TextButton.icon(
-                        onPressed: () =>
-                            _replaceNoteImage(note['note_id'], note['picture']),
-                        icon: const Icon(Icons.camera_alt, color: Colors.blue),
-                        label: const Text("Replace Image",
-                            style: TextStyle(color: Colors.blue)),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-
-            const SizedBox(height: 8), // Spacing
-
-            // Display Note Text
-            Text(
-              note['note'] ?? 'No note available',
-              style: const TextStyle(fontSize: 16),
-            ),
-
-            // Timestamp
-            Text(
-              formatTimestamp(note['created_date']),
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
-            ),
-
-            const SizedBox(height: 5), // Spacing before buttons
-
-            // Edit & Delete Buttons
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.edit, color: Colors.blue),
-                  onPressed: () {
-                    _showEditDialog(note['note_id'], note['note']);
-                  },
-                ),
-                IconButton(
-                  icon: const Icon(Icons.delete, color: Colors.red),
-                  onPressed: () {
-                    _showDeleteConfirmationDialog(note['note_id']);
-                  },
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   String formatTimestamp(String timestamp) {
     try {
       DateTime parsedDate = DateTime.parse(timestamp);
@@ -682,6 +592,108 @@ Future<void> _addNote() async {
     } catch (e) {
       return 'Invalid Date';
     }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchNotes(
+      int hardwareId, DateTime date) async {
+    final supabase = Supabase.instance.client;
+
+    DateTime startOfDayUtc = DateTime(date.year, date.month, date.day).toUtc();
+    DateTime endOfDayUtc =
+        startOfDayUtc.add(const Duration(hours: 23, minutes: 59, seconds: 59));
+
+    try {
+      print(
+          "Fetching notes for hardware_id: $hardwareId between $startOfDayUtc and $endOfDayUtc");
+
+      final response = await supabase
+          .from('Notes_test_test')
+          .select(
+              'note_id, note, created_date, picture, created_by, date_modified, last_modified_by') // ✅ Correct relationship fetching
+          .eq('hardware_id', hardwareId)
+          .gte('created_date', startOfDayUtc.toIso8601String())
+          .lt('created_date', endOfDayUtc.toIso8601String());
+
+      if (response == null || response.isEmpty) {
+        print("No notes found for this date.");
+        return [];
+      }
+
+      print("Fetched ${response.length} notes.");
+      return List<Map<String, dynamic>>.from(response);
+    } catch (error) {
+      print("Error fetching notes: $error");
+      return [];
+    }
+  }
+
+  Widget buildNoteCard(Map<String, dynamic> note) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(10.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (note['picture'] != null && note['picture'].isNotEmpty)
+              Image.network(note['picture'],
+                  width: double.infinity, height: 150, fit: BoxFit.cover),
+
+            const SizedBox(height: 5),
+
+            Text(
+              note['note'] ?? 'No note available',
+              style: const TextStyle(fontSize: 16),
+            ),
+
+            Text(
+              formatTimestamp(note['created_date']),
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+
+            if (note['date_modified'] != null) // Show only if not null
+              Text(
+                "Date modified: ${formatTimestamp(note['date_modified'])}",
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+
+            const SizedBox(height: 5),
+
+            // ✅ Fetch `created_by` and display Fullname properly
+            Text(
+              "Added by: ${note['created_by'] ?? 'Unknown User'}",
+              style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue),
+            ),
+
+            if (note['last_modified_by'] != null) // Show only if not null
+              Text(
+                "Last modified by: ${note['last_modified_by']}",
+                style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue),
+              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.edit, color: Colors.blue),
+                  onPressed: () =>
+                      _showEditDialog(note['note_id'], note['note']),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete, color: Colors.red),
+                  onPressed: () =>
+                      _showDeleteConfirmationDialog(note['note_id']),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget buildBarChart(
@@ -1935,10 +1947,14 @@ Future<void> _addNote() async {
 Future<void> updateNoteInDatabase(int noteId, String updatedNote) async {
   final supabase = Supabase.instance.client;
 
+  String? editorName = await getStoredString("fullname");
+
   try {
-    await supabase
-        .from('Notes_test_test')
-        .update({'note': updatedNote}).eq('note_id', noteId);
+    await supabase.from('Notes_test_test').update({
+      'note': updatedNote,
+      'date_modified': getLocalTimestamp(),
+      'last_modified_by': editorName,
+    }).eq('note_id', noteId);
     print('Note updated successfully');
   } catch (error) {
     print('Error updating note: $error');
@@ -1999,49 +2015,21 @@ Future<void> addNoteToDatabase(
       return;
     }
 
-    // ✅ Insert note with the correct hardware_id and use getUtcTimestamp()
+    String? authorName =
+        await getStoredString('fullname'); // ✅ Store author name
+
+    // ✅ Insert note with user full name
     await supabase.from('Notes_test_test').insert({
       'hardware_id': hardwareId,
+      'created_by': authorName, // ✅ Store creator's name
       'note': note,
       'picture': imageUrl,
-      'created_date': getLocalTimestamp(), // ✅ Now correctly using UTC function
+      'created_date': getLocalTimestamp(),
     });
 
     print("Note added successfully for hardware ID: $hardwareId");
   } catch (error) {
     print("Error adding note: $error");
-  }
-}
-
-Future<List<Map<String, dynamic>>> fetchNotes(
-    int hardwareId, DateTime date) async {
-  final supabase = Supabase.instance.client;
-
-  DateTime startOfDayUtc = DateTime(date.year, date.month, date.day).toUtc();
-  DateTime endOfDayUtc =
-      startOfDayUtc.add(const Duration(hours: 23, minutes: 59, seconds: 59));
-
-  try {
-    print(
-        "Fetching notes for hardware_id: $hardwareId between $startOfDayUtc and $endOfDayUtc");
-
-    final response = await supabase
-        .from('Notes_test_test')
-        .select('*')
-        .eq('hardware_id', hardwareId)
-        .gte('created_date', startOfDayUtc.toIso8601String())
-        .lt('created_date', endOfDayUtc.toIso8601String());
-
-    if (response == null) {
-      print("Supabase returned null for notes.");
-      return [];
-    }
-
-    print("Fetched notes: ${response.length} notes."); // Debug log
-    return List<Map<String, dynamic>>.from(response);
-  } catch (error) {
-    print("Error fetching notes: $error");
-    return []; // Return an empty list instead of failing
   }
 }
 
