@@ -2536,16 +2536,16 @@ class OthersPage extends StatelessWidget {
           onTap: _downloadApk, // Call the download function
         ),
         // App Guide
-        ListTile(
-          leading: const Icon(Icons.help_outline, color: Colors.orange),
-          title: const Text('App Guide'),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const AppGuidePage()),
-            );
-          },
-        ),
+        // ListTile(
+        //   leading: const Icon(Icons.help_outline, color: Colors.orange),
+        //   title: const Text('App Guide'),
+        //   onTap: () {
+        //     Navigator.push(
+        //       context,
+        //       MaterialPageRoute(builder: (context) => const AppGuidePage()),
+        //     );
+        //   },
+        // ),
         // Log Out
         ListTile(
           leading: const Icon(Icons.logout, color: Colors.red),
