@@ -37,6 +37,7 @@ class ContainerState extends ChangeNotifier {
     if (containerId != null && containerId != 0) {
       _saveSelectedContainer(containerId);
     } else {
+      selectedContainerId = null;
       _removeSelectedContainer();
     }
   }
