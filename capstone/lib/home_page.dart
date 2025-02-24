@@ -34,6 +34,7 @@ class ContainerState extends ChangeNotifier {
     if (containerId != null && containerId != 0) {
       _saveSelectedContainer(containerId);
     } else {
+      selectedContainerId = null;
       _removeSelectedContainer();
     }
   }
@@ -2099,6 +2100,7 @@ Widget buildSensorCard(IconData icon, String title, String value, Color color) {
 
 //Database Fetching: Fetch sensor data for a specific container
 // Fetch sensor data for a specific container & trigger alerts if needed
+//Notification?
 Future<Map<String, dynamic>> fetchSensorData(int containerId) async {
   final supabase = Supabase.instance.client;
 

@@ -22,6 +22,8 @@ class SharedPrefsHelper {
     return {
       "user_id_pref": prefs.getString(_keyUserId),
       "user_level_pref": prefs.getString(_keyUserLevel),
+      "fullname": prefs.getString(_keyFullName),
+      "email": prefs.getString(_keyEmail)
     };
   }
 
