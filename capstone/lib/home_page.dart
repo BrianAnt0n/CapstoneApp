@@ -70,11 +70,20 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int _currentIndex = 1; // Tracks the selected tab index
+  List<Map<String, dynamic>> _notifications = [];
 
   @override
   void initState() {
     super.initState();
+    _refreshNotifications();
     _checkSelectedContainer();
+  }
+
+  void _refreshNotifications() async {
+    final notifications = await fetchNotifications();
+    setState(() {
+      _notifications = notifications;
+    });
   }
 
   Future<void> _checkSelectedContainer() async {
@@ -109,17 +118,42 @@ class _HomePageState extends State<HomePage> {
       create: (_) => ContainerState(),
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('E-ComposThink Home - Admin'), // AppBar title
+          title: const Text('E-ComposThink Home - Admin'),
           actions: [
             IconButton(
-              icon: const Icon(Icons.notifications), // Notification bell icon
-              onPressed: () {
-                Navigator.push(
+              icon: Stack(
+                children: [
+                  const Icon(Icons.notifications, size: 28),
+                  if (_notifications.isNotEmpty)
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(5),
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          _notifications.length.toString(),
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              onPressed: () async {
+                await Navigator.push(
                   context,
                   MaterialPageRoute(
-                      builder: (context) =>
-                          NotificationPage()), // Navigate to NotificationPage
+                      builder: (context) => NotificationPage(
+                            onNotificationUpdate: _refreshNotifications,
+                          )),
                 );
+                _refreshNotifications(); // Ensure refresh on return
               },
             ),
           ],
@@ -2105,7 +2139,6 @@ Future<Map<String, dynamic>> fetchSensorData(int containerId) async {
   final supabase = Supabase.instance.client;
 
   try {
-    // ✅ Fetch hardware_id from Containers_test
     final containerResponse = await supabase
         .from('Containers_test')
         .select('hardware_id')
@@ -2119,7 +2152,6 @@ Future<Map<String, dynamic>> fetchSensorData(int containerId) async {
 
     int hardwareId = containerResponse['hardware_id'];
 
-    // ✅ Fetch latest sensor data from Hardware_Sensors_Test
     final sensorResponse = await supabase
         .from('Hardware_Sensors_Test')
         .select(
@@ -2134,68 +2166,214 @@ Future<Map<String, dynamic>> fetchSensorData(int containerId) async {
       return {};
     }
 
-    // ✅ Extract sensor values with safe defaults
     double temp = (sensorResponse['temperature'] as num?)?.toDouble() ?? 0.0;
     double moisture = (sensorResponse['moisture'] as num?)?.toDouble() ?? 0.0;
     double ph1 = (sensorResponse['ph_level'] as num?)?.toDouble() ?? 0.0;
     double ph2 = (sensorResponse['ph_level2'] as num?)?.toDouble() ?? 0.0;
     double humidity = (sensorResponse['humidity'] as num?)?.toDouble() ?? 0.0;
 
-    // ✅ Define sensor thresholds
+    print(
+        "✅ Sensor Data: Temp = $temp, Moisture = $moisture, pH1 = $ph1, pH2 = $ph2, Humidity = $humidity");
+
     const double minTemp = 10.0, maxTemp = 54.0;
     const double minMoisture = 50.0, maxMoisture = 60.0;
     const double minPH = 6.0, maxPH = 8.0;
     const double minHumidity = 40.0, maxHumidity = 60.0;
 
-    // ✅ Function to log notifications
     Future<void> logNotification(String title, String message) async {
-      await supabase.from('Notifications_Test').insert({
-        'container_id': containerId,
-        'title': title,
-        'message': message,
-        'timestamp': DateTime.now().toIso8601String(),
-      });
+      if (hardwareId == null) {
+        print("❌ ERROR: hardware_id is NULL. Cannot insert notification.");
+        return;
+      }
+
+      try {
+        print("🛑 Logging notification: $title - $message");
+
+        final response = await supabase.from('Notifications_Test').insert({
+          'hardware_id': hardwareId,
+          'title': title,
+          'message': message,
+          'timestamp': DateTime.now().toIso8601String(),
+        }).select();
+
+        print("✅ Supabase Insert Response: $response");
+      } catch (error) {
+        print("❌ ERROR logging notification: $error");
+      }
     }
 
-    // ✅ Check sensor values and log alerts
     if (temp < minTemp) {
+      print("🚨 Temperature too LOW: $temp°C");
       await logNotification(
           "Temperature Alert", "Temperature is $temp°C, below normal range.");
     } else if (temp > maxTemp) {
+      print("🚨 Temperature too HIGH: $temp°C");
       await logNotification(
           "Temperature Alert", "Temperature is $temp°C, above normal range.");
     }
 
     if (moisture < minMoisture) {
+      print("🚨 Moisture too LOW: $moisture%");
       await logNotification("Moisture Alert",
           "Moisture level is $moisture%, below normal range.");
     } else if (moisture > maxMoisture) {
+      print("🚨 Moisture too HIGH: $moisture%");
       await logNotification("Moisture Alert",
           "Moisture level is $moisture%, above normal range.");
     }
 
     if (ph1 < minPH || ph1 > maxPH) {
+      print("🚨 pH Level 1 out of range: $ph1");
       await logNotification(
           "pH Level 1 Alert", "pH Level 1 is $ph1, out of range.");
     }
 
     if (ph2 < minPH || ph2 > maxPH) {
+      print("🚨 pH Level 2 out of range: $ph2");
       await logNotification(
           "pH Level 2 Alert", "pH Level 2 is $ph2, out of range.");
     }
 
     if (humidity < minHumidity) {
+      print("🚨 Humidity too LOW: $humidity%");
       await logNotification(
           "Humidity Alert", "Humidity is $humidity%, below normal range.");
     } else if (humidity > maxHumidity) {
+      print("🚨 Humidity too HIGH: $humidity%");
       await logNotification(
           "Humidity Alert", "Humidity is $humidity%, above normal range.");
     }
 
-    return sensorResponse; // ✅ Return sensor data
+    return sensorResponse;
   } catch (error) {
     print("❌ Error fetching sensor data: $error");
     return {};
+  }
+}
+
+Future<List<Map<String, dynamic>>> fetchNotifications() async {
+  final supabase = Supabase.instance.client;
+  try {
+    final response = await supabase
+        .from('Notifications_Test')
+        .select('*')
+        .order('timestamp', ascending: false);
+
+    print("✅ Fetched ${response.length} notifications.");
+    return List<Map<String, dynamic>>.from(response);
+  } catch (error) {
+    print("❌ Error fetching notifications: $error");
+    return [];
+  }
+}
+
+class NotificationPage extends StatefulWidget {
+  final VoidCallback onNotificationUpdate; // ✅ Callback to refresh bell icon
+
+  const NotificationPage({super.key, required this.onNotificationUpdate});
+
+  @override
+  _NotificationPageState createState() => _NotificationPageState();
+}
+
+class _NotificationPageState extends State<NotificationPage> {
+  late Future<List<Map<String, dynamic>>> _notificationsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotifications();
+  }
+
+  void _loadNotifications() {
+    setState(() {
+      _notificationsFuture = fetchNotifications();
+    });
+  }
+
+  Future<List<Map<String, dynamic>>> fetchNotifications() async {
+    final supabase = Supabase.instance.client;
+
+    try {
+      final notifResponse = await supabase
+          .from('Notifications_Test')
+          .select('notification_id, hardware_id, title, message, timestamp')
+          .order('timestamp', ascending: false);
+
+      // int hardwareId = notifResponse['hardware_id'];
+
+      // final containerResponse = await supabase
+      //     .from('Containers_test')
+      //     .select()
+      //     .eq('hardware_id', hardwareId);
+
+      if (notifResponse.isEmpty) {
+        print("ℹ No notifications found.");
+        return [];
+      }
+
+      print("✅ Fetched ${notifResponse.length} notifications.");
+      return List<Map<String, dynamic>>.from(notifResponse);
+    } catch (error) {
+      print("❌ Error fetching notifications: $error");
+      return [];
+    }
+  }
+
+  Future<void> deleteNotification(int notificationId) async {
+    final supabase = Supabase.instance.client;
+
+    try {
+      await supabase
+          .from('Notifications_Test')
+          .delete()
+          .eq('notification_id', notificationId);
+
+      print("✅ Notification deleted: $notificationId");
+
+      _loadNotifications(); // ✅ Refresh the page
+      widget.onNotificationUpdate(); // ✅ Notify HomePage to refresh bell icon
+    } catch (error) {
+      print("❌ Error deleting notification: $error");
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Notifications")),
+      body: FutureBuilder<List<Map<String, dynamic>>>(
+        future: _notificationsFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          } else if (snapshot.hasError) {
+            return Center(child: Text("Error: ${snapshot.error}"));
+          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return const Center(child: Text("No notifications available."));
+          }
+
+          final notifications = snapshot.data!;
+
+          return ListView.builder(
+            itemCount: notifications.length,
+            itemBuilder: (context, index) {
+              final notification = notifications[index];
+
+              return ListTile(
+                title: Text(notification['title']),
+                subtitle: Text(notification['message']),
+                trailing: IconButton(
+                  icon: const Icon(Icons.delete, color: Colors.red),
+                  onPressed: () =>
+                      deleteNotification(notification['notification_id']),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
   }
 }
 
@@ -2343,19 +2521,19 @@ class _ContainerPageState extends State<ContainerPage> {
                                 if (isSelected)
                                   const Icon(Icons.check_circle,
                                       color: Colors.green),
-                                IconButton(
-                                  icon: const Icon(Icons.info,
-                                      color: Colors.blueAccent),
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            const ContainerDetails(),
-                                      ),
-                                    );
-                                  },
-                                ),
+                                // IconButton(
+                                //   icon: const Icon(Icons.info,
+                                //       color: Colors.blueAccent),
+                                //   onPressed: () {
+                                //     Navigator.push(
+                                //       context,
+                                //       MaterialPageRoute(
+                                //         builder: (context) =>
+                                //             const ContainerDetails(),
+                                //       ),
+                                //     );
+                                //   },
+                                // ),
                                 IconButton(
                                   icon: const Icon(Icons.edit,
                                       color: Colors.blue),
