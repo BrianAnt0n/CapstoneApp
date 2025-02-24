@@ -54,6 +54,7 @@ class _AccountManagementPageState extends State<AccountManagementPage> {
     }
 
     final supabase = Supabase.instance.client;
+    await supabase.from('Containers_test').delete().eq('user_id', userId);
     await supabase.from('Users').delete().eq('user_id', userId);
     _fetchAccounts(); // Refresh the list
   }
