@@ -73,11 +73,20 @@ class HomePageMember extends StatefulWidget {
 
 class _HomePageMemberState extends State<HomePageMember> {
   int _currentIndex = 1; // Tracks the selected tab index
+  List<Map<String, dynamic>> _notifications = [];
 
   @override
   void initState() {
     super.initState();
+    _refreshNotifications();
     _checkSelectedContainer();
+  }
+
+  void _refreshNotifications() async {
+    final notifications = await fetchNotifications();
+    setState(() {
+      _notifications = notifications;
+    });
   }
 
   Future<void> _checkSelectedContainer() async {
@@ -112,17 +121,42 @@ class _HomePageMemberState extends State<HomePageMember> {
       create: (_) => ContainerState(),
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('E-ComposThink Home - Member'), // AppBar title
+          title: const Text('E-ComposThink Home - Member'),
           actions: [
             IconButton(
-              icon: const Icon(Icons.notifications), // Notification bell icon
-              onPressed: () {
-                Navigator.push(
+              icon: Stack(
+                children: [
+                  const Icon(Icons.notifications, size: 28),
+                  if (_notifications.isNotEmpty)
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(5),
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          _notifications.length.toString(),
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              onPressed: () async {
+                await Navigator.push(
                   context,
                   MaterialPageRoute(
-                      builder: (context) =>
-                          NotificationPage()), // Navigate to NotificationPage
+                      builder: (context) => NotificationPage(
+                            onNotificationUpdate: _refreshNotifications,
+                          )),
                 );
+                _refreshNotifications(); // Ensure refresh on return
               },
             ),
           ],
@@ -2154,86 +2188,240 @@ Widget buildSensorCard(IconData icon, String title, String value, Color color) {
 
 //Database Fetching: Fetch sensor data for a specific container
 // Fetch sensor data for a specific container & trigger alerts if needed
+//Notification?
 Future<Map<String, dynamic>> fetchSensorData(int containerId) async {
   final supabase = Supabase.instance.client;
 
-  // 1️⃣ Get hardware_id from the container
-  final containerResponse = await supabase
-      .from('Containers_test')
-      .select('hardware_id')
-      .eq('container_id', containerId)
-      .single();
+  try {
+    final containerResponse = await supabase
+        .from('Containers_test')
+        .select('hardware_id')
+        .eq('container_id', containerId)
+        .maybeSingle();
 
-  final hardwareId = containerResponse['hardware_id'];
+    if (containerResponse == null || containerResponse['hardware_id'] == null) {
+      print("⚠️ No hardware_id found for container_id: $containerId");
+      return {};
+    }
 
-  // 2️⃣ Fetch latest sensor data
-  final sensorResponse = await supabase
-      .from('Hardware_Sensors_Test')
-      .select(
-          'temperature, moisture, ph_level, ph_level2, humidity, refreshed_date')
-      .eq('hardware_id', hardwareId)
-      .order('refreshed_date', ascending: false)
-      .limit(1)
-      .single();
+    int hardwareId = containerResponse['hardware_id'];
 
-  // 3️⃣ Define acceptable sensor ranges
-  const double minTemp = 10.0, maxTemp = 54.0;
-  const double minMoisture = 50.0, maxMoisture = 60.0;
-  const double minPH = 6.0, maxPH = 8.0;
-  const double minHumidity = 40.0, maxHumidity = 60.0;
+    final sensorResponse = await supabase
+        .from('Hardware_Sensors_Test')
+        .select(
+            'temperature, moisture, ph_level, ph_level2, humidity, refreshed_date')
+        .eq('hardware_id', hardwareId)
+        .order('refreshed_date', ascending: false)
+        .limit(1)
+        .maybeSingle();
 
-  // 4️⃣ Extract sensor values
-  final double temp = sensorResponse['temperature'];
-  final double moisture = sensorResponse['moisture'];
-  final double ph1 = sensorResponse['ph_level'];
-  final double ph2 = sensorResponse['ph_level2'];
-  final double humidity = sensorResponse['humidity'];
+    if (sensorResponse == null) {
+      print("⚠️ No sensor data found for hardware_id: $hardwareId");
+      return {};
+    }
 
-  // 5️⃣ Check for alerts & insert into Notifications_Test table
-  Future<void> logNotification(String title, String message) async {
-    await supabase.from('Notifications_Test').insert({
-      'container_id': containerId,
-      'title': title,
-      'message': message,
-      'timestamp': DateTime.now().toIso8601String(),
+    double temp = (sensorResponse['temperature'] as num?)?.toDouble() ?? 0.0;
+    double moisture = (sensorResponse['moisture'] as num?)?.toDouble() ?? 0.0;
+    double ph1 = (sensorResponse['ph_level'] as num?)?.toDouble() ?? 0.0;
+    double ph2 = (sensorResponse['ph_level2'] as num?)?.toDouble() ?? 0.0;
+    double humidity = (sensorResponse['humidity'] as num?)?.toDouble() ?? 0.0;
+
+    print(
+        "✅ Sensor Data: Temp = $temp, Moisture = $moisture, pH1 = $ph1, pH2 = $ph2, Humidity = $humidity");
+
+    const double minTemp = 10.0, maxTemp = 54.0;
+    const double minMoisture = 50.0, maxMoisture = 60.0;
+    const double minPH = 6.0, maxPH = 8.0;
+    const double minHumidity = 40.0, maxHumidity = 60.0;
+
+    Future<void> logNotification(String title, String message) async {
+      if (hardwareId == null) {
+        print("❌ ERROR: hardware_id is NULL. Cannot insert notification.");
+        return;
+      }
+
+      try {
+        print("🛑 Logging notification: $title - $message");
+
+        final response = await supabase.from('Notifications_Test').insert({
+          'hardware_id': hardwareId,
+          'title': title,
+          'message': message,
+          'timestamp': DateTime.now().toIso8601String(),
+        }).select();
+
+        print("✅ Supabase Insert Response: $response");
+      } catch (error) {
+        print("❌ ERROR logging notification: $error");
+      }
+    }
+
+    if (temp < minTemp) {
+      print("🚨 Temperature too LOW: $temp°C");
+      await logNotification(
+          "Temperature Alert", "Temperature is $temp°C, below normal range.");
+    } else if (temp > maxTemp) {
+      print("🚨 Temperature too HIGH: $temp°C");
+      await logNotification(
+          "Temperature Alert", "Temperature is $temp°C, above normal range.");
+    }
+
+    if (moisture < minMoisture) {
+      print("🚨 Moisture too LOW: $moisture%");
+      await logNotification("Moisture Alert",
+          "Moisture level is $moisture%, below normal range.");
+    } else if (moisture > maxMoisture) {
+      print("🚨 Moisture too HIGH: $moisture%");
+      await logNotification("Moisture Alert",
+          "Moisture level is $moisture%, above normal range.");
+    }
+
+    if (ph1 < minPH || ph1 > maxPH) {
+      print("🚨 pH Level 1 out of range: $ph1");
+      await logNotification(
+          "pH Level 1 Alert", "pH Level 1 is $ph1, out of range.");
+    }
+
+    if (ph2 < minPH || ph2 > maxPH) {
+      print("🚨 pH Level 2 out of range: $ph2");
+      await logNotification(
+          "pH Level 2 Alert", "pH Level 2 is $ph2, out of range.");
+    }
+
+    if (humidity < minHumidity) {
+      print("🚨 Humidity too LOW: $humidity%");
+      await logNotification(
+          "Humidity Alert", "Humidity is $humidity%, below normal range.");
+    } else if (humidity > maxHumidity) {
+      print("🚨 Humidity too HIGH: $humidity%");
+      await logNotification(
+          "Humidity Alert", "Humidity is $humidity%, above normal range.");
+    }
+
+    return sensorResponse;
+  } catch (error) {
+    print("❌ Error fetching sensor data: $error");
+    return {};
+  }
+}
+
+Future<List<Map<String, dynamic>>> fetchNotifications() async {
+  final supabase = Supabase.instance.client;
+  try {
+    final response = await supabase
+        .from('Notifications_Test')
+        .select('*')
+        .order('timestamp', ascending: false);
+
+    print("✅ Fetched ${response.length} notifications.");
+    return List<Map<String, dynamic>>.from(response);
+  } catch (error) {
+    print("❌ Error fetching notifications: $error");
+    return [];
+  }
+}
+
+class NotificationPage extends StatefulWidget {
+  final VoidCallback onNotificationUpdate; // ✅ Callback to refresh bell icon
+
+  const NotificationPage({super.key, required this.onNotificationUpdate});
+
+  @override
+  _NotificationPageState createState() => _NotificationPageState();
+}
+
+class _NotificationPageState extends State<NotificationPage> {
+  late Future<List<Map<String, dynamic>>> _notificationsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotifications();
+  }
+
+  void _loadNotifications() {
+    setState(() {
+      _notificationsFuture = fetchNotifications();
     });
   }
 
-  if (temp < minTemp) {
-    await logNotification(
-        "Temperature Alert", "Temperature is $temp°C, below normal range.");
-  } else if (temp > maxTemp) {
-    await logNotification(
-        "Temperature Alert", "Temperature is $temp°C, above normal range.");
+  Future<List<Map<String, dynamic>>> fetchNotifications() async {
+    final supabase = Supabase.instance.client;
+
+    try {
+      final response = await supabase
+          .from('Notifications_Test')
+          .select('notification_id, hardware_id, title, message, timestamp')
+          .order('timestamp', ascending: false);
+
+      if (response.isEmpty) {
+        print("ℹ No notifications found.");
+        return [];
+      }
+
+      print("✅ Fetched ${response.length} notifications.");
+      return List<Map<String, dynamic>>.from(response);
+    } catch (error) {
+      print("❌ Error fetching notifications: $error");
+      return [];
+    }
   }
 
-  if (moisture < minMoisture) {
-    await logNotification(
-        "Moisture Alert", "Moisture level is $moisture%, below normal range.");
-  } else if (moisture > maxMoisture) {
-    await logNotification(
-        "Moisture Alert", "Moisture level is $moisture%, above normal range.");
+  Future<void> deleteNotification(int notificationId) async {
+    final supabase = Supabase.instance.client;
+
+    try {
+      await supabase
+          .from('Notifications_Test')
+          .delete()
+          .eq('notification_id', notificationId);
+
+      print("✅ Notification deleted: $notificationId");
+
+      _loadNotifications(); // ✅ Refresh the page
+      widget.onNotificationUpdate(); // ✅ Notify HomePage to refresh bell icon
+    } catch (error) {
+      print("❌ Error deleting notification: $error");
+    }
   }
 
-  if (ph1 < minPH || ph1 > maxPH) {
-    await logNotification(
-        "pH Level 1 Alert", "pH Level 1 is $ph1, out of range.");
-  }
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Notifications")),
+      body: FutureBuilder<List<Map<String, dynamic>>>(
+        future: _notificationsFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          } else if (snapshot.hasError) {
+            return Center(child: Text("Error: ${snapshot.error}"));
+          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return const Center(child: Text("No notifications available."));
+          }
 
-  if (ph2 < minPH || ph2 > maxPH) {
-    await logNotification(
-        "pH Level 2 Alert", "pH Level 2 is $ph2, out of range.");
-  }
+          final notifications = snapshot.data!;
 
-  if (humidity < minHumidity) {
-    await logNotification(
-        "Humidity Alert", "Humidity is $humidity%, below normal range.");
-  } else if (humidity > maxHumidity) {
-    await logNotification(
-        "Humidity Alert", "Humidity is $humidity%, above normal range.");
-  }
+          return ListView.builder(
+            itemCount: notifications.length,
+            itemBuilder: (context, index) {
+              final notification = notifications[index];
 
-  return sensorResponse;
+              return ListTile(
+                title: Text(notification['title']),
+                subtitle: Text(notification['message']),
+                trailing: IconButton(
+                  icon: const Icon(Icons.delete, color: Colors.red),
+                  onPressed: () =>
+                      deleteNotification(notification['notification_id']),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
 }
 
 // Container Page : Displays a list of available containers
@@ -2385,19 +2573,19 @@ class _ContainerPageState extends State<ContainerPage> {
                                 if (isSelected)
                                   const Icon(Icons.check_circle,
                                       color: Colors.green),
-                                IconButton(
-                                  icon: const Icon(Icons.info,
-                                      color: Colors.blueAccent),
-                                  onPressed: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            const ContainerDetails(),
-                                      ),
-                                    );
-                                  },
-                                ),
+                                // IconButton(
+                                //   icon: const Icon(Icons.info,
+                                //       color: Colors.blueAccent),
+                                //   onPressed: () {
+                                //     Navigator.push(
+                                //       context,
+                                //       MaterialPageRoute(
+                                //         builder: (context) =>
+                                //             const ContainerDetails(),
+                                //       ),
+                                //     );
+                                //   },
+                                // ),
                                 IconButton(
                                   icon: const Icon(Icons.edit,
                                       color: Colors.blue),
