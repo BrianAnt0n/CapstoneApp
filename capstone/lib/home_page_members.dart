@@ -103,12 +103,12 @@ class _HomePageMemberState extends State<HomePageMember> {
     });
   }
 
-  void _refreshNotifications() async {
-    final notifications = await fetchNotifications();
-    setState(() {
-      _notifications = notifications;
-    });
-  }
+  // void _refreshNotifications() async {
+  //   final notifications = await fetchNotifications();
+  //   setState(() {
+  //     _notifications = notifications;
+  //   });
+  // }
 
   Future<void> _checkSelectedContainer() async {
     final prefs = await SharedPreferences.getInstance();
