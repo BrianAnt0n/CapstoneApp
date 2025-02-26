@@ -100,6 +100,13 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  void _refreshNotifications() async {
+    final notifications = await fetchNotifications();
+    setState(() {
+      _notifications = notifications;
+    });
+  }
+
   Future<void> _checkSelectedContainer() async {
     final prefs = await SharedPreferences.getInstance();
     final selectedContainerId = prefs.getInt('selected_container_id');
@@ -2336,7 +2343,7 @@ class _NotificationPageState extends State<NotificationPage> {
       _notificationsFuture = fetchNotifications();
     });
   }
-
+  
   Future<void> deleteNotification(int notificationId) async {
     final supabase = Supabase.instance.client;
 

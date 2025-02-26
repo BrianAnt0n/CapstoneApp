@@ -103,6 +103,13 @@ class _HomePageMemberState extends State<HomePageMember> {
     });
   }
 
+  void _refreshNotifications() async {
+    final notifications = await fetchNotifications();
+    setState(() {
+      _notifications = notifications;
+    });
+  }
+
   Future<void> _checkSelectedContainer() async {
     final prefs = await SharedPreferences.getInstance();
     final selectedContainerId = prefs.getInt('selected_container_id');
@@ -2311,7 +2318,6 @@ Future<Map<String, dynamic>> fetchSensorData(int containerId) async {
       await logNotification(
           "Humidity Alert", "Humidity is $humidity%, above normal range.");
     }
-
     return sensorResponse;
   } catch (error) {
     print("❌ Error fetching sensor data: $error");
@@ -2375,7 +2381,6 @@ class NotificationPage extends StatefulWidget {
   @override
   _NotificationPageState createState() => _NotificationPageState();
 }
-
 class _NotificationPageState extends State<NotificationPage> {
   late Future<List<Map<String, dynamic>>> _notificationsFuture;
 
