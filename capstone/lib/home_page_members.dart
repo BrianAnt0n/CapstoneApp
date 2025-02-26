@@ -1,4 +1,6 @@
 //import 'Others tab/account_management_page.dart';
+import 'dart:async';
+
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
@@ -74,12 +76,24 @@ class HomePageMember extends StatefulWidget {
 class _HomePageMemberState extends State<HomePageMember> {
   int _currentIndex = 1; // Tracks the selected tab index
   List<Map<String, dynamic>> _notifications = [];
+  Timer? _timer; // Add a Timer
 
   @override
   void initState() {
     super.initState();
     _refreshNotifications();
     _checkSelectedContainer();
+
+    // Start a timer that refreshes notifications every second
+    _timer = Timer.periodic(const Duration(seconds: 1), (Timer t) {
+      _refreshNotifications();
+    });
+  }
+
+    @override
+  void dispose() {
+    _timer?.cancel(); // Cancel the timer when widget is disposed
+    super.dispose();
   }
 
   void _refreshNotifications() async {
@@ -2307,14 +2321,46 @@ Future<Map<String, dynamic>> fetchSensorData(int containerId) async {
 
 Future<List<Map<String, dynamic>>> fetchNotifications() async {
   final supabase = Supabase.instance.client;
+  final prefs = await SharedPreferences.getInstance();
+
+  String? storedString = await getStoredString("user_id_pref");
+  int storedInt = int.parse(storedString ?? "");
+
   try {
-    final response = await supabase
+    // Fetch notifications
+    final notifResponse = await supabase
         .from('Notifications_Test')
-        .select('*')
+        .select('notification_id, hardware_id, title, message, timestamp')
         .order('timestamp', ascending: false);
 
-    print("✅ Fetched ${response.length} notifications.");
-    return List<Map<String, dynamic>>.from(response);
+    if (notifResponse.isEmpty) {
+      print("ℹ No notifications found.");
+      return [];
+    }
+
+    List<Map<String, dynamic>> notificationsWithContainers = [];
+
+    for (var notification in notifResponse) {
+      final hardwareId = notification['hardware_id'];
+
+      // Fetch corresponding Containers_test row using hardware_id and user_id_pref
+      final containerResponse = await supabase
+          .from('Containers_test')
+          .select('container_name')
+          .eq('hardware_id', hardwareId)
+          .eq('user_id', storedInt)
+          .maybeSingle();
+
+      if (containerResponse != null) {
+        notification['container_name'] = containerResponse['container_name'];
+      }
+
+      notificationsWithContainers.add(notification);
+    }
+
+    print(
+        "✅ Fetched ${notificationsWithContainers.length} notifications with containers.");
+    return notificationsWithContainers;
   } catch (error) {
     print("❌ Error fetching notifications: $error");
     return [];
@@ -2343,28 +2389,6 @@ class _NotificationPageState extends State<NotificationPage> {
     setState(() {
       _notificationsFuture = fetchNotifications();
     });
-  }
-
-  Future<List<Map<String, dynamic>>> fetchNotifications() async {
-    final supabase = Supabase.instance.client;
-
-    try {
-      final response = await supabase
-          .from('Notifications_Test')
-          .select('notification_id, hardware_id, title, message, timestamp')
-          .order('timestamp', ascending: false);
-
-      if (response.isEmpty) {
-        print("ℹ No notifications found.");
-        return [];
-      }
-
-      print("✅ Fetched ${response.length} notifications.");
-      return List<Map<String, dynamic>>.from(response);
-    } catch (error) {
-      print("❌ Error fetching notifications: $error");
-      return [];
-    }
   }
 
   Future<void> deleteNotification(int notificationId) async {
@@ -2408,7 +2432,11 @@ class _NotificationPageState extends State<NotificationPage> {
               final notification = notifications[index];
 
               return ListTile(
-                title: Text(notification['title']),
+                title: Text(
+                  "${notification['container_name'] ?? 'Unknown Container'}: ${notification['title']}",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                  overflow: TextOverflow.ellipsis,
+                ),
                 subtitle: Text(notification['message']),
                 trailing: IconButton(
                   icon: const Icon(Icons.delete, color: Colors.red),
