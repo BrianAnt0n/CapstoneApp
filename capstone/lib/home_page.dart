@@ -82,7 +82,7 @@ class _HomePageState extends State<HomePage> {
     _checkSelectedContainer();
 
     // Start a timer that refreshes notifications every second
-    _timer = Timer.periodic(const Duration(seconds: 1), (Timer t) {
+    _timer = Timer.periodic(const Duration(seconds: 2), (Timer t) {
       _refreshNotifications();
     });
   }

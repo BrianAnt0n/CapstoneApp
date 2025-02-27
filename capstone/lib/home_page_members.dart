@@ -85,7 +85,7 @@ class _HomePageMemberState extends State<HomePageMember> {
     _checkSelectedContainer();
 
     // Start a timer that refreshes notifications every second
-    _timer = Timer.periodic(const Duration(seconds: 1), (Timer t) {
+    _timer = Timer.periodic(const Duration(seconds: 2), (Timer t) {
       _refreshNotifications();
     });
   }
@@ -2606,10 +2606,7 @@ class _ContainerPageState extends State<ContainerPage> {
                     backgroundColor: Colors.green,
                     minimumSize: const Size(double.infinity, 50),
                   ),
-                  onPressed: () async {
-                    performQuery(context);
-                    _fetchContainers;
-                  },
+                  onPressed: () => performQuery(context),
                   icon: const Icon(Icons.add, color: Colors.white),
                   label: const Text('New container',
                       style: TextStyle(color: Colors.white)),
