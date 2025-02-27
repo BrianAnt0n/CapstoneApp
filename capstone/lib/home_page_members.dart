@@ -144,42 +144,44 @@ class _HomePageMemberState extends State<HomePageMember> {
         appBar: AppBar(
           title: const Text('E-ComposThink Home - Member'),
           actions: [
-            IconButton(
-              icon: Stack(
-                children: [
-                  const Icon(Icons.notifications, size: 28),
-                  if (_notifications.isNotEmpty)
-                    Positioned(
-                      right: 0,
-                      top: 0,
-                      child: Container(
-                        padding: const EdgeInsets.all(5),
-                        decoration: const BoxDecoration(
-                          color: Colors.red,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Text(
-                          _notifications.length.toString(),
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              onPressed: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => NotificationPage(
-                            onNotificationUpdate: _refreshNotifications,
-                          )),
-                );
-                _refreshNotifications(); // Ensure refresh on return
-              },
+IconButton(
+  icon: Stack(
+    children: [
+      const Icon(Icons.notifications, size: 30),
+      if (_notifications.isNotEmpty)
+        Positioned(
+          right: 0, // Move slightly outside the icon
+          bottom: -0.5, // Move to bottom-right
+          child: Container(
+            padding: const EdgeInsets.all(5),
+            decoration: const BoxDecoration(
+              color: Colors.red,
+              shape: BoxShape.circle,
             ),
+            child: Text(
+              _notifications.length.toString(),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 8,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+    ],
+  ),
+  onPressed: () async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => NotificationPage(
+          onNotificationUpdate: _refreshNotifications,
+        ),
+      ),
+    );
+    _refreshNotifications(); // Ensure refresh on return
+  },
+),
           ],
         ),
         body: _pages[_currentIndex], // Show the selected page
@@ -2395,7 +2397,14 @@ class _NotificationPageState extends State<NotificationPage> {
       _notificationsFuture = fetchNotifications();
     });
   }
-
+      String _formatDate(String dateString) {
+    try {
+      DateTime dateTime = DateTime.parse(dateString);
+      return DateFormat('yyyy-MM-dd hh:mm a').format(dateTime);
+    } catch (e) {
+      return 'Invalid date';
+    }
+  }
   Future<void> deleteNotification(int notificationId) async {
     final supabase = Supabase.instance.client;
 
@@ -2432,25 +2441,31 @@ class _NotificationPageState extends State<NotificationPage> {
           final notifications = snapshot.data!;
 
           return ListView.builder(
-            itemCount: notifications.length,
-            itemBuilder: (context, index) {
-              final notification = notifications[index];
+  itemCount: notifications.length,
+  itemBuilder: (context, index) {
+    final notification = notifications[index];
 
-              return ListTile(
-                title: Text(
-                  "${notification['container_name'] ?? 'Unknown Container'}: ${notification['title']}",
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                subtitle: Text(notification['message']),
-                trailing: IconButton(
-                  icon: const Icon(Icons.delete, color: Colors.red),
-                  onPressed: () =>
-                      deleteNotification(notification['notification_id']),
-                ),
-              );
-            },
-          );
+    return Column(
+      children: [
+        ListTile(
+          title: Text(
+            "${notification['container_name'] ?? 'Unknown Container'}: ${notification['title']}",
+            style: TextStyle(fontWeight: FontWeight.bold),
+            overflow: TextOverflow.ellipsis,
+          ),
+          subtitle: Text(
+            "${notification['message']}\n${_formatDate(notification['timestamp'])}",
+          ),
+          trailing: IconButton(
+            icon: const Icon(Icons.delete, color: Colors.red),
+            onPressed: () => deleteNotification(notification['notification_id']),
+          ),
+        ),
+        const Divider(thickness: 1), // Add a divider after each ListTile
+      ],
+    );
+  },
+);
         },
       ),
     );
