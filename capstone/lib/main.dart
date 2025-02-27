@@ -41,23 +41,25 @@ Future<void> checkForNotifications() async {
   final supabase = Supabase.instance.client;
   final prefs = await SharedPreferences.getInstance();
 
-  int lastSeenId = prefs.getInt('last_seen_notification') ?? 0;
+  int lastSeenId = prefs.getInt('last_seen_notification') ?? -1; // Ensure it's an int
   print("🔢 Last seen notification ID: $lastSeenId");
 
   try {
     final response = await supabase
-        .from('Notification_Test')
+        .from('Notifications_Test')
         .select()
-        .gt('id', lastSeenId)
-        .order('id', ascending: true)
+        .gt('notification_id', lastSeenId)
+        .order('notification_id', ascending: true)
         .limit(1);
+
+    print("🔍 Full Supabase Response: $response");
 
     if (response.isNotEmpty) {
       final newNotification = response[0];
-      int newId = newNotification['id'];
-      String message = newNotification['message'];
+      int newId = (newNotification['notification_id'] ?? -1).toInt();
+      String message = newNotification['message'] ?? "No message available"; // ✅ Added null check
 
-      print("📩 New notification found: $message");
+      print("📩 New notification found: $message (ID: $newId)");
 
       await _showNotification(message);
       await prefs.setInt('last_seen_notification', newId);
@@ -65,10 +67,11 @@ Future<void> checkForNotifications() async {
     } else {
       print("❌ No new notifications found.");
     }
-  } catch (e, stacktrace) {
-  log("❌ Error fetching notifications: $e", stackTrace: stacktrace);
+  } catch (e) {
+    print("❌ Error fetching notifications: $e");
   }
 }
+
 
 Future<void> _showNotification(String message) async {
   print("🔔 Attempting to show notification: $message");
@@ -97,6 +100,7 @@ Future<void> _showNotification(String message) async {
 }
 
 // ✅ Corrected callbackDispatcher function
+@pragma('vm:entry-point')
 void callbackDispatcher() {
   Workmanager().executeTask((task, inputData) async {
     print("🔄 Running background task: $task");
