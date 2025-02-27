@@ -85,7 +85,7 @@ class _HomePageMemberState extends State<HomePageMember> {
     _checkSelectedContainer();
 
     // Start a timer that refreshes notifications every second
-    _timer = Timer.periodic(const Duration(seconds: 1), (Timer t) {
+    _timer = Timer.periodic(const Duration(seconds: 2), (Timer t) {
       _refreshNotifications();
     });
   }
@@ -2329,16 +2329,36 @@ Future<Map<String, dynamic>> fetchSensorData(int containerId) async {
 
 Future<List<Map<String, dynamic>>> fetchNotifications() async {
   final supabase = Supabase.instance.client;
-  final prefs = await SharedPreferences.getInstance();
-
-  String? storedString = await getStoredString("user_id_pref");
-  int storedInt = int.parse(storedString ?? "");
 
   try {
-    // Fetch notifications
+    // Retrieve user_id from SharedPreferences
+    String? storedString = await getStoredString("user_id_pref");
+    if (storedString == null || storedString.isEmpty) {
+      print("⚠️ No user_id found in SharedPreferences.");
+      return [];
+    }
+    
+    int userId = int.parse(storedString);
+
+    // Fetch all hardware_id linked to this user
+    final hardwareResponse = await supabase
+        .from('Containers_test')
+        .select('hardware_id')
+        .eq('user_id', userId);
+
+    if (hardwareResponse.isEmpty) {
+      print("⚠️ No hardware linked to user_id: $userId.");
+      return [];
+    }
+
+    // Extract hardware IDs
+    List<int> hardwareIds = hardwareResponse.map<int>((e) => e['hardware_id']).toList();
+
+    // Fetch notifications matching the hardware IDs
     final notifResponse = await supabase
         .from('Notifications_Test')
         .select('notification_id, hardware_id, title, message, timestamp')
+        .inFilter('hardware_id', hardwareIds)
         .order('timestamp', ascending: false);
 
     if (notifResponse.isEmpty) {
@@ -2351,12 +2371,12 @@ Future<List<Map<String, dynamic>>> fetchNotifications() async {
     for (var notification in notifResponse) {
       final hardwareId = notification['hardware_id'];
 
-      // Fetch corresponding Containers_test row using hardware_id and user_id_pref
+      // Fetch container name linked to this hardware_id and user_id
       final containerResponse = await supabase
           .from('Containers_test')
           .select('container_name')
           .eq('hardware_id', hardwareId)
-          .eq('user_id', storedInt)
+          .eq('user_id', userId)
           .maybeSingle();
 
       if (containerResponse != null) {
@@ -2366,8 +2386,7 @@ Future<List<Map<String, dynamic>>> fetchNotifications() async {
       notificationsWithContainers.add(notification);
     }
 
-    print(
-        "✅ Fetched ${notificationsWithContainers.length} notifications with containers.");
+    print("✅ Fetched ${notificationsWithContainers.length} notifications.");
     return notificationsWithContainers;
   } catch (error) {
     print("❌ Error fetching notifications: $error");
@@ -2587,10 +2606,7 @@ class _ContainerPageState extends State<ContainerPage> {
                     backgroundColor: Colors.green,
                     minimumSize: const Size(double.infinity, 50),
                   ),
-                  onPressed: () async {
-                    performQuery(context);
-                    _fetchContainers;
-                  },
+                  onPressed: () => performQuery(context),
                   icon: const Icon(Icons.add, color: Colors.white),
                   label: const Text('New container',
                       style: TextStyle(color: Colors.white)),
