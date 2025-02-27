@@ -11,6 +11,7 @@ import 'package:workmanager/workmanager.dart';
 import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 import 'dart:developer';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:intl/intl.dart'; // ✅ Import this at the top
 
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
@@ -40,30 +41,25 @@ Future<void> checkForNotifications() async {
 
   final supabase = Supabase.instance.client;
   final prefs = await SharedPreferences.getInstance();
+  int lastSeenId = prefs.getInt('last_seen_notification') ?? -1;
 
-  int lastSeenId = prefs.getInt('last_seen_notification') ?? -1; // Ensure it's an int
   print("🔢 Last seen notification ID: $lastSeenId");
 
   try {
     final response = await supabase
         .from('Notifications_Test')
         .select()
-        .gt('notification_id', lastSeenId)
-        .order('notification_id', ascending: true)
-        .limit(1);
+        .gt('notification_id', lastSeenId)  // Fetch all new notifications
+        .order('notification_id', ascending: true);
 
     print("🔍 Full Supabase Response: $response");
 
     if (response.isNotEmpty) {
-      final newNotification = response[0];
-      int newId = (newNotification['notification_id'] ?? -1).toInt();
-      String message = newNotification['message'] ?? "No message available"; // ✅ Added null check
+      await _showGroupedNotifications(response);  // 🔥 Send grouped notification
 
-      print("📩 New notification found: $message (ID: $newId)");
-
-      await _showNotification(message);
-      await prefs.setInt('last_seen_notification', newId);
-      print("✅ Notification saved with ID: $newId");
+      int newLastSeenId = response.last['notification_id'];  // ✅ Update latest seen ID
+      await prefs.setInt('last_seen_notification', newLastSeenId);
+      print("✅ Notification saved with ID: $newLastSeenId");
     } else {
       print("❌ No new notifications found.");
     }
@@ -73,31 +69,73 @@ Future<void> checkForNotifications() async {
 }
 
 
-Future<void> _showNotification(String message) async {
-  print("🔔 Attempting to show notification: $message");
+Future<void> _showGroupedNotifications(List<Map<String, dynamic>> notifications) async {
+  print("🔔 Displaying ${notifications.length} grouped notifications...");
 
-  const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-    'channel_id',
+  const String groupKey = 'ecomposThink_notifications';
+  const String channelId = 'channel_id';
+
+  // 1️⃣ Show individual notifications in a group
+  for (var notification in notifications) {
+    int id = notification['notification_id'];
+    String title = notification['title'];
+    String message = notification['message'];
+    String timestamp = notification['timestamp'];  // ✅ Fetch timestamp
+    DateTime dateTime = DateTime.parse(timestamp); // ✅ Convert to DateTime
+
+    // ✅ Format into 12-hour format with AM/PM
+    String formattedTime = DateFormat('hh:mm a • MMM d, yyyy').format(dateTime);
+
+    String messageWithTime = "$message\n🕒 $formattedTime";  // ✅ Add timestamp to message
+
+    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+      channelId,
+      'E-ComposThink Alerts',
+      channelDescription: 'Grouped App Notifications',
+      importance: Importance.max,
+      priority: Priority.high,
+      playSound: true,
+      enableLights: true,
+      enableVibration: true,
+      groupKey: groupKey, // 🚀 Group Key for Bundling Notifications
+    );
+
+    const NotificationDetails details = NotificationDetails(android: androidDetails);
+
+    await flutterLocalNotificationsPlugin.show(
+      id,  // Unique ID per notification
+      title,
+      messageWithTime, // ✅ Show message + timestamp
+      details,
+    );
+  }
+
+  // 2️⃣ Show summary notification (for collapsed view)
+  const AndroidNotificationDetails summaryNotificationDetails = AndroidNotificationDetails(
+    channelId,
     'E-ComposThink Alerts',
-    channelDescription: 'App Notifications',
+    channelDescription: 'Grouped App Notifications',
     importance: Importance.max,
     priority: Priority.high,
-    playSound: true,
-    enableLights: true,
-    enableVibration: true,
+    styleInformation: InboxStyleInformation([]), // This makes it expandable
+    setAsGroupSummary: true,
+    groupKey: groupKey, // Same Group Key
   );
 
-  const NotificationDetails details = NotificationDetails(android: androidDetails);
+  const NotificationDetails summaryDetails = NotificationDetails(android: summaryNotificationDetails);
 
   await flutterLocalNotificationsPlugin.show(
-    0,
-    'New Alert',
-    message,
-    details,
+    0,  // Static ID for the summary notification
+    'E-ComposThink Alerts',
+    '${notifications.length} new notifications',
+    summaryDetails,
   );
 
-  print("✅ Notification should now be displayed!");
+  print("✅ Grouped notifications with timestamps displayed!");
 }
+
+
+
 
 // ✅ Corrected callbackDispatcher function
 @pragma('vm:entry-point')
@@ -123,8 +161,22 @@ Future<void> requestNotificationPermission() async {
 }
 
 Future<void> testNotification() async {
-  await _showNotification("🚀 This is a test floating notification!");
+  List<Map<String, dynamic>> testNotifications = [
+    {
+      'notification_id': 999,
+      'title': '🚀 Test Alert 1',
+      'message': 'This is the first test notification!',
+    },
+    {
+      'notification_id': 1000,
+      'title': '🔥 Test Alert 2',
+      'message': 'This is the second test notification!',
+    }
+  ];
+
+  await _showGroupedNotifications(testNotifications);
 }
+
 
 
 
@@ -148,13 +200,13 @@ void main() async {
   Workmanager().registerPeriodicTask(
     "fetchNotifications",
     "checkForNotificationsTask",
-    frequency: const Duration(minutes: 15),
+    frequency: const Duration(minutes: 2),
   );
 
   await requestNotificationPermission(); // Request permission on startup
 
-  testNotification(); // 🔥 Trigger a test notification
-  checkForNotifications(); // 🔥 Check for new notifications
+  // testNotification(); // 🔥 Trigger a test notification
+   checkForNotifications(); // 🔥 Check for new notifications
 
 
   runApp(MyApp());
