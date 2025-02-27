@@ -103,6 +103,13 @@ class _HomePageMemberState extends State<HomePageMember> {
     });
   }
 
+  // void _refreshNotifications() async {
+  //   final notifications = await fetchNotifications();
+  //   setState(() {
+  //     _notifications = notifications;
+  //   });
+  // }
+
   Future<void> _checkSelectedContainer() async {
     final prefs = await SharedPreferences.getInstance();
     final selectedContainerId = prefs.getInt('selected_container_id');
@@ -2390,7 +2397,6 @@ class _NotificationPageState extends State<NotificationPage> {
       _notificationsFuture = fetchNotifications();
     });
   }
-
       String _formatDate(String dateString) {
     try {
       DateTime dateTime = DateTime.parse(dateString);
@@ -2399,7 +2405,6 @@ class _NotificationPageState extends State<NotificationPage> {
       return 'Invalid date';
     }
   }
-
   Future<void> deleteNotification(int notificationId) async {
     final supabase = Supabase.instance.client;
 
