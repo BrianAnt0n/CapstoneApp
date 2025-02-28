@@ -42,22 +42,28 @@ Future<void> checkForNotifications() async {
   final supabase = Supabase.instance.client;
   final prefs = await SharedPreferences.getInstance();
   int lastSeenId = prefs.getInt('last_seen_notification') ?? -1;
-
   print("🔢 Last seen notification ID: $lastSeenId");
 
   try {
     final response = await supabase
         .from('Notifications_Test')
         .select()
-        .gt('notification_id', lastSeenId)  // Fetch all new notifications
         .order('notification_id', ascending: true);
 
     print("🔍 Full Supabase Response: $response");
 
-    if (response.isNotEmpty) {
-      await _showGroupedNotifications(response);  // 🔥 Send grouped notification
+    if (response.isEmpty) {
+      print("⚠ Table was truncated! Resetting last seen notification ID...");
+      await prefs.setInt('last_seen_notification', -1); // ✅ Reset last seen ID
+      return;
+    }
 
-      int newLastSeenId = response.last['notification_id'];  // ✅ Update latest seen ID
+    final newNotifications = response.where((n) => n['notification_id'] > lastSeenId).toList();
+
+    if (newNotifications.isNotEmpty) {
+      await _showGroupedNotifications(newNotifications);
+
+      int newLastSeenId = newNotifications.last['notification_id'];
       await prefs.setInt('last_seen_notification', newLastSeenId);
       print("✅ Notification saved with ID: $newLastSeenId");
     } else {
