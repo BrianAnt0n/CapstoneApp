@@ -39,9 +39,40 @@ Future<void> checkForNotifications() async {
     );
   }
 
+  Future<String?> getStoredString(String key) async {
+  final prefs = await SharedPreferences.getInstance();
+  return prefs.getString(key);
+}
+
   final supabase = Supabase.instance.client;
   final prefs = await SharedPreferences.getInstance();
+    String? storedString = await getStoredString("user_id_pref");
+
+    
+    int userId = int.parse(storedString!);
+
+  if (userId == null) {
+    print("❌ No user logged in. Skipping notification check.");
+    return;
+  }
+
+  // Fetch hardware_ids linked to the user_id
+  final containerResponse = await supabase
+      .from('Containers_test')
+      .select('hardware_id, container_name')
+      .eq('user_id', userId);
+  
+  if (containerResponse.isEmpty) {
+    print("❌ No linked containers for user $userId.");
+    return;
+  }
+
+  Map<int, String> hardwareIdToContainerName = {
+    for (var entry in containerResponse) entry['hardware_id']: entry['container_name']
+  };
+  List<int> hardwareIds = hardwareIdToContainerName.keys.toList();
   int lastSeenId = prefs.getInt('last_seen_notification') ?? -1;
+  DateTime fiveMinutesAgo = DateTime.now().subtract(Duration(minutes: 5));
   print("🔢 Last seen notification ID: $lastSeenId");
 
   try {
@@ -49,6 +80,18 @@ Future<void> checkForNotifications() async {
         .from('Notifications_Test')
         .select()
         .order('notification_id', ascending: true);
+
+    final filteredNotifications = response.where((n) => 
+      hardwareIds.contains(n['hardware_id']) && 
+      n['notification_id'] > lastSeenId && 
+      hardwareIdToContainerName.containsKey(n['hardware_id']) &&
+      DateTime.parse(n['timestamp']).isAfter(fiveMinutesAgo)
+    ).toList();
+
+    if (filteredNotifications.isEmpty) {
+      print("⚠ No new notifications found.");
+      return;
+    }
 
     print("🔍 Full Supabase Response: $response");
 
@@ -58,16 +101,13 @@ Future<void> checkForNotifications() async {
       return;
     }
 
-    final newNotifications = response.where((n) => n['notification_id'] > lastSeenId).toList();
+    //final newNotifications = response.where((n) => n['notification_id'] > lastSeenId).toList();
 
-    if (newNotifications.isNotEmpty) {
-      await _showGroupedNotifications(newNotifications);
-
-      int newLastSeenId = newNotifications.last['notification_id'];
+    if (filteredNotifications.isNotEmpty) {
+      await _showGroupedNotifications(filteredNotifications, hardwareIdToContainerName);
+      int newLastSeenId = filteredNotifications.last['notification_id'];
       await prefs.setInt('last_seen_notification', newLastSeenId);
-      print("✅ Notification saved with ID: $newLastSeenId");
-    } else {
-      print("❌ No new notifications found.");
+      print("✅ Updated last seen notification ID to: $newLastSeenId");
     }
   } catch (e) {
     print("❌ Error fetching notifications: $e");
@@ -75,7 +115,7 @@ Future<void> checkForNotifications() async {
 }
 
 
-Future<void> _showGroupedNotifications(List<Map<String, dynamic>> notifications) async {
+Future<void> _showGroupedNotifications(List<Map<String, dynamic>> notifications, Map<int, String> hardwareIdToContainerName) async {
   print("🔔 Displaying ${notifications.length} grouped notifications...");
 
   const String groupKey = 'ecomposThink_notifications';
@@ -83,16 +123,15 @@ Future<void> _showGroupedNotifications(List<Map<String, dynamic>> notifications)
 
   // 1️⃣ Show individual notifications in a group
   for (var notification in notifications) {
-    int id = notification['notification_id'];
+int id = notification['notification_id'];
     String title = notification['title'];
     String message = notification['message'];
-    String timestamp = notification['timestamp'];  // ✅ Fetch timestamp
-    DateTime dateTime = DateTime.parse(timestamp); // ✅ Convert to DateTime
-
-    // ✅ Format into 12-hour format with AM/PM
+    int hardwareId = notification['hardware_id'];
+    String containerName = hardwareIdToContainerName[hardwareId]!;
+    DateTime dateTime = DateTime.parse(notification['timestamp']);
     String formattedTime = DateFormat('hh:mm a • MMM d, yyyy').format(dateTime);
-
-    String messageWithTime = "$message\n🕒 $formattedTime";  // ✅ Add timestamp to message
+    String fullTitle = "$containerName - $title";
+    String fullMessage = "$message\n🕒 $formattedTime";
 
     const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
       channelId,
@@ -109,9 +148,9 @@ Future<void> _showGroupedNotifications(List<Map<String, dynamic>> notifications)
     const NotificationDetails details = NotificationDetails(android: androidDetails);
 
     await flutterLocalNotificationsPlugin.show(
-      id,  // Unique ID per notification
-      title,
-      messageWithTime, // ✅ Show message + timestamp
+      id,
+      fullTitle,
+      fullMessage, // ✅ Show message + timestamp
       details,
     );
   }
@@ -166,22 +205,22 @@ Future<void> requestNotificationPermission() async {
   }
 }
 
-Future<void> testNotification() async {
-  List<Map<String, dynamic>> testNotifications = [
-    {
-      'notification_id': 999,
-      'title': '🚀 Test Alert 1',
-      'message': 'This is the first test notification!',
-    },
-    {
-      'notification_id': 1000,
-      'title': '🔥 Test Alert 2',
-      'message': 'This is the second test notification!',
-    }
-  ];
+// Future<void> testNotification() async {
+//   List<Map<String, dynamic>> testNotifications = [
+//     {
+//       'notification_id': 999,
+//       'title': '🚀 Test Alert 1',
+//       'message': 'This is the first test notification!',
+//     },
+//     {
+//       'notification_id': 1000,
+//       'title': '🔥 Test Alert 2',
+//       'message': 'This is the second test notification!',
+//     }
+//   ];
 
-  await _showGroupedNotifications(testNotifications);
-}
+//   await _showGroupedNotifications(testNotifications);
+// }
 
 
 
@@ -202,7 +241,7 @@ void main() async {
     isInDebugMode: true,
   );
 
-  // ✅ Schedule background work every 15 minutes
+  // // ✅ Schedule background work every 15 minutes
   Workmanager().registerPeriodicTask(
     "fetchNotifications",
     "checkForNotificationsTask",
