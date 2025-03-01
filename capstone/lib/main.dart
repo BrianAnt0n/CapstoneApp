@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:capstone/splash_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -72,7 +74,7 @@ Future<void> checkForNotifications() async {
   };
   List<int> hardwareIds = hardwareIdToContainerName.keys.toList();
   int lastSeenId = prefs.getInt('last_seen_notification') ?? -1;
-  DateTime fiveMinutesAgo = DateTime.now().subtract(Duration(minutes: 5));
+  //DateTime fiveMinutesAgo = DateTime.now().subtract(Duration(minutes: 5));
   print("🔢 Last seen notification ID: $lastSeenId");
 
   try {
@@ -84,8 +86,7 @@ Future<void> checkForNotifications() async {
     final filteredNotifications = response.where((n) => 
       hardwareIds.contains(n['hardware_id']) && 
       n['notification_id'] > lastSeenId && 
-      hardwareIdToContainerName.containsKey(n['hardware_id']) &&
-      DateTime.parse(n['timestamp']).isAfter(fiveMinutesAgo)
+      hardwareIdToContainerName.containsKey(n['hardware_id'])
     ).toList();
 
     if (filteredNotifications.isEmpty) {
@@ -242,17 +243,24 @@ void main() async {
   );
 
   // // ✅ Schedule background work every 15 minutes
-  Workmanager().registerPeriodicTask(
-    "fetchNotifications",
-    "checkForNotificationsTask",
-    frequency: const Duration(minutes: 2),
-  );
+  // Workmanager().registerPeriodicTask(
+  //   "fetchNotifications",
+  //   "checkForNotificationsTask",
+  //   frequency: const Duration(minutes: 2),
+  // );
+
+  const Duration customInterval = Duration(seconds: 30); // Set your preferred interval
+  void startCustomNotificationCheck() {
+  Timer.periodic(customInterval, (timer) {
+    checkForNotifications();
+  });
+}
 
   await requestNotificationPermission(); // Request permission on startup
 
   // testNotification(); // 🔥 Trigger a test notification
-   checkForNotifications(); // 🔥 Check for new notifications
-
+  //checkForNotifications(); // 🔥 Check for new notifications
+  startCustomNotificationCheck();
 
   runApp(MyApp());
 }
