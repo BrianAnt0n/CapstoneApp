@@ -74,7 +74,10 @@ Future<void> checkForNotifications() async {
   };
   List<int> hardwareIds = hardwareIdToContainerName.keys.toList();
   int lastSeenId = prefs.getInt('last_seen_notification') ?? -1;
-  //DateTime fiveMinutesAgo = DateTime.now().subtract(Duration(minutes: 5));
+
+// =======
+//   DateTime fiveMinutesAgo = DateTime.now().subtract(Duration(minutes: 5));
+// >>>>>>> master
   print("🔢 Last seen notification ID: $lastSeenId");
 
   try {
@@ -87,6 +90,9 @@ Future<void> checkForNotifications() async {
       hardwareIds.contains(n['hardware_id']) && 
       n['notification_id'] > lastSeenId && 
       hardwareIdToContainerName.containsKey(n['hardware_id'])
+//       hardwareIdToContainerName.containsKey(n['hardware_id']) &&
+//       DateTime.parse(n['timestamp']).isAfter(fiveMinutesAgo)
+// >>>>>>> master
     ).toList();
 
     if (filteredNotifications.isEmpty) {
@@ -242,19 +248,18 @@ void main() async {
     isInDebugMode: true,
   );
 
-  // // ✅ Schedule background work every 15 minutes
-  // Workmanager().registerPeriodicTask(
-  //   "fetchNotifications",
-  //   "checkForNotificationsTask",
-  //   frequency: const Duration(minutes: 2),
-  // );
-
   const Duration customInterval = Duration(seconds: 30); // Set your preferred interval
   void startCustomNotificationCheck() {
   Timer.periodic(customInterval, (timer) {
     checkForNotifications();
   });
 }
+//   Workmanager().registerPeriodicTask(
+//     "fetchNotifications",
+//     "checkForNotificationsTask",
+//     frequency: const Duration(minutes: 2),
+//   );
+// >>>>>>> master
 
   await requestNotificationPermission(); // Request permission on startup
 
