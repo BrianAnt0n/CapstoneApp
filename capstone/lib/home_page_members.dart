@@ -1096,30 +1096,208 @@ class _DashboardPageState extends State<DashboardPage> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Full Calendar inside the popup
                       TableCalendar(
                         focusedDay: _selectedDate,
                         firstDay: DateTime(2000),
                         lastDay: DateTime(2100),
-                        calendarFormat: CalendarFormat.month, // Show full month
+                        calendarFormat:
+                            CalendarFormat.month, // Show the full month
+                        headerStyle: HeaderStyle(
+                          titleCentered: true,
+                          formatButtonVisible: false,
+                          leftChevronIcon: const Icon(Icons.chevron_left),
+                          rightChevronIcon: const Icon(Icons.chevron_right),
+                          titleTextFormatter: (date, locale) {
+                            return DateFormat.yMMMM(locale).format(date);
+                          },
+                        ),
+                        calendarBuilders: CalendarBuilders(
+                          defaultBuilder: (context, date, _) {
+                            DateTime today = DateTime.now();
+
+                            if (_containerAddedDate != null) {
+                              DateTime compostEndDate = _containerAddedDate!.add(const Duration(days: 112)); // 16 weeks later
+                              DateTime cycleDayOne = _containerAddedDate!.add(const Duration(days: 1)); // Day 1 of the cycle
+
+                              bool isWithinCycle = date.isAfter(_containerAddedDate!) && date.isBefore(compostEndDate);
+                              bool isToday = date.year == today.year && date.month == today.month && date.day == today.day;
+
+                              if (isWithinCycle || isToday) {
+                                bool isDayOne = date.year == cycleDayOne.year && date.month == cycleDayOne.month && date.day == cycleDayOne.day;
+                                bool isEndDate = date.year == compostEndDate.year && date.month == compostEndDate.month && date.day == compostEndDate.day;
+
+                                return Container(
+                                  margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 0),
+                                  padding: const EdgeInsets.symmetric(vertical: 4), // Shortens top and bottom spacing
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.withOpacity(
+                                        0.3), // Gray shading effect
+                                    borderRadius: BorderRadius.horizontal(
+                                      left: isDayOne
+                                          ? const Radius.circular(20)
+                                          : Radius.zero,
+                                      right: isEndDate
+                                          ? const Radius.circular(20)
+                                          : Radius.zero,
+                                    ),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      date.day.toString(),
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black87,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }
+                            }
+                            return null; // Default calendar rendering
+                          },
+                          todayBuilder: (context, date, _) {
+                            return Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                // Background shading extending to adjacent dates
+                                Container(
+                                  margin: const EdgeInsets.symmetric(
+                                      vertical: 6, horizontal: 0),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.withOpacity(
+                                        0.3), // Maintain shading effect
+                                    // borderRadius: BorderRadius.horizontal(
+                                    //   left: const Radius.circular(20), // Smooth connection on the left
+                                    //   right: const Radius.circular(20), // Smooth connection on the right
+                                    // ),
+                                  ),
+                                  height: 40, // Maintain shading visibility
+                                  width: double.infinity,
+                                ),
+
+                                // Today indicator
+                                Container(
+                                  height: 36,
+                                  width: 36,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Colors.green.withOpacity(
+                                        0.5), // Highlight today's date
+                                  ),
+                                ),
+
+                                // Date number
+                                Center(
+                                  child: Text(
+                                    date.day.toString(),
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color:
+                                          Colors.black87, // Ensure visibility
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                          selectedBuilder: (context, date, _) {
+                            DateTime compostEndDate =
+                                _containerAddedDate != null
+                                    ? _containerAddedDate!
+                                        .add(const Duration(days: 112))
+                                    : DateTime.now();
+                            DateTime cycleDayOne = _containerAddedDate != null
+                                ? _containerAddedDate!
+                                    .add(const Duration(days: 1))
+                                : DateTime.now();
+
+                            bool isWithinCycle =
+                                date.isAfter(_containerAddedDate!) &&
+                                    date.isBefore(compostEndDate);
+                            bool isDayOne = date.year == cycleDayOne.year &&
+                                date.month == cycleDayOne.month &&
+                                date.day == cycleDayOne.day;
+
+                            bool isEndDate = date.year == compostEndDate.year &&
+                                date.month == compostEndDate.month &&
+                                date.day == compostEndDate.day;
+
+                            return Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                // Preserve shading effect
+                                if (isWithinCycle)
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey
+                                          .withOpacity(0.3), // Shading effect
+                                      borderRadius: BorderRadius.horizontal(
+                                        left: isDayOne
+                                            ? const Radius.circular(20)
+                                            : Radius.zero,
+                                        right: isEndDate
+                                            ? const Radius.circular(20)
+                                            : Radius.zero,
+                                      ),
+                                    ),
+                                    height: 40, // Maintain shading visibility
+                                    width: double.infinity,
+                                  ),
+
+                                // Selection circle (on top)
+                                Container(
+                                  height: 36,
+                                  width: 36,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                        color: Colors.green,
+                                        width:
+                                            2), // Green outline for selection
+                                    color: Colors
+                                        .transparent, // Keep shading visible
+                                  ),
+                                ),
+                                // Date number (ensures readability)
+                                Center(
+                                  child: Text(
+                                    date.day.toString(),
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color:
+                                          Colors.black87, // Keep text readable
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
                         selectedDayPredicate: (day) =>
                             isSameDay(_selectedDate, day),
-                        onDaySelected: (selectedDay, focusedDay) {
+                        onDaySelected: (selectedDay, focusedDay) async {
                           setState(() {
                             _selectedDate = selectedDay;
-                            _notesFuture =
-                                fetchNotes(selectedContainerId!, _selectedDate);
-                            _calculateContainerAge(); // Update the age when a date is selected
                           });
-                          Navigator.pop(
-                              context); // Close the popup after selection
+
+                          int? hardwareId =
+                              await fetchHardwareId(selectedContainerId!);
+                          if (hardwareId != null) {
+                            setState(() {
+                              _notesFuture =
+                                  fetchNotes(hardwareId, _selectedDate);
+                            });
+                          }
+                          // Close the dialog after selecting a date
+                          Navigator.pop(context);
                         },
-                        headerStyle: const HeaderStyle(
-                          formatButtonVisible:
-                              false, // Hide the week toggle button
-                          titleCentered: true,
-                        ),
                       ),
+
                       const SizedBox(height: 10),
                       ElevatedButton(
                         onPressed: () => Navigator.pop(context),
@@ -1135,7 +1313,6 @@ class _DashboardPageState extends State<DashboardPage> {
       );
     });
   }
-
   int _calculateContainerAge() {
     if (_containerAddedDate == null) {
       _containerAge = "Unknown";
