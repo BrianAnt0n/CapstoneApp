@@ -36,8 +36,10 @@ Future<void> checkForNotifications() async {
   if (Supabase.instance.client == null) {
     print("⚡ Reinitializing Supabase...");
     await Supabase.initialize(
-      url: 'https://mibhnlcgkbgesgmkmufy.supabase.co',
-      anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1pYmhubGNna2JnZXNnbWttdWZ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzEzNzg2MDIsImV4cCI6MjA0Njk1NDYwMn0.0_pCroFd0IaLCpzaxI2FE2juS0wRaszcf3OtYFK5iA4',
+      //url: 'https://mibhnlcgkbgesgmkmufy.supabase.co',
+      //anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1pYmhubGNna2JnZXNnbWttdWZ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzEzNzg2MDIsImV4cCI6MjA0Njk1NDYwMn0.0_pCroFd0IaLCpzaxI2FE2juS0wRaszcf3OtYFK5iA4',
+      url: 'https://ddhmidcspkncvanwuhsv.supabase.co',
+      anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkaG1pZGNzcGtuY3Zhbnd1aHN2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDEwMDE2NDQsImV4cCI6MjA1NjU3NzY0NH0.64MgOzQRHJr2yEk3AVxVaIhDKnZkjHx-JkoU0g92lfE',
     );
   }
 
@@ -196,8 +198,10 @@ void callbackDispatcher() {
     print("🔄 Running background task: $task");
 
     await Supabase.initialize(
-      url: 'https://mibhnlcgkbgesgmkmufy.supabase.co',
-      anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1pYmhubGNna2JnZXNnbWttdWZ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzEzNzg2MDIsImV4cCI6MjA0Njk1NDYwMn0.0_pCroFd0IaLCpzaxI2FE2juS0wRaszcf3OtYFK5iA4',
+      //url: 'https://mibhnlcgkbgesgmkmufy.supabase.co',
+      //anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1pYmhubGNna2JnZXNnbWttdWZ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzEzNzg2MDIsImV4cCI6MjA0Njk1NDYwMn0.0_pCroFd0IaLCpzaxI2FE2juS0wRaszcf3OtYFK5iA4',
+      url: 'https://ddhmidcspkncvanwuhsv.supabase.co',
+      anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkaG1pZGNzcGtuY3Zhbnd1aHN2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDEwMDE2NDQsImV4cCI6MjA1NjU3NzY0NH0.64MgOzQRHJr2yEk3AVxVaIhDKnZkjHx-JkoU0g92lfE',
     );
 
     await checkForNotifications();
@@ -238,8 +242,10 @@ void main() async {
 
   await _initNotifications();
   await Supabase.initialize(
-    url: 'https://mibhnlcgkbgesgmkmufy.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1pYmhubGNna2JnZXNnbWttdWZ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzEzNzg2MDIsImV4cCI6MjA0Njk1NDYwMn0.0_pCroFd0IaLCpzaxI2FE2juS0wRaszcf3OtYFK5iA4',
+    //url: 'https://mibhnlcgkbgesgmkmufy.supabase.co',
+    //anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1pYmhubGNna2JnZXNnbWttdWZ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzEzNzg2MDIsImV4cCI6MjA0Njk1NDYwMn0.0_pCroFd0IaLCpzaxI2FE2juS0wRaszcf3OtYFK5iA4',
+    url: 'https://ddhmidcspkncvanwuhsv.supabase.co',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkaG1pZGNzcGtuY3Zhbnd1aHN2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDEwMDE2NDQsImV4cCI6MjA1NjU3NzY0NH0.64MgOzQRHJr2yEk3AVxVaIhDKnZkjHx-JkoU0g92lfE',
   );
 
   // ✅ Initialize WorkManager before registering tasks

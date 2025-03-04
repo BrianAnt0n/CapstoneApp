@@ -87,7 +87,7 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-    @override
+  @override
   void dispose() {
     _timer?.cancel(); // Cancel the timer when widget is disposed
     super.dispose();
@@ -141,44 +141,44 @@ class _HomePageState extends State<HomePage> {
         appBar: AppBar(
           title: const Text('E-ComposThink Home - Admin'),
           actions: [
-IconButton(
-  icon: Stack(
-    children: [
-      const Icon(Icons.notifications, size: 30),
-      if (_notifications.isNotEmpty)
-        Positioned(
-          right: 0, // Move slightly outside the icon
-          bottom: -0.5, // Move to bottom-right
-          child: Container(
-            padding: const EdgeInsets.all(5),
-            decoration: const BoxDecoration(
-              color: Colors.red,
-              shape: BoxShape.circle,
-            ),
-            child: Text(
-              _notifications.length.toString(),
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 8,
-                fontWeight: FontWeight.bold,
+            IconButton(
+              icon: Stack(
+                children: [
+                  const Icon(Icons.notifications, size: 30),
+                  if (_notifications.isNotEmpty)
+                    Positioned(
+                      right: 0, // Move slightly outside the icon
+                      bottom: -0.5, // Move to bottom-right
+                      child: Container(
+                        padding: const EdgeInsets.all(5),
+                        decoration: const BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          _notifications.length.toString(),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
+              onPressed: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => NotificationPage(
+                      onNotificationUpdate: _refreshNotifications,
+                    ),
+                  ),
+                );
+                _refreshNotifications(); // Ensure refresh on return
+              },
             ),
-          ),
-        ),
-    ],
-  ),
-  onPressed: () async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => NotificationPage(
-          onNotificationUpdate: _refreshNotifications,
-        ),
-      ),
-    );
-    _refreshNotifications(); // Ensure refresh on return
-  },
-),
           ],
         ),
         body: _pages[_currentIndex], // Show the selected page
@@ -225,6 +225,9 @@ class DashboardPage extends StatefulWidget {
 }
 
 DateTime? _containerAddedDate; // Holds the compost start date
+
+// Inside _DashboardPageState, add a state variable to store note dates
+List<DateTime> _noteDates = [];
 
 class _DashboardPageState extends State<DashboardPage> {
   Future<Map<String, dynamic>>? _sensorDataFuture;
@@ -297,6 +300,7 @@ class _DashboardPageState extends State<DashboardPage> {
         _historyFuture =
             fetchHistoryData(selectedContainerId!); // ✅ Fetch history
       });
+      _noteDates = await fetchNoteDates(hardwareId);
     }
 
     FocusScope.of(context).unfocus();
@@ -1074,6 +1078,22 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
+// Add this function to fetch dates with notes
+Future<List<DateTime>> fetchNoteDates(int hardwareId) async {
+  final supabase = Supabase.instance.client;
+  try {
+    final response = await supabase
+        .from('Notes_test_test')
+        .select('created_date')
+        .eq('hardware_id', hardwareId);
+    
+    return response.map<DateTime>((note) => DateTime.parse(note['created_date']).toLocal()).toList();
+  } catch (error) {
+    print("Error fetching note dates: $error");
+    return [];
+  }
+}
+
   void _openFullCalendar() {
     //Ensure keyboard is fully dismissed before opening the calendar
     FocusScope.of(context).requestFocus(FocusNode());
@@ -1093,30 +1113,208 @@ class _DashboardPageState extends State<DashboardPage> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Full Calendar inside the popup
                       TableCalendar(
                         focusedDay: _selectedDate,
                         firstDay: DateTime(2000),
                         lastDay: DateTime(2100),
-                        calendarFormat: CalendarFormat.month, // Show full month
+                        calendarFormat:
+                            CalendarFormat.month, // Show the full month
+                        headerStyle: HeaderStyle(
+                          titleCentered: true,
+                          formatButtonVisible: false,
+                          leftChevronIcon: const Icon(Icons.chevron_left),
+                          rightChevronIcon: const Icon(Icons.chevron_right),
+                          titleTextFormatter: (date, locale) {
+                            return DateFormat.yMMMM(locale).format(date);
+                          },
+                        ),
+                        calendarBuilders: CalendarBuilders(
+                          defaultBuilder: (context, date, _) {
+                            DateTime today = DateTime.now();
+
+                            if (_containerAddedDate != null) {
+                              DateTime compostEndDate = _containerAddedDate!.add(const Duration(days: 112)); // 16 weeks later
+                              DateTime cycleDayOne = _containerAddedDate!.add(const Duration(days: 1)); // Day 1 of the cycle
+
+                              bool isWithinCycle = date.isAfter(_containerAddedDate!) && date.isBefore(compostEndDate);
+                              bool isToday = date.year == today.year && date.month == today.month && date.day == today.day;
+
+                              if (isWithinCycle || isToday) {
+                                bool isDayOne = date.year == cycleDayOne.year && date.month == cycleDayOne.month && date.day == cycleDayOne.day;
+                                bool isEndDate = date.year == compostEndDate.year && date.month == compostEndDate.month && date.day == compostEndDate.day;
+
+                                return Container(
+                                  margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 0),
+                                  padding: const EdgeInsets.symmetric(vertical: 4), // Shortens top and bottom spacing
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.withOpacity(
+                                        0.3), // Gray shading effect
+                                    borderRadius: BorderRadius.horizontal(
+                                      left: isDayOne
+                                          ? const Radius.circular(20)
+                                          : Radius.zero,
+                                      right: isEndDate
+                                          ? const Radius.circular(20)
+                                          : Radius.zero,
+                                    ),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      date.day.toString(),
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black87,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }
+                            }
+                            return null; // Default calendar rendering
+                          },
+                          todayBuilder: (context, date, _) {
+                            return Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                // Background shading extending to adjacent dates
+                                Container(
+                                  margin: const EdgeInsets.symmetric(
+                                      vertical: 6, horizontal: 0),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.withOpacity(
+                                        0.3), // Maintain shading effect
+                                    // borderRadius: BorderRadius.horizontal(
+                                    //   left: const Radius.circular(20), // Smooth connection on the left
+                                    //   right: const Radius.circular(20), // Smooth connection on the right
+                                    // ),
+                                  ),
+                                  height: 40, // Maintain shading visibility
+                                  width: double.infinity,
+                                ),
+
+                                // Today indicator
+                                Container(
+                                  height: 36,
+                                  width: 36,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Colors.green.withOpacity(
+                                        0.5), // Highlight today's date
+                                  ),
+                                ),
+
+                                // Date number
+                                Center(
+                                  child: Text(
+                                    date.day.toString(),
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color:
+                                          Colors.black87, // Ensure visibility
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                          selectedBuilder: (context, date, _) {
+                            DateTime compostEndDate =
+                                _containerAddedDate != null
+                                    ? _containerAddedDate!
+                                        .add(const Duration(days: 112))
+                                    : DateTime.now();
+                            DateTime cycleDayOne = _containerAddedDate != null
+                                ? _containerAddedDate!
+                                    .add(const Duration(days: 1))
+                                : DateTime.now();
+
+                            bool isWithinCycle =
+                                date.isAfter(_containerAddedDate!) &&
+                                    date.isBefore(compostEndDate);
+                            bool isDayOne = date.year == cycleDayOne.year &&
+                                date.month == cycleDayOne.month &&
+                                date.day == cycleDayOne.day;
+
+                            bool isEndDate = date.year == compostEndDate.year &&
+                                date.month == compostEndDate.month &&
+                                date.day == compostEndDate.day;
+
+                            return Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                // Preserve shading effect
+                                if (isWithinCycle)
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey
+                                          .withOpacity(0.3), // Shading effect
+                                      borderRadius: BorderRadius.horizontal(
+                                        left: isDayOne
+                                            ? const Radius.circular(20)
+                                            : Radius.zero,
+                                        right: isEndDate
+                                            ? const Radius.circular(20)
+                                            : Radius.zero,
+                                      ),
+                                    ),
+                                    height: 40, // Maintain shading visibility
+                                    width: double.infinity,
+                                  ),
+
+                                // Selection circle (on top)
+                                Container(
+                                  height: 36,
+                                  width: 36,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                        color: Colors.green,
+                                        width:
+                                            2), // Green outline for selection
+                                    color: Colors
+                                        .transparent, // Keep shading visible
+                                  ),
+                                ),
+                                // Date number (ensures readability)
+                                Center(
+                                  child: Text(
+                                    date.day.toString(),
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color:
+                                          Colors.black87, // Keep text readable
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
                         selectedDayPredicate: (day) =>
                             isSameDay(_selectedDate, day),
-                        onDaySelected: (selectedDay, focusedDay) {
+                        onDaySelected: (selectedDay, focusedDay) async {
                           setState(() {
                             _selectedDate = selectedDay;
-                            _notesFuture =
-                                fetchNotes(selectedContainerId!, _selectedDate);
-                            _calculateContainerAge(); // Update the age when a date is selected
                           });
-                          Navigator.pop(
-                              context); // Close the popup after selection
+
+                          int? hardwareId =
+                              await fetchHardwareId(selectedContainerId!);
+                          if (hardwareId != null) {
+                            setState(() {
+                              _notesFuture =
+                                  fetchNotes(hardwareId, _selectedDate);
+                            });
+                          }
+                          // Close the dialog after selecting a date
+                          Navigator.pop(context);
                         },
-                        headerStyle: const HeaderStyle(
-                          formatButtonVisible:
-                              false, // Hide the week toggle button
-                          titleCentered: true,
-                        ),
                       ),
+
                       const SizedBox(height: 10),
                       ElevatedButton(
                         onPressed: () => Navigator.pop(context),
@@ -2284,7 +2482,7 @@ Future<List<Map<String, dynamic>>> fetchNotifications() async {
       print("⚠️ No user_id found in SharedPreferences.");
       return [];
     }
-    
+
     int userId = int.parse(storedString);
 
     // Fetch all hardware_id linked to this user
@@ -2299,14 +2497,16 @@ Future<List<Map<String, dynamic>>> fetchNotifications() async {
     }
 
     // Extract hardware IDs
-    List<int> hardwareIds = hardwareResponse.map<int>((e) => e['hardware_id']).toList();
+    List<int> hardwareIds =
+        hardwareResponse.map<int>((e) => e['hardware_id']).toList();
 
     // Fetch notifications matching the hardware IDs
     final notifResponse = await supabase
         .from('Notifications_Test')
         .select('notification_id, hardware_id, title, message, timestamp')
         .inFilter('hardware_id', hardwareIds)
-        .order('timestamp', ascending: false);
+        .order('timestamp', ascending: false)
+        .limit(50);
 
     if (notifResponse.isEmpty) {
       print("ℹ No notifications found.");
@@ -2341,7 +2541,6 @@ Future<List<Map<String, dynamic>>> fetchNotifications() async {
   }
 }
 
-
 class NotificationPage extends StatefulWidget {
   final VoidCallback onNotificationUpdate; // ✅ Callback to refresh bell icon
 
@@ -2365,8 +2564,8 @@ class _NotificationPageState extends State<NotificationPage> {
       _notificationsFuture = fetchNotifications();
     });
   }
- 
-    String _formatDate(String dateString) {
+
+  String _formatDate(String dateString) {
     try {
       DateTime dateTime = DateTime.parse(dateString);
       return DateFormat('yyyy-MM-dd hh:mm a').format(dateTime);
@@ -2411,32 +2610,33 @@ class _NotificationPageState extends State<NotificationPage> {
           final notifications = snapshot.data!;
 
           return ListView.builder(
-  itemCount: notifications.length,
-  itemBuilder: (context, index) {
-    final notification = notifications[index];
+            itemCount: notifications.length,
+            itemBuilder: (context, index) {
+              final notification = notifications[index];
 
-    return Column(
-      children: [
-        ListTile(
-          title: Text(
-            "${notification['container_name']}: ${notification['title']}",
-            style: TextStyle(fontWeight: FontWeight.bold),
-            overflow: TextOverflow.ellipsis,
-          ),
-          subtitle: Text(
-            "${notification['message']}\n${_formatDate(notification['timestamp'])}",
-          ),
-          trailing: IconButton(
-            icon: const Icon(Icons.delete, color: Colors.red),
-            onPressed: () => deleteNotification(notification['notification_id']),
-          ),
-        ),
-        const Divider(thickness: 1), // Add a divider after each ListTile
-      ],
-    );
-  },
-);
-
+              return Column(
+                children: [
+                  ListTile(
+                    title: Text(
+                      "${notification['container_name']}: ${notification['title']}",
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text(
+                      "${notification['message']}\n${_formatDate(notification['timestamp'])}",
+                    ),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.red),
+                      onPressed: () =>
+                          deleteNotification(notification['notification_id']),
+                    ),
+                  ),
+                  const Divider(
+                      thickness: 1), // Add a divider after each ListTile
+                ],
+              );
+            },
+          );
         },
       ),
     );
