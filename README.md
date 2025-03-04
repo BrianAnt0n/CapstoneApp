@@ -1,4 +1,4 @@
-# **Capstone Project of SBIT-4B Group 2 (QCU)**
+# **Capstone Project of SBIT-4B Group 2 (QCU) E-ComposThink Application**
 
 Welcome to the repository for the capstone project of **SBIT-4B Group 2** at Quezon City University (QCU). This project showcases our innovative solution for urban farming and sustainable waste management.
 
