@@ -82,7 +82,7 @@ class _HomePageState extends State<HomePage> {
     _checkSelectedContainer();
 
     // Start a timer that refreshes notifications every second
-    _timer = Timer.periodic(const Duration(seconds: 2), (Timer t) {
+    _timer = Timer.periodic(const Duration(seconds: 30), (Timer t) {
       _refreshNotifications();
     });
   }
@@ -1363,6 +1363,8 @@ Future<List<DateTime>> fetchNoteDates(int hardwareId) async {
     return weeks; // ✅ Returns weeks for other functions
   }
 
+
+
 //notes image section
   final SupabaseClient supabase = Supabase.instance.client;
 
@@ -1806,6 +1808,259 @@ Future<List<DateTime>> fetchNoteDates(int hardwareId) async {
     );
   }
 
+// Function to show the full-screen data report
+  void _showDataReportDialog(
+      BuildContext context, int selectedContainerId) async {
+    print(
+        "Button pressed, fetching hardware ID for container: $selectedContainerId");
+
+    int? hardwareId = await _fetchHardwareId(selectedContainerId);
+    if (hardwareId == null) {
+      print("Error: No hardware ID found for container $selectedContainerId");
+      return;
+    }
+
+    print("Fetched hardware ID: $hardwareId");
+    DateTime selectedDate = DateTime.now();
+    bool hasSelectedDate = false;
+
+    Map<String, String> todayData = await _fetchTodayData(hardwareId);
+    Map<String, String> selectedDateData = {};
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Dialog(
+              insetPadding: EdgeInsets.zero,
+              backgroundColor: Colors.white,
+              child: Scaffold(
+                appBar: AppBar(
+                  title: const Text("Historical Data Report"),
+                  backgroundColor: Colors.blueAccent,
+                  centerTitle: true,
+                  leading: IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ),
+                body: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ListTile(
+                        leading: const Icon(Icons.calendar_today,
+                            color: Colors.blue),
+                        title: const Text("Select Date",
+                            style: TextStyle(fontWeight: FontWeight.bold)),
+                        subtitle: Text(
+                          DateFormat.yMMMMd().format(selectedDate),
+                          style: TextStyle(color: Colors.grey[600]),
+                        ),
+                        trailing: const Icon(Icons.arrow_forward_ios, size: 18),
+                        onTap: () async {
+                          DateTime? pickedDate = await showDatePicker(
+                            context: context,
+                            initialDate: selectedDate,
+                            firstDate: DateTime(2000),
+                            lastDate: DateTime(2100),
+                          );
+                          if (pickedDate != null) {
+                            setState(() {
+                              selectedDate = pickedDate;
+                              hasSelectedDate = true;
+                            });
+                            selectedDateData = await _fetchHistoricalData(
+                                selectedDate, hardwareId);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 20),
+                      Flexible(
+                        fit: FlexFit.loose,
+                        child: SingleChildScrollView(
+                          child: _buildAnalyticsComparisonView(todayData,
+                              selectedDateData, hasSelectedDate, selectedDate),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<int?> _fetchHardwareId(int selectedContainerId) async {
+    try {
+      final response = await Supabase.instance.client
+          .from('Containers_test') // ✅ Use the correct table
+          .select('hardware_id')
+          .eq('container_id',
+              selectedContainerId) // ✅ Match the correct container
+          .maybeSingle();
+
+      if (response == null) {
+        print("No hardware ID found for container: $selectedContainerId");
+        return null;
+      }
+
+      print("Fetched hardware ID: ${response['hardware_id']}");
+      return response['hardware_id'] as int?;
+    } catch (e) {
+      print("Error fetching hardware ID: $e");
+      return null;
+    }
+  }
+
+  Future<Map<String, String>> _fetchTodayData(int hardwareId) async {
+    try {
+      final response = await Supabase.instance.client
+          .from('Hardware_Sensors_Test') // ✅ Fetch from correct table
+          .select()
+          .eq('hardware_id',
+              hardwareId) // ✅ Use hardware_id from Containers_test
+          .order('refreshed_date', ascending: false)
+          .limit(1)
+          .maybeSingle();
+
+      if (response == null) {
+        return _defaultData("No Data");
+      }
+
+      return {
+        "Temperature": "${response['temperature'] ?? 'N/A'}°C",
+        "Moisture Level": "${response['moisture'] ?? 'N/A'}%",
+        "pH Level 1": "${response['ph_level'] ?? 'N/A'}",
+        "pH Level 2": "${response['ph_level2'] ?? 'N/A'}",
+        "Humidity": "${response['humidity'] ?? 'N/A'}%",
+      };
+    } catch (e) {
+      print("Error fetching today's data: $e");
+      return _defaultData("Error");
+    }
+  }
+
+  Future<Map<String, String>> _fetchHistoricalData(
+      DateTime date, int hardwareId) async {
+    try {
+      final response = await Supabase.instance.client
+          .from('History_Test') // ✅ Fetch from correct table
+          .select()
+          .eq('hardware_id',
+              hardwareId) // ✅ Use hardware_id from Containers_test
+          .gte('timestamp', DateFormat('yyyy-MM-dd 00:00:00').format(date))
+          .lte('timestamp', DateFormat('yyyy-MM-dd 23:59:59').format(date))
+          .order('timestamp', ascending: false)
+          .limit(1)
+          .maybeSingle();
+
+      if (response == null) {
+        return _defaultData("No Data");
+      }
+
+      return {
+        "Temperature": "${response['temperature'] ?? 'N/A'}°C",
+        "Moisture Level": "${response['moisture'] ?? 'N/A'}%",
+        "pH Level 1": "${response['ph_level1'] ?? 'N/A'}",
+        "pH Level 2": "${response['ph_level2'] ?? 'N/A'}",
+        "Humidity": "${response['humidity'] ?? 'N/A'}%",
+      };
+    } catch (e) {
+      print("Error fetching historical data: $e");
+      return _defaultData("Error");
+    }
+  }
+
+// Function to build the analytics comparison view
+  Widget _buildAnalyticsComparisonView(
+      Map<String, String> todayData,
+      Map<String, String> selectedDateData,
+      bool hasSelectedDate,
+      DateTime selectedDate) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          "Data Insights",
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+                child: _buildDataColumn(
+                    "Today's Data", todayData, Colors.blueAccent)),
+            if (hasSelectedDate)
+              Expanded(
+                  child: _buildDataColumn(
+                      "Data from ${DateFormat.yMd().format(selectedDate)}",
+                      selectedDateData,
+                      Colors.orange)),
+          ],
+        ),
+      ],
+    );
+  }
+
+// Function to build a uniform column for each dataset
+  Widget _buildDataColumn(String title, Map<String, String> data, Color color) {
+    return Card(
+      margin: const EdgeInsets.all(8),
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title,
+                style: TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.bold, color: color)),
+            const Divider(),
+            ...data.entries.map((entry) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                          child: Text(entry.key,
+                              style: const TextStyle(
+                                  fontSize: 14, fontWeight: FontWeight.w500))),
+                      Expanded(
+                          child: Text(entry.value,
+                              textAlign: TextAlign.right,
+                              style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: color))),
+                    ],
+                  ),
+                )),
+          ],
+        ),
+      ),
+    );
+  }
+
+// Function to provide default data
+  Map<String, String> _defaultData(String message) {
+    return {
+      "Temperature": message,
+      "Moisture Level": message,
+      "pH Level 1": message,
+      "pH Level 2": message,
+      "Humidity": message,
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     return selectedContainerId == null
@@ -2152,7 +2407,50 @@ Future<List<DateTime>> fetchNoteDates(int hardwareId) async {
                       style: TextStyle(
                           fontSize: 14, fontWeight: FontWeight.normal),
                     ),
+Column(
+                      children: [
+                        // Existing historical data graphs go here...
 
+                        const SizedBox(height: 20),
+
+                        // Add "Show Data Report" button below historical data
+                        ElevatedButton(
+                          onPressed: () {
+                            if (selectedContainerId != null) {
+                              _showDataReportDialog(
+                                  context, selectedContainerId!);
+                            } else {
+                              print("Error: No container selected.");
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blueAccent,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 24, vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: const BorderSide(
+                                  color: Colors.white, width: 2),
+                            ),
+                            elevation: 5,
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.analytics, color: Colors.white),
+                              SizedBox(width: 8),
+                              Text(
+                                "Show Data Report",
+                                style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                     FutureBuilder(
                       future: _historyFuture,
                       builder: (context, snapshot) {
