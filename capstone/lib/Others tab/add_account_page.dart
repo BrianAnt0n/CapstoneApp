@@ -19,54 +19,64 @@ class _AddAccountPageState extends State<AddAccountPage> {
   String? _passwordError; // To store password mismatch error
 
   Future<void> _addAccount() async {
-    final String fullname = _fullnameController.text.trim();
-    final String email = _emailController.text.trim();
-    final String password = _passwordController.text.trim();
-    final String confirmPassword = _confirmPasswordController.text.trim();
-    final String userLevel = _selectedUserLevel;
+  final String fullname = _fullnameController.text.trim();
+  final String email = _emailController.text.trim().toLowerCase(); // ✅ Force lowercase
+  final String password = _passwordController.text.trim();
+  final String confirmPassword = _confirmPasswordController.text.trim();
+  final String userLevel = _selectedUserLevel;
 
-    // Check if passwords match
-    if (password != confirmPassword) {
-      setState(() {
-        _passwordError = "Passwords do not match!";
-      });
-      return;
-    } else {
-      setState(() {
-        _passwordError = null; // Clear error if matched
-      });
-    }
-
-    if (fullname.isEmpty || email.isEmpty || password.isEmpty || userLevel.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill in all fields')),
-      );
-      return;
-    }
-
-    try {
-      await supabase.from('Users').insert({
-        'fullname': fullname,
-        'email': email,
-        'password': password,
-        'user_level': userLevel,
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Account added successfully!')),
-      );
-      Navigator.pop(context, true);
-    } catch (error) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error adding account: $error')),
-      );
-    }
+  // ✅ Email format validation
+  final emailRegex = RegExp(r'^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$');
+  if (!emailRegex.hasMatch(email)) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Invalid email format. Please enter a valid email.')),
+    );
+    return;
   }
+
+  // ✅ Check if passwords match
+  if (password != confirmPassword) {
+    setState(() {
+      _passwordError = "Passwords do not match!";
+    });
+    return;
+  } else {
+    setState(() {
+      _passwordError = null; // Clear error if matched
+    });
+  }
+
+  if (fullname.isEmpty || email.isEmpty || password.isEmpty || userLevel.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Please fill in all fields')),
+    );
+    return;
+  }
+
+  try {
+    await supabase.from('Users').insert({
+      'fullname': fullname,
+      'email': email, // ✅ Ensure email is saved in lowercase
+      'password': password,
+      'user_level': userLevel,
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Account added successfully!')),
+    );
+    Navigator.pop(context, true);
+  } catch (error) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Error adding account: $error')),
+    );
+  }
+}
 
   Widget _buildTextField({
     required String label,
     required TextEditingController controller,
     bool isPassword = false,
+    bool isEmail = false, // ✅ Added this
     String? errorText,
   }) {
     return Column(
@@ -77,17 +87,27 @@ class _AddAccountPageState extends State<AddAccountPage> {
         TextField(
           controller: controller,
           obscureText: isPassword,
+          keyboardType: isEmail ? TextInputType.emailAddress : TextInputType.text,
           decoration: InputDecoration(
             hintText: 'Enter $label',
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
             contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
-            errorText: errorText, // Shows error below the text field
+            errorText: errorText,
           ),
+          onChanged: (value) {
+            if (isEmail) {
+              controller.value = controller.value.copyWith(
+                text: value.toLowerCase(), // ✅ Converts input to lowercase
+                selection: TextSelection.collapsed(offset: value.length),
+              );
+            }
+          },
         ),
         const SizedBox(height: 15),
       ],
     );
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -106,7 +126,8 @@ class _AddAccountPageState extends State<AddAccountPage> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     _buildTextField(label: 'Fullname', controller: _fullnameController),
-                    _buildTextField(label: 'Email', controller: _emailController),
+                    _buildTextField(label: 'Email', controller: _emailController, isEmail: true),
+
                     _buildTextField(label: 'Password', controller: _passwordController, isPassword: true),
                     _buildTextField(
                       label: 'Confirm Password',

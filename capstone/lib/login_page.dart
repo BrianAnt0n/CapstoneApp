@@ -78,9 +78,20 @@ class _LoginPageState extends State<LoginPage> {
   //   }
   // }
 
-  void _login() async {
-    String email = _emailController.text.trim();
+ void _login() async {
+    String email =
+        _emailController.text.trim().toLowerCase(); // ✅ Force lowercase
     String password = _passwordController.text.trim();
+
+    // ✅ Email format validation
+    final emailRegex = RegExp(r'^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$');
+    if (!emailRegex.hasMatch(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Invalid email format. Please enter a valid email.')),
+      );
+      return;
+    }
 
     try {
       final response = await supabase
@@ -117,6 +128,7 @@ class _LoginPageState extends State<LoginPage> {
           const SnackBar(content: Text("Login failed. Please try again.")));
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -160,13 +172,22 @@ class _LoginPageState extends State<LoginPage> {
                   // Email Field
                   TextField(
                     controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
                     decoration: const InputDecoration(
                       labelText: 'Email',
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.email),
                     ),
-                    keyboardType: TextInputType.emailAddress,
+                    onChanged: (value) {
+                      _emailController.value = _emailController.value.copyWith(
+                        text: value
+                            .toLowerCase(), // ✅ Converts input to lowercase
+                        selection:
+                            TextSelection.collapsed(offset: value.length),
+                      );
+                    },
                   ),
+
                   const SizedBox(height: 20),
 
                   // Password Field
