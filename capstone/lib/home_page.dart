@@ -2415,35 +2415,53 @@ Column(
 
                         const SizedBox(height: 20),
 
-                        // Add "Show Data Report" button below historical data
+                       // Add "Show Data Report" button below historical data
                         ElevatedButton(
                           onPressed: () async {
                             if (selectedContainerId != null) {
                               final supabase = Supabase.instance.client;
 
                               try {
-                                // Fetch sensor data based on selectedContainerId
+                                // Fetch the correct hardware_id first
+                                final hardwareResponse = await supabase
+                                    .from('Containers_test')
+                                    .select('hardware_id')
+                                    .eq('container_id', selectedContainerId!)
+                                    .maybeSingle();
+
+                                if (hardwareResponse == null ||
+                                    hardwareResponse['hardware_id'] == null) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                        content: Text(
+                                            "No hardware assigned to this container.")),
+                                  );
+                                  return;
+                                }
+
+                                int selectedHardwareId =
+                                    hardwareResponse['hardware_id'];
+
+                                // Fetch sensor data based on hardware_id
                                 final response = await supabase
                                     .from('Hardware_Sensors_Test')
                                     .select(
-                                        'temperature, moisture, ph_level, ph_level2, humidity, refreshed_date') // ✅ Use refreshed_date
-                                    .eq('hardware_id', selectedContainerId!)
-                                    .order('refreshed_date',
-                                        ascending:
-                                            false) // ✅ Order by the latest data
-                                    .limit(10); // ✅ Adjust limit as needed
-
+                                        'temperature, moisture, ph_level, ph_level2, humidity, refreshed_date')
+                                    .eq('hardware_id',
+                                        selectedHardwareId) // ✅ Use hardware_id
+                                    .order('refreshed_date', ascending: false)
+                                    .limit(10);
 
                                 if (response.isNotEmpty) {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
                                       builder: (context) => DataReportPage(
-                                          selectedContainerId:
-                                              selectedContainerId!),
+                                        selectedHardwareId:
+                                            selectedHardwareId, // ✅ Fix here
+                                      ),
                                     ),
                                   );
-
                                 } else {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
@@ -2477,13 +2495,16 @@ Column(
                               Text(
                                 "Show Data Report",
                                 style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white),
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
                               ),
                             ],
                           ),
                         ),
+
+
 
 
                       ],
