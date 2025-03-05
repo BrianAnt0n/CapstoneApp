@@ -52,36 +52,44 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
   }
 
   Future<void> _updateEmail() async {
-    final prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getString("user_id_pref");
-    final newEmail = _emailController.text.trim();
+  final prefs = await SharedPreferences.getInstance();
+  final userId = prefs.getString("user_id_pref");
+  final newEmail = _emailController.text.trim();
 
-    if (userId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('User session not found. Please log in again.')),
-      );
-      return;
-    }
-
-    if (newEmail.isEmpty) {
-      setState(() => _errorText = "Email cannot be empty");
-      return;
-    }
-
-    try {
-      await supabase.from('Users').update({'email': newEmail}).eq('user_id', int.parse(userId));
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Email updated successfully!')),
-      );
-
-      _refreshPage();
-    } catch (error) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error updating email: $error')),
-      );
-    }
+  if (userId == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('User session not found. Please log in again.')),
+    );
+    return;
   }
+
+  if (newEmail.isEmpty) {
+    setState(() => _errorText = "Email cannot be empty");
+    return;
+  }
+
+  // ✅ Email format validation
+  final emailRegex = RegExp(r'^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$');
+  if (!emailRegex.hasMatch(newEmail)) {
+    setState(() => _errorText = "Invalid email format");
+    return;
+  }
+
+  try {
+    await supabase.from('Users').update({'email': newEmail}).eq('user_id', int.parse(userId));
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Email updated successfully!')),
+    );
+
+    _refreshPage();
+  } catch (error) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Error updating email: $error')),
+    );
+  }
+}
+
 
   Future<void> _updatePassword() async {
     final prefs = await SharedPreferences.getInstance();
@@ -156,8 +164,18 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
                 children: [
                   TextField(
                     controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
                     decoration: const InputDecoration(labelText: 'New Email'),
+                    onChanged: (value) {
+                      _emailController.value = _emailController.value.copyWith(
+                        text: value
+                            .toLowerCase(), // ✅ Converts input to lowercase
+                        selection:
+                            TextSelection.collapsed(offset: value.length),
+                      );
+                    },
                   ),
+
                   const SizedBox(height: 10),
                   _buildButton("Update Email", _updateEmail),
                 ],
