@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'shared_prefs_helper.dart';
+import 'package:fl_chart/fl_chart.dart';
 
 class DataReportPage extends StatefulWidget {
   final int selectedHardwareId; // ✅ Using hardware_id
@@ -75,7 +76,7 @@ Widget _buildDatePickerTile(String title, DateTime selectedDate, Function(DateTi
 }
 
 // Data Card Widget
-Widget _buildDataCard(String title, Map<String, String> data) {
+Widget _buildDataCard(String title, Map<String, String> data, bool isFirstDate) {
   return Card(
     color: Colors.white,
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -95,7 +96,14 @@ Widget _buildDataCard(String title, Map<String, String> data) {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(entry.key, style: const TextStyle(fontSize: 16, color: Colors.black54)),
-                  Text(entry.value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blueAccent)),
+                  Text(
+                    entry.value,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: isFirstDate ? Colors.blue : Colors.green, // ✅ Dynamic Color Matching Graph
+                    ),
+                  ),
                 ],
               ),
             );
@@ -105,6 +113,7 @@ Widget _buildDataCard(String title, Map<String, String> data) {
     ),
   );
 }
+
 
 
   Future<Map<String, String>> _fetchHistoricalData(DateTime date, int hardwareId) async {
@@ -192,55 +201,125 @@ Widget _buildDataCard(String title, Map<String, String> data) {
     };
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white, // ✅ White theme background
-      appBar: AppBar(
-        title: const Text("Data Report", style: TextStyle(color: Colors.white)),
-        backgroundColor: Colors.green[700], // ✅ Nature theme
-        elevation: 4,
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          children: [
-            _buildDatePickerTile("Select First Date", firstSelectedDate, (pickedDate) async {
-              if (pickedDate != null) {
-                setState(() {
-                  firstSelectedDate = pickedDate;
-                });
-                firstDateData = await _fetchHistoricalData(firstSelectedDate, hardwareId!);
-                setState(() {});
-              }
-            }),
+  Widget _buildComparisonGraph() {
+  if (firstDateData.isEmpty || secondDateData.isEmpty) {
+    return const Center(child: Text("Select two dates to compare data."));
+  }
 
-            _buildDatePickerTile("Select Second Date", secondSelectedDate, (pickedDate) async {
-              if (pickedDate != null) {
-                setState(() {
-                  secondSelectedDate = pickedDate;
-                  hasSecondDate = true;
-                });
-                secondDateData = await _fetchHistoricalData(secondSelectedDate, hardwareId!);
-                setState(() {});
-              }
-            }),
+  List<String> labels = ["Temperature", "Moisture Level", "pH Level 1", "pH Level 2", "Humidity"];
+  List<double> firstValues = labels.map((label) {
+    return double.tryParse(firstDateData[label]?.replaceAll(RegExp('[^0-9.]'), '') ?? "0") ?? 0;
+  }).toList();
 
-            Expanded(
-              child: ListView(
-                children: [
-                  _buildDataCard("First Date Data", firstDateData),
-                  if (hasSecondDate) _buildDataCard("Second Date Data", secondDateData),
-                  _buildFrequencyAnalysisCard(),
-                ],
-              ),
+  List<double> secondValues = labels.map((label) {
+    return double.tryParse(secondDateData[label]?.replaceAll(RegExp('[^0-9.]'), '') ?? "0") ?? 0;
+  }).toList();
+
+  return SizedBox(
+    height: 300,
+    child: BarChart(
+      BarChartData(
+        barGroups: List.generate(labels.length, (index) {
+          return BarChartGroupData(
+            x: index,
+            barRods: [
+              BarChartRodData(toY: firstValues[index], color: Colors.blue, width: 16),
+              BarChartRodData(toY: secondValues[index], color: Colors.green, width: 16),
+            ],
+          );
+        }),
+        titlesData: FlTitlesData(
+          leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 40)),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              getTitlesWidget: (value, _) {
+                return Icon(_getSensorIcon(labels[value.toInt()]), size: 24, color: Colors.black54); // ✅ Icons for X-Axis
+              },
             ),
-          ],
+          ),
         ),
       ),
-    );
+    ),
+  );
+}
+
+// Function to Map Sensor Type to Icons
+IconData _getSensorIcon(String sensorType) {
+  switch (sensorType.toLowerCase()) {
+    case "temperature":
+      return Icons.thermostat; // 🌡️ Temperature
+    case "moisture level":
+      return Icons.water_drop; // 💧 Moisture Level
+    case "ph level 1":
+    case "ph level 2":
+      return Icons.science; // 🧪 pH Levels
+    case "humidity":
+      return Icons.cloud; // ☁️ Humidity
+    default:
+      return Icons.device_unknown; // ❓ Default Icon
   }
+}
+
+
+
+  @override
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: Colors.white,
+    appBar: AppBar(
+      title: const Text("Data Report", style: TextStyle(color: Colors.white)),
+      backgroundColor: Colors.green[700],
+      elevation: 4,
+      iconTheme: const IconThemeData(color: Colors.white),
+    ),
+    body: Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        children: [
+          _buildDatePickerTile("Select First Date", firstSelectedDate, (pickedDate) async {
+            if (pickedDate != null) {
+              setState(() {
+                firstSelectedDate = pickedDate;
+              });
+              firstDateData = await _fetchHistoricalData(firstSelectedDate, hardwareId!);
+              setState(() {});
+            }
+          }),
+
+          _buildDatePickerTile("Select Second Date", secondSelectedDate, (pickedDate) async {
+            if (pickedDate != null) {
+              setState(() {
+                secondSelectedDate = pickedDate;
+                hasSecondDate = true;
+              });
+              secondDateData = await _fetchHistoricalData(secondSelectedDate, hardwareId!);
+              setState(() {});
+            }
+          }),
+
+          Expanded(
+              child: ListView(
+                children: [
+                  _buildDataCard("First Date Data", firstDateData, true),
+                  if (hasSecondDate)
+                    _buildDataCard("Second Date Data", secondDateData, false),
+                  if (hasSecondDate) _buildComparisonGraph(),
+
+                  const Divider(
+                      thickness: 2,
+                      color: Colors.black26), // ✅ Adds a Visual Separator
+
+                  _buildFrequencyAnalysisCard(),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
 
   Widget _buildFrequencyAnalysisCard() {
     return Card(
