@@ -823,6 +823,18 @@ Widget _buildTimeBasedFrequencyGraph() {
   );
 }
 
+String formatSensorValue(String sensor, double value) {
+  if (sensor.toLowerCase().contains("moisture") || sensor.toLowerCase().contains("humidity")) {
+    return "${value.toInt()}%"; // Whole number + %
+  } else if (sensor.toLowerCase().contains("temperature")) {
+    return "${value.toStringAsFixed(1)}°C"; // 1 decimal place + °C
+  } else if (sensor.toLowerCase().contains("ph")) {
+    return value.toStringAsFixed(2); // 2 decimal places
+  }
+  return value.toString(); // Default case
+}
+
+
 Widget _buildConclusionWidget() {
   if (firstDateData.isEmpty && secondDateData.isEmpty && frequencyAnalysisData.isEmpty) {
     return const Center(
@@ -843,43 +855,59 @@ Widget _buildConclusionWidget() {
       double secondValue = double.tryParse(secondDateData[label]?.replaceAll(RegExp('[^0-9.]'), '') ?? "0") ?? 0;
 
       if (firstValue > secondValue) {
-          double diff = (firstValue - secondValue);
-          comparisonSummary +=
-              "$label on **$firstDateStr** was higher than on **$secondDateStr** by ${diff.toStringAsFixed(2)}.\n";
-        } else if (firstValue < secondValue) {
-          double diff = (secondValue - firstValue);
-          comparisonSummary +=
-              "$label on **$secondDateStr** was higher than on **$firstDateStr** by ${diff.toStringAsFixed(2)}.\n";
-        } else {
-          comparisonSummary +=
-              "$label was the same on **both dates** ($firstDateStr & $secondDateStr).\n";
-        }
+        double diff = (firstValue - secondValue);
+        comparisonSummary +=
+            "$label on **$firstDateStr** was higher than on **$secondDateStr** by ${diff.toStringAsFixed(2)}.\n";
+      } else if (firstValue < secondValue) {
+        double diff = (secondValue - firstValue);
+        comparisonSummary +=
+            "$label on **$secondDateStr** was higher than on **$firstDateStr** by ${diff.toStringAsFixed(2)}.\n";
+      } else {
+        comparisonSummary +=
+            "$label was the same on **both dates** ($firstDateStr & $secondDateStr).\n";
+      }
     }
   }
 
-  // 📌 2️⃣ Time-Based Frequency Summary
+  // 📌 2️⃣ Time-Based Frequency Summary (Updated)
   String frequencySummary = "";
   if (frequencyAnalysisData.isNotEmpty) {
-    String highestSensor = "";
-    double highestValue = 0;
-    String peakTime = "";
+    List<String> summaries = [];
 
-    for (var sensor in frequencyAnalysisData.keys) {
-      for (var entry in frequencyAnalysisData[sensor] ?? []) {
-        double value = double.tryParse(entry["Value"].toString()) ?? 0;
-        if (value > highestValue) {
-          highestValue = value;
-          highestSensor = sensor;
-          peakTime = entry["Time"];
+    frequencyAnalysisData.forEach((sensorType, sensorData) {
+      if (sensorData.isNotEmpty) {
+        // ✅ Find the highest value for this sensor type
+        var highestRecord = (sensorData as List<Map<String, dynamic>>).reduce(
+              (a, b) => (double.tryParse(a["Value"].toString()) ?? 0) >
+                      (double.tryParse(b["Value"].toString()) ?? 0)
+                  ? a
+                  : b);
+                  
+        double highestValue = double.tryParse(highestRecord["Value"].toString()) ?? 0;
+        String highestValueStr = formatSensorValue(sensorType, highestValue);
+        String rawTimestamp = highestRecord["Time"];
+        String formattedTimestamp = "Unknown Time";
+
+        try {
+          DateTime parsedTime = DateFormat("yyyy-MM-dd hh:mm a").parse(rawTimestamp);
+          if (selectedFilter == "Weekly") {
+            formattedTimestamp = DateFormat("yyyy-MM-dd hh:mm a").format(parsedTime);
+          } else {
+            formattedTimestamp = DateFormat("hh:mm a").format(parsedTime);
+          }
+        } catch (e) {
+          print("⚠️ Error parsing timestamp: $rawTimestamp - $e");
         }
-      }
-    }
 
-    if (selectedFilter == "Daily") {
-      frequencySummary = "The highest recorded value today was $highestSensor at $peakTime with $highestValue.";
-    } else {
-      frequencySummary = "The highest recorded value this week was $highestSensor at $peakTime with $highestValue.";
-    }
+        // ✅ Add summary for this sensor type
+        summaries.add(selectedFilter == "Weekly"
+              ? "The highest recorded value this week for **$sensorType** was at **$formattedTimestamp** with a value of **$highestValueStr**."
+              : "The highest recorded value today for **$sensorType** was at **$formattedTimestamp** with a value of **$highestValueStr**.");
+      }
+    });
+
+    // ✅ Combine summaries for all sensor types
+    frequencySummary = summaries.join("\n");
   }
 
   // 📌 UI Layout
@@ -915,6 +943,7 @@ Widget _buildConclusionWidget() {
     ),
   );
 }
+
 
 
 }
