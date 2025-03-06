@@ -386,22 +386,27 @@ FlTitlesData _buildChartTitles(List<String> timestamps) {
                 parsedTime = DateFormat("yyyy-MM-dd HH:mm:ss").parse(timestamps[index]);
               }
 
-              // ✅ Show Day for Weekly, Only Time for Daily
+              // ✅ Show Day + Time for Weekly, Only Time for Daily
               formattedTime = (selectedFilter == "Weekly")
-                  ? DateFormat("EEE hh:mm a").format(parsedTime) // Show day (Mon, Tue, etc.)
-                  : DateFormat("hh:mm a").format(parsedTime); // Only time
+                  ? DateFormat("EEE hh:mm a").format(parsedTime) // Mon 08:00 AM
+                  : DateFormat("hh:mm a").format(parsedTime); // 08:00 AM
             } catch (e) {
               print("⚠️ Error parsing timestamp: ${timestamps[index]} - $e");
             }
 
-            return Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                formattedTime,
-                style: const TextStyle(fontSize: 10),
-                textAlign: TextAlign.center,
-              ),
-            );
+            // ✅ Adaptive Label Spacing
+            bool showLabel = timestamps.length <= 4 || index % 2 == 0; // Show every other label if > 4
+
+            return showLabel
+                ? Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      formattedTime,
+                      style: const TextStyle(fontSize: 10),
+                      textAlign: TextAlign.center,
+                    ),
+                  )
+                : const SizedBox.shrink(); // ✅ Hide label if skipping
           }
           return const Text("");
         },
@@ -632,34 +637,70 @@ Widget _buildTimeBasedFrequencyGraph() {
           height: 300, // ✅ Fixed height for Daily
           child: BarChart(
             BarChartData(
-              barGroups: List.generate(timestamps.length, (index) {
-                String timeLabel = timestamps[index];
+  barGroups: List.generate(timestamps.length, (index) {
+    String timeLabel = timestamps[index];
 
-                List<BarChartRodData> bars = [];
+    List<BarChartRodData> bars = [];
 
-                for (var sensor in sensorTypes) {
-                  var sensorData = frequencyAnalysisData[sensor]
-                          ?.where((data) => data["Time"] == timeLabel)
-                          .toList() ??
-                      [];
-                  if (sensorData.isNotEmpty) {
-                    double sensorValue =
-                        double.tryParse(sensorData.first["Value"].toString()) ?? 0;
+    for (var sensor in sensorTypes) {
+      var sensorData = frequencyAnalysisData[sensor]
+              ?.where((data) => data["Time"] == timeLabel)
+              .toList() ??
+          [];
+      if (sensorData.isNotEmpty) {
+        double sensorValue = double.tryParse(sensorData.first["Value"].toString()) ?? 0;
 
-                    bars.add(
-                      BarChartRodData(
-                        toY: sensorValue,
-                        color: _getSensorColor(sensor),
-                        width: 16,
-                      ),
-                    );
-                  }
-                }
+        bars.add(
+          BarChartRodData(
+            toY: sensorValue,
+            color: _getSensorColor(sensor),
+            width: 16,
+          ),
+        );
+      }
+    }
 
-                return BarChartGroupData(x: index, barRods: bars);
-              }),
-              titlesData: _buildChartTitles(timestamps), // ✅ Reuse title logic
-            ),
+    return BarChartGroupData(x: index, barRods: bars);
+  }),
+
+  // ✅ Enable Touch Interaction
+  barTouchData: BarTouchData(
+  touchTooltipData: BarTouchTooltipData(
+    getTooltipItem: (group, groupIndex, rod, rodIndex) {
+      String formattedTime = "Unknown Time";
+
+      try {
+        DateTime parsedTime;
+        if (timestamps[groupIndex].contains("AM") || timestamps[groupIndex].contains("PM")) {
+          parsedTime = DateFormat("yyyy-MM-dd hh:mm a").parse(timestamps[groupIndex]);
+        } else {
+          parsedTime = DateFormat("yyyy-MM-dd HH:mm:ss").parse(timestamps[groupIndex]);
+        }
+
+        // Show Day + Time for Weekly, Only Time for Daily
+        formattedTime = (selectedFilter == "Weekly")
+            ? DateFormat("EEE hh:mm a").format(parsedTime) // Example: Mon 08:00 AM
+            : DateFormat("hh:mm a").format(parsedTime); // Example: 08:00 AM
+      } catch (e) {
+        print("Error parsing timestamp: ${timestamps[groupIndex]} - $e");
+      }
+
+      return BarTooltipItem(
+        "Sensor Value: ${rod.toY}\nTime: $formattedTime", // Tooltip Format
+        const TextStyle(color: Colors.white, fontSize: 12),
+      );
+    },
+    getTooltipColor: (group) => Colors.black87, // Tooltip background color
+    tooltipRoundedRadius: 8, // Rounded corners
+    tooltipPadding: const EdgeInsets.all(8), // Padding inside tooltip
+    tooltipMargin: 10, // Space between bars & tooltip
+  ),
+),
+
+
+  titlesData: _buildChartTitles(timestamps), // ✅ Keep existing title formatting
+),
+
           ),
         ),
       ],
@@ -704,32 +745,70 @@ Widget _buildTimeBasedFrequencyGraph() {
             height: 300, // ✅ Consistent height per graph
             child: BarChart(
               BarChartData(
-                barGroups: List.generate(sensorTimestamps.length, (index) {
-                  String timeLabel = sensorTimestamps[index];
+  barGroups: List.generate(timestamps.length, (index) {
+    String timeLabel = timestamps[index];
 
-                  var sensorData = frequencyAnalysisData[sensor]
-                          ?.where((data) => data["Time"] == timeLabel)
-                          .toList() ??
-                      [];
-                  if (sensorData.isNotEmpty) {
-                    double sensorValue =
-                        double.tryParse(sensorData.first["Value"].toString()) ?? 0;
+    List<BarChartRodData> bars = [];
 
-                    return BarChartGroupData(
-                      x: index,
-                      barRods: [
-                        BarChartRodData(
-                          toY: sensorValue,
-                          color: _getSensorColor(sensor),
-                          width: 16,
-                        ),
-                      ],
-                    );
-                  }
-                  return BarChartGroupData(x: index, barRods: []);
-                }),
-                titlesData: _buildChartTitles(sensorTimestamps), // ✅ Reuse title logic
-              ),
+    for (var sensor in sensorTypes) {
+      var sensorData = frequencyAnalysisData[sensor]
+              ?.where((data) => data["Time"] == timeLabel)
+              .toList() ??
+          [];
+      if (sensorData.isNotEmpty) {
+        double sensorValue = double.tryParse(sensorData.first["Value"].toString()) ?? 0;
+
+        bars.add(
+          BarChartRodData(
+            toY: sensorValue,
+            color: _getSensorColor(sensor),
+            width: 16,
+          ),
+        );
+      }
+    }
+
+    return BarChartGroupData(x: index, barRods: bars);
+  }),
+
+  // ✅ Enable Touch Interaction
+  barTouchData: BarTouchData(
+  touchTooltipData: BarTouchTooltipData(
+    getTooltipItem: (group, groupIndex, rod, rodIndex) {
+      String formattedTime = "Unknown Time";
+
+      try {
+        DateTime parsedTime;
+        if (timestamps[groupIndex].contains("AM") || timestamps[groupIndex].contains("PM")) {
+          parsedTime = DateFormat("yyyy-MM-dd hh:mm a").parse(timestamps[groupIndex]);
+        } else {
+          parsedTime = DateFormat("yyyy-MM-dd HH:mm:ss").parse(timestamps[groupIndex]);
+        }
+
+        // Show Day + Time for Weekly, Only Time for Daily
+        formattedTime = (selectedFilter == "Weekly")
+            ? DateFormat("EEE hh:mm a").format(parsedTime) // Example: Mon 08:00 AM
+            : DateFormat("hh:mm a").format(parsedTime); // Example: 08:00 AM
+      } catch (e) {
+        print("Error parsing timestamp: ${timestamps[groupIndex]} - $e");
+      }
+
+      return BarTooltipItem(
+        "Sensor Value: ${rod.toY}\nTime: $formattedTime", // Tooltip Format
+        const TextStyle(color: Colors.white, fontSize: 12),
+      );
+    },
+    getTooltipColor: (group) => Colors.black87, // Tooltip background color
+    tooltipRoundedRadius: 8, // Rounded corners
+    tooltipPadding: const EdgeInsets.all(8), // Padding inside tooltip
+    tooltipMargin: 10, // Space between bars & tooltip
+  ),
+),
+
+
+  titlesData: _buildChartTitles(timestamps), // ✅ Keep existing title formatting
+),
+
             ),
           ),
         ],
