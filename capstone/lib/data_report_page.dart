@@ -242,9 +242,9 @@ String selectedFilter = "Daily"; // Default filter
       return Colors.red;
     case "moisture":
       return Colors.blue;
-    case "ph level 1":
+    case "ph_level": // ✅ Match database name
       return Colors.green;
-    case "ph level 2":
+    case "ph_level2": // ✅ Match database name
       return Colors.orange;
     case "humidity":
       return Colors.purple;
@@ -252,6 +252,7 @@ String selectedFilter = "Daily"; // Default filter
       return Colors.grey; // Default color for unknown sensors
   }
 }
+
 
 
   Widget _buildComparisonGraph() {
@@ -268,33 +269,63 @@ String selectedFilter = "Daily"; // Default filter
     return double.tryParse(secondDateData[label]?.replaceAll(RegExp('[^0-9.]'), '') ?? "0") ?? 0;
   }).toList();
 
-  return SizedBox(
-    height: 300,
-    child: BarChart(
-      BarChartData(
-        barGroups: List.generate(labels.length, (index) {
-          return BarChartGroupData(
-            x: index, // ✅ Use index directly for positioning
-
-            barRods: [
-              BarChartRodData(toY: firstValues[index], color: Colors.blue, width: 16),
-              BarChartRodData(toY: secondValues[index], color: Colors.green, width: 16),
+  return Column(
+    children: [
+      // ✅ Legend Row
+      Wrap(
+        spacing: 12,
+        children: labels.map((sensor) {
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(_getSensorIcon(sensor), size: 18, color: Colors.black),
+              const SizedBox(width: 5),
+              Text(sensor, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
             ],
           );
-        }),
-        titlesData: FlTitlesData(
-          leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 40)),
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              getTitlesWidget: (value, _) {
-                return Icon(_getSensorIcon(labels[value.toInt()]), size: 24, color: Colors.black54); // ✅ Icons for X-Axis
-              },
+        }).toList(),
+      ),
+
+      const SizedBox(height: 13), // ✅ Adds spacing before the graph
+
+      // ✅ The Graph
+      SizedBox(
+        height: 300,
+        child: BarChart(
+          BarChartData(
+            barGroups: List.generate(labels.length, (index) {
+              return BarChartGroupData(
+                x: index, // ✅ Use index directly for positioning
+                barRods: [
+                  BarChartRodData(toY: firstValues[index], color: Colors.blue, width: 16),
+                  BarChartRodData(toY: secondValues[index], color: Colors.green, width: 16),
+                ],
+              );
+            }),
+            titlesData: FlTitlesData(
+              topTitles: AxisTitles(
+                sideTitles: SideTitles(showTitles: false), // ✅ Hide numbers on top
+              ),
+              leftTitles: AxisTitles(
+                sideTitles: SideTitles(showTitles: true, reservedSize: 40),
+              ),
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  getTitlesWidget: (value, _) {
+                    return Icon(
+                      _getSensorIcon(labels[value.toInt()]),
+                      size: 24,
+                      color: Colors.black54,
+                    );
+                  },
+                ),
+              ),
             ),
           ),
         ),
       ),
-    ),
+    ],
   );
 }
 
@@ -369,12 +400,16 @@ Widget build(BuildContext context) {
             }
           }),
 
+
           Expanded(
   child: ListView(
     children: [
       _buildDataCard("First Date Data", firstDateData, true),
       if (hasSecondDate) _buildDataCard("Second Date Data", secondDateData, false),
+      const SizedBox(height: 16), // ✅ Adds spacing between _buildDataCard and _buildComparisonGraph
       if (hasSecondDate) _buildComparisonGraph(),
+
+      const SizedBox(height: 12), // ✅ Adds spacing before the graph
 
       const Divider(thickness: 2, color: Colors.black26), // ✅ Adds a Visual Separator
       
@@ -409,7 +444,7 @@ Widget build(BuildContext context) {
           ],
         ),
       ),
-
+      
       // Build Frequency Analysis Card
        _buildFrequencyAnalysisCard(),
 
@@ -499,45 +534,129 @@ Widget _buildTimeBasedFrequencyGraph() {
   }
 
   List<String> sensorTypes = frequencyAnalysisData.keys.toList();
+  List<String> timestamps = [];
 
-  return SizedBox(
-    height: 300,
-    child: BarChart(
-      BarChartData(
-        barGroups: List.generate(sensorTypes.length, (index) {
-          String sensor = sensorTypes[index];
-          List<dynamic> sensorData = frequencyAnalysisData[sensor] ?? [];
+  // ✅ Collect unique timestamps for X-axis labels
+  for (var sensor in sensorTypes) {
+    for (var entry in frequencyAnalysisData[sensor] ?? []) {
+      if (!timestamps.contains(entry["Time"])) {
+        timestamps.add(entry["Time"]);
+      }
+    }
+  }
 
-          return BarChartGroupData(
-            x: sensorData.isNotEmpty
-                ? int.tryParse(sensorData.first["Time"].split(":")[0]) ?? index
-                : index, // Ensure valid X values
-            barRods: sensorData.map((data) {
-              double sensorValue = double.tryParse(data["Value"].toString()) ?? 0;
-              return BarChartRodData(
-                toY: sensorValue, // Y-axis uses parsed sensor values
-                color: _getSensorColor(sensor), // Assign proper colors
-                width: 16,
-              );
-            }).toList(),
+  return Column(
+    children: [
+      // ✅ Add the Legend Row
+      Wrap(
+        spacing: 10,
+        children: sensorTypes.map((sensor) {
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: _getSensorColor(sensor),
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 5),
+              Text(sensor, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            ],
           );
-        }),
-        titlesData: FlTitlesData(
-          leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 40)),
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              getTitlesWidget: (value, meta) {
-                String sensorLabel = sensorTypes.elementAt(value.toInt() % sensorTypes.length);
-                return Text(sensorLabel, style: const TextStyle(fontSize: 12));
-              },
+        }).toList(),
+      ),
+
+      const SizedBox(height: 12), // ✅ Adds spacing before the graph
+
+      // ✅ The Graph
+      SizedBox(
+        height: 300,
+        child: BarChart(
+          BarChartData(
+            barGroups: List.generate(timestamps.length, (index) {
+              String timeLabel = timestamps[index];
+
+              List<BarChartRodData> bars = [];
+
+              for (var sensor in sensorTypes) {
+                var sensorData = frequencyAnalysisData[sensor]
+                        ?.where((data) => data["Time"] == timeLabel)
+                        .toList() ??
+                    [];
+                if (sensorData.isNotEmpty) {
+                  double sensorValue =
+                      double.tryParse(sensorData.first["Value"].toString()) ?? 0;
+
+                  bars.add(
+                    BarChartRodData(
+                      toY: sensorValue,
+                      color: _getSensorColor(sensor),
+                      width: 16,
+                    ),
+                  );
+                }
+              }
+
+              return BarChartGroupData(x: index, barRods: bars);
+            }),
+            titlesData: FlTitlesData(
+                topTitles: AxisTitles(
+                  // ✅ Hide the numbers at the top
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                leftTitles: AxisTitles(
+                  sideTitles: SideTitles(showTitles: true, reservedSize: 40),
+                ),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    reservedSize: 60,
+                    getTitlesWidget: (value, meta) {
+                      int index = value.toInt();
+                      if (index >= 0 && index < timestamps.length) {
+                        String formattedTime = "Invalid Time";
+
+                        try {
+                          DateTime parsedTime;
+                          if (timestamps[index].contains("AM") ||
+                              timestamps[index].contains("PM")) {
+                            parsedTime = DateFormat("yyyy-MM-dd hh:mm a")
+                                .parse(timestamps[index]);
+                          } else {
+                            parsedTime = DateFormat("yyyy-MM-dd HH:mm:ss")
+                                .parse(timestamps[index]);
+                          }
+                          formattedTime =
+                              DateFormat("hh:mm a").format(parsedTime);
+                        } catch (e) {
+                          print(
+                              "⚠️ Error parsing timestamp: ${timestamps[index]} - $e");
+                        }
+
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            formattedTime,
+                            style: const TextStyle(fontSize: 10),
+                            textAlign: TextAlign.center,
+                          ),
+                        );
+                      }
+                      return const Text("");
+                  },
+                ),
+              ),
             ),
           ),
         ),
       ),
-    ),
+    ],
   );
 }
+
 
 
 }
