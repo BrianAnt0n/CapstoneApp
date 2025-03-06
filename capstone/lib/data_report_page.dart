@@ -502,7 +502,13 @@ Widget build(BuildContext context) {
        _buildFrequencyAnalysisCard(),
 
       const SizedBox(height: 16), // ✅ Adds spacing before the graph
-      if (frequencyAnalysisData.isNotEmpty) _buildTimeBasedFrequencyGraph(),
+      if (frequencyAnalysisData.isNotEmpty)
+                    _buildTimeBasedFrequencyGraph(),
+                  const SizedBox( height: 16), // Adds spacing before the conclusion
+                  _buildConclusionWidget(),
+
+
+
               ],
             ),
           ),
@@ -817,6 +823,98 @@ Widget _buildTimeBasedFrequencyGraph() {
   );
 }
 
+Widget _buildConclusionWidget() {
+  if (firstDateData.isEmpty && secondDateData.isEmpty && frequencyAnalysisData.isEmpty) {
+    return const Center(
+      child: Text("No data available for conclusion."),
+    );
+  }
+
+  String firstDateStr = DateFormat("yyyy-MM-dd").format(firstSelectedDate);
+  String secondDateStr = DateFormat("yyyy-MM-dd").format(secondSelectedDate);
+
+  // 📌 1️⃣ Comparison Summary
+  String comparisonSummary = "";
+  if (firstDateData.isNotEmpty && secondDateData.isNotEmpty) {
+    List<String> labels = ["Temperature", "Moisture Level", "pH Level 1", "pH Level 2", "Humidity"];
+
+    for (String label in labels) {
+      double firstValue = double.tryParse(firstDateData[label]?.replaceAll(RegExp('[^0-9.]'), '') ?? "0") ?? 0;
+      double secondValue = double.tryParse(secondDateData[label]?.replaceAll(RegExp('[^0-9.]'), '') ?? "0") ?? 0;
+
+      if (firstValue > secondValue) {
+          double diff = (firstValue - secondValue);
+          comparisonSummary +=
+              "$label on **$firstDateStr** was higher than on **$secondDateStr** by ${diff.toStringAsFixed(2)}.\n";
+        } else if (firstValue < secondValue) {
+          double diff = (secondValue - firstValue);
+          comparisonSummary +=
+              "$label on **$secondDateStr** was higher than on **$firstDateStr** by ${diff.toStringAsFixed(2)}.\n";
+        } else {
+          comparisonSummary +=
+              "$label was the same on **both dates** ($firstDateStr & $secondDateStr).\n";
+        }
+    }
+  }
+
+  // 📌 2️⃣ Time-Based Frequency Summary
+  String frequencySummary = "";
+  if (frequencyAnalysisData.isNotEmpty) {
+    String highestSensor = "";
+    double highestValue = 0;
+    String peakTime = "";
+
+    for (var sensor in frequencyAnalysisData.keys) {
+      for (var entry in frequencyAnalysisData[sensor] ?? []) {
+        double value = double.tryParse(entry["Value"].toString()) ?? 0;
+        if (value > highestValue) {
+          highestValue = value;
+          highestSensor = sensor;
+          peakTime = entry["Time"];
+        }
+      }
+    }
+
+    if (selectedFilter == "Daily") {
+      frequencySummary = "The highest recorded value today was $highestSensor at $peakTime with $highestValue.";
+    } else {
+      frequencySummary = "The highest recorded value this week was $highestSensor at $peakTime with $highestValue.";
+    }
+  }
+
+  // 📌 UI Layout
+  return Card(
+    color: Colors.white,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    elevation: 3,
+    margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+    child: Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "Conclusion & Findings",
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black),
+          ),
+          const Divider(color: Colors.black45),
+
+          if (comparisonSummary.isNotEmpty) ...[
+            Text("📊 Date Comparison Summary ($firstDateStr vs. $secondDateStr)",
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(comparisonSummary, style: const TextStyle(fontSize: 16, color: Colors.black54)),
+            const SizedBox(height: 10),
+          ],
+
+          if (frequencySummary.isNotEmpty) ...[
+            const Text("📈 Time-Based Frequency Summary", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(frequencySummary, style: const TextStyle(fontSize: 16, color: Colors.black54)),
+          ],
+        ],
+      ),
+    ),
+  );
+}
 
 
 }
