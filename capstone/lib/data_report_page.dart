@@ -502,7 +502,13 @@ Widget build(BuildContext context) {
        _buildFrequencyAnalysisCard(),
 
       const SizedBox(height: 16), // ✅ Adds spacing before the graph
-      if (frequencyAnalysisData.isNotEmpty) _buildTimeBasedFrequencyGraph(),
+      if (frequencyAnalysisData.isNotEmpty)
+                    _buildTimeBasedFrequencyGraph(),
+                  const SizedBox( height: 16), // Adds spacing before the conclusion
+                  _buildConclusionWidget(),
+
+
+
               ],
             ),
           ),
@@ -814,6 +820,127 @@ Widget _buildTimeBasedFrequencyGraph() {
         ],
       );
     }).toList(),
+  );
+}
+
+String formatSensorValue(String sensor, double value) {
+  if (sensor.toLowerCase().contains("moisture") || sensor.toLowerCase().contains("humidity")) {
+    return "${value.toInt()}%"; // Whole number + %
+  } else if (sensor.toLowerCase().contains("temperature")) {
+    return "${value.toStringAsFixed(1)}°C"; // 1 decimal place + °C
+  } else if (sensor.toLowerCase().contains("ph")) {
+    return value.toStringAsFixed(2); // 2 decimal places
+  }
+  return value.toString(); // Default case
+}
+
+
+Widget _buildConclusionWidget() {
+  if (firstDateData.isEmpty && secondDateData.isEmpty && frequencyAnalysisData.isEmpty) {
+    return const Center(
+      child: Text("No data available for conclusion."),
+    );
+  }
+
+  String firstDateStr = DateFormat("yyyy-MM-dd").format(firstSelectedDate);
+  String secondDateStr = DateFormat("yyyy-MM-dd").format(secondSelectedDate);
+
+  // 📌 1️⃣ Comparison Summary
+  String comparisonSummary = "";
+  if (firstDateData.isNotEmpty && secondDateData.isNotEmpty) {
+    List<String> labels = ["Temperature", "Moisture Level", "pH Level 1", "pH Level 2", "Humidity"];
+
+    for (String label in labels) {
+      double firstValue = double.tryParse(firstDateData[label]?.replaceAll(RegExp('[^0-9.]'), '') ?? "0") ?? 0;
+      double secondValue = double.tryParse(secondDateData[label]?.replaceAll(RegExp('[^0-9.]'), '') ?? "0") ?? 0;
+
+      if (firstValue > secondValue) {
+        double diff = (firstValue - secondValue);
+        comparisonSummary +=
+            "$label on **$firstDateStr** was higher than on **$secondDateStr** by ${diff.toStringAsFixed(2)}.\n";
+      } else if (firstValue < secondValue) {
+        double diff = (secondValue - firstValue);
+        comparisonSummary +=
+            "$label on **$secondDateStr** was higher than on **$firstDateStr** by ${diff.toStringAsFixed(2)}.\n";
+      } else {
+        comparisonSummary +=
+            "$label was the same on **both dates** ($firstDateStr & $secondDateStr).\n";
+      }
+    }
+  }
+
+  // 📌 2️⃣ Time-Based Frequency Summary (Updated)
+  String frequencySummary = "";
+  if (frequencyAnalysisData.isNotEmpty) {
+    List<String> summaries = [];
+
+    frequencyAnalysisData.forEach((sensorType, sensorData) {
+      if (sensorData.isNotEmpty) {
+        // ✅ Find the highest value for this sensor type
+        var highestRecord = (sensorData as List<Map<String, dynamic>>).reduce(
+              (a, b) => (double.tryParse(a["Value"].toString()) ?? 0) >
+                      (double.tryParse(b["Value"].toString()) ?? 0)
+                  ? a
+                  : b);
+                  
+        double highestValue = double.tryParse(highestRecord["Value"].toString()) ?? 0;
+        String highestValueStr = formatSensorValue(sensorType, highestValue);
+        String rawTimestamp = highestRecord["Time"];
+        String formattedTimestamp = "Unknown Time";
+
+        try {
+          DateTime parsedTime = DateFormat("yyyy-MM-dd hh:mm a").parse(rawTimestamp);
+          if (selectedFilter == "Weekly") {
+            formattedTimestamp = DateFormat("yyyy-MM-dd hh:mm a").format(parsedTime);
+          } else {
+            formattedTimestamp = DateFormat("hh:mm a").format(parsedTime);
+          }
+        } catch (e) {
+          print("⚠️ Error parsing timestamp: $rawTimestamp - $e");
+        }
+
+        // ✅ Add summary for this sensor type
+        summaries.add(selectedFilter == "Weekly"
+              ? "The highest recorded value this week for **$sensorType** was at **$formattedTimestamp** with a value of **$highestValueStr**."
+              : "The highest recorded value today for **$sensorType** was at **$formattedTimestamp** with a value of **$highestValueStr**.");
+      }
+    });
+
+    // ✅ Combine summaries for all sensor types
+    frequencySummary = summaries.join("\n");
+  }
+
+  // 📌 UI Layout
+  return Card(
+    color: Colors.white,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    elevation: 3,
+    margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+    child: Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "Conclusion & Findings",
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black),
+          ),
+          const Divider(color: Colors.black45),
+
+          if (comparisonSummary.isNotEmpty) ...[
+            Text("📊 Date Comparison Summary ($firstDateStr vs. $secondDateStr)",
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(comparisonSummary, style: const TextStyle(fontSize: 16, color: Colors.black54)),
+            const SizedBox(height: 10),
+          ],
+
+          if (frequencySummary.isNotEmpty) ...[
+            const Text("📈 Time-Based Frequency Summary", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(frequencySummary, style: const TextStyle(fontSize: 16, color: Colors.black54)),
+          ],
+        ],
+      ),
+    ),
   );
 }
 
