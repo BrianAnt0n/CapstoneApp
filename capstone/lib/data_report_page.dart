@@ -361,6 +361,54 @@ String _formatSensorValue(String sensorType, dynamic value) {
   return value.toString(); // ✅ Keep pH values as-is
 }
 
+FlTitlesData _buildChartTitles(List<String> timestamps) {
+  return FlTitlesData(
+    topTitles: AxisTitles(
+      sideTitles: SideTitles(showTitles: false), // ✅ Hide numbers at the top
+    ),
+    leftTitles: AxisTitles(
+      sideTitles: SideTitles(showTitles: true, reservedSize: 40),
+    ),
+    bottomTitles: AxisTitles(
+      sideTitles: SideTitles(
+        showTitles: true,
+        reservedSize: 60,
+        getTitlesWidget: (value, meta) {
+          int index = value.toInt();
+          if (index >= 0 && index < timestamps.length) {
+            String formattedTime = "Invalid Time";
+
+            try {
+              DateTime parsedTime;
+              if (timestamps[index].contains("AM") || timestamps[index].contains("PM")) {
+                parsedTime = DateFormat("yyyy-MM-dd hh:mm a").parse(timestamps[index]);
+              } else {
+                parsedTime = DateFormat("yyyy-MM-dd HH:mm:ss").parse(timestamps[index]);
+              }
+
+              // ✅ Show Day for Weekly, Only Time for Daily
+              formattedTime = (selectedFilter == "Weekly")
+                  ? DateFormat("EEE hh:mm a").format(parsedTime) // Show day (Mon, Tue, etc.)
+                  : DateFormat("hh:mm a").format(parsedTime); // Only time
+            } catch (e) {
+              print("⚠️ Error parsing timestamp: ${timestamps[index]} - $e");
+            }
+
+            return Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                formattedTime,
+                style: const TextStyle(fontSize: 10),
+                textAlign: TextAlign.center,
+              ),
+            );
+          }
+          return const Text("");
+        },
+      ),
+    ),
+  );
+}
 
 
 
@@ -491,8 +539,14 @@ Widget build(BuildContext context) {
                 // ✅ Format timestamp properly
                 String formattedTime = "Unknown Time";
                 try {
-                  DateTime parsedTime = DateTime.parse(data["Time"]);
-                  formattedTime = DateFormat("yyyy-MM-dd hh:mm a").format(parsedTime);
+                  DateTime parsedTime = DateFormat("yyyy-MM-dd hh:mm a").parse(data["Time"]); 
+                  if (selectedFilter == "Weekly") {
+                      formattedTime = DateFormat("EEE hh:mm a")
+                          .format(parsedTime); // ✅ Show day (Mon, Tue, etc.)
+                    } else {
+                      formattedTime = DateFormat("hh:mm a")
+                          .format(parsedTime); // ✅ Keep time-only for "Daily"
+                    }
                 } catch (e) {
                   print("⚠️ Error parsing timestamp: ${data["Time"]} - $e");
                 }
@@ -545,14 +599,90 @@ Widget _buildTimeBasedFrequencyGraph() {
     }
   }
 
+  // ✅ If "Daily", show a single combined graph
+  if (selectedFilter == "Daily") {
+    return Column(
+      children: [
+        // ✅ Add the Legend Row
+        Wrap(
+          spacing: 10,
+          children: sensorTypes.map((sensor) {
+            return Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: _getSensorColor(sensor),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 5),
+                Text(sensor, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              ],
+            );
+          }).toList(),
+        ),
+
+        const SizedBox(height: 12), // ✅ Adds spacing before the graph
+
+        // ✅ The Combined Graph
+        SizedBox(
+          height: 300, // ✅ Fixed height for Daily
+          child: BarChart(
+            BarChartData(
+              barGroups: List.generate(timestamps.length, (index) {
+                String timeLabel = timestamps[index];
+
+                List<BarChartRodData> bars = [];
+
+                for (var sensor in sensorTypes) {
+                  var sensorData = frequencyAnalysisData[sensor]
+                          ?.where((data) => data["Time"] == timeLabel)
+                          .toList() ??
+                      [];
+                  if (sensorData.isNotEmpty) {
+                    double sensorValue =
+                        double.tryParse(sensorData.first["Value"].toString()) ?? 0;
+
+                    bars.add(
+                      BarChartRodData(
+                        toY: sensorValue,
+                        color: _getSensorColor(sensor),
+                        width: 16,
+                      ),
+                    );
+                  }
+                }
+
+                return BarChartGroupData(x: index, barRods: bars);
+              }),
+              titlesData: _buildChartTitles(timestamps), // ✅ Reuse title logic
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ✅ If "Weekly", show separate graphs per sensor type
   return Column(
-    children: [
-      // ✅ Add the Legend Row
-      Wrap(
-        spacing: 10,
-        children: sensorTypes.map((sensor) {
-          return Row(
-            mainAxisSize: MainAxisSize.min,
+    children: sensorTypes.map((sensor) {
+      List<String> sensorTimestamps = [];
+      for (var entry in frequencyAnalysisData[sensor] ?? []) {
+        if (!sensorTimestamps.contains(entry["Time"])) {
+          sensorTimestamps.add(entry["Time"]);
+        }
+      }
+
+      return Column(
+        children: [
+          const SizedBox(height: 16), // ✅ Adds spacing between graphs
+
+          // ✅ Sensor Title (Legend for Each Graph)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
                 width: 12,
@@ -563,97 +693,48 @@ Widget _buildTimeBasedFrequencyGraph() {
                 ),
               ),
               const SizedBox(width: 5),
-              Text(sensor, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              Text(sensor, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
             ],
-          );
-        }).toList(),
-      ),
+          ),
 
-      const SizedBox(height: 12), // ✅ Adds spacing before the graph
+          const SizedBox(height: 10),
 
-      // ✅ The Graph
-      SizedBox(
-        height: 300,
-        child: BarChart(
-          BarChartData(
-            barGroups: List.generate(timestamps.length, (index) {
-              String timeLabel = timestamps[index];
+          // ✅ The Separate Graph for this Sensor
+          SizedBox(
+            height: 300, // ✅ Consistent height per graph
+            child: BarChart(
+              BarChartData(
+                barGroups: List.generate(sensorTimestamps.length, (index) {
+                  String timeLabel = sensorTimestamps[index];
 
-              List<BarChartRodData> bars = [];
+                  var sensorData = frequencyAnalysisData[sensor]
+                          ?.where((data) => data["Time"] == timeLabel)
+                          .toList() ??
+                      [];
+                  if (sensorData.isNotEmpty) {
+                    double sensorValue =
+                        double.tryParse(sensorData.first["Value"].toString()) ?? 0;
 
-              for (var sensor in sensorTypes) {
-                var sensorData = frequencyAnalysisData[sensor]
-                        ?.where((data) => data["Time"] == timeLabel)
-                        .toList() ??
-                    [];
-                if (sensorData.isNotEmpty) {
-                  double sensorValue =
-                      double.tryParse(sensorData.first["Value"].toString()) ?? 0;
-
-                  bars.add(
-                    BarChartRodData(
-                      toY: sensorValue,
-                      color: _getSensorColor(sensor),
-                      width: 16,
-                    ),
-                  );
-                }
-              }
-
-              return BarChartGroupData(x: index, barRods: bars);
-            }),
-            titlesData: FlTitlesData(
-                topTitles: AxisTitles(
-                  // ✅ Hide the numbers at the top
-                  sideTitles: SideTitles(showTitles: false),
-                ),
-                leftTitles: AxisTitles(
-                  sideTitles: SideTitles(showTitles: true, reservedSize: 40),
-                ),
-                bottomTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    reservedSize: 60,
-                    getTitlesWidget: (value, meta) {
-                      int index = value.toInt();
-                      if (index >= 0 && index < timestamps.length) {
-                        String formattedTime = "Invalid Time";
-
-                        try {
-                          DateTime parsedTime;
-                          if (timestamps[index].contains("AM") ||
-                              timestamps[index].contains("PM")) {
-                            parsedTime = DateFormat("yyyy-MM-dd hh:mm a")
-                                .parse(timestamps[index]);
-                          } else {
-                            parsedTime = DateFormat("yyyy-MM-dd HH:mm:ss")
-                                .parse(timestamps[index]);
-                          }
-                          formattedTime =
-                              DateFormat("hh:mm a").format(parsedTime);
-                        } catch (e) {
-                          print(
-                              "⚠️ Error parsing timestamp: ${timestamps[index]} - $e");
-                        }
-
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Text(
-                            formattedTime,
-                            style: const TextStyle(fontSize: 10),
-                            textAlign: TextAlign.center,
-                          ),
-                        );
-                      }
-                      return const Text("");
-                  },
-                ),
+                    return BarChartGroupData(
+                      x: index,
+                      barRods: [
+                        BarChartRodData(
+                          toY: sensorValue,
+                          color: _getSensorColor(sensor),
+                          width: 16,
+                        ),
+                      ],
+                    );
+                  }
+                  return BarChartGroupData(x: index, barRods: []);
+                }),
+                titlesData: _buildChartTitles(sensorTimestamps), // ✅ Reuse title logic
               ),
             ),
           ),
-        ),
-      ),
-    ],
+        ],
+      );
+    }).toList(),
   );
 }
 
