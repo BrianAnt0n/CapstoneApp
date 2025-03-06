@@ -23,7 +23,6 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'data_report_page.dart'; // Import the new file
 
-
 // State Management: Tracks the selected container
 class ContainerState extends ChangeNotifier {
   int? selectedContainerId;
@@ -318,6 +317,28 @@ class _DashboardPageState extends State<DashboardPage> {
         .maybeSingle();
 
     return containerResponse?['hardware_id']; // ✅ Returns correct hardware_id
+  }
+
+  Future<int?> _fetchHardwareId(int containerId) async {
+    try {
+      final response = await Supabase.instance.client
+          .from('Containers_test') // ✅ Correct table
+          .select('hardware_id')
+          .eq('container_id', containerId)
+          .maybeSingle(); // ✅ Avoids errors if no data
+
+      if (response != null && response['hardware_id'] != null) {
+        print(
+            "Fetched hardware_id: ${response['hardware_id']} for container_id: $containerId");
+        return response['hardware_id'] as int;
+      } else {
+        print("No hardware_id found for container_id: $containerId");
+        return null;
+      }
+    } catch (error) {
+      print("Error fetching hardware_id: $error");
+      return null;
+    }
   }
 
   Future<void> _deleteNoteImage(int noteId, String imageUrl) async {
@@ -1081,20 +1102,23 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
 // Add this function to fetch dates with notes
-Future<List<DateTime>> fetchNoteDates(int hardwareId) async {
-  final supabase = Supabase.instance.client;
-  try {
-    final response = await supabase
-        .from('Notes_test_test')
-        .select('created_date')
-        .eq('hardware_id', hardwareId);
-    
-    return response.map<DateTime>((note) => DateTime.parse(note['created_date']).toLocal()).toList();
-  } catch (error) {
-    print("Error fetching note dates: $error");
-    return [];
+  Future<List<DateTime>> fetchNoteDates(int hardwareId) async {
+    final supabase = Supabase.instance.client;
+    try {
+      final response = await supabase
+          .from('Notes_test_test')
+          .select('created_date')
+          .eq('hardware_id', hardwareId);
+
+      return response
+          .map<DateTime>(
+              (note) => DateTime.parse(note['created_date']).toLocal())
+          .toList();
+    } catch (error) {
+      print("Error fetching note dates: $error");
+      return [];
+    }
   }
-}
 
   void _openFullCalendar() {
     //Ensure keyboard is fully dismissed before opening the calendar
@@ -1135,19 +1159,35 @@ Future<List<DateTime>> fetchNoteDates(int hardwareId) async {
                             DateTime today = DateTime.now();
 
                             if (_containerAddedDate != null) {
-                              DateTime compostEndDate = _containerAddedDate!.add(const Duration(days: 112)); // 16 weeks later
-                              DateTime cycleDayOne = _containerAddedDate!.add(const Duration(days: 1)); // Day 1 of the cycle
+                              DateTime compostEndDate = _containerAddedDate!
+                                  .add(const Duration(
+                                      days: 112)); // 16 weeks later
+                              DateTime cycleDayOne = _containerAddedDate!.add(
+                                  const Duration(
+                                      days: 1)); // Day 1 of the cycle
 
-                              bool isWithinCycle = date.isAfter(_containerAddedDate!) && date.isBefore(compostEndDate);
-                              bool isToday = date.year == today.year && date.month == today.month && date.day == today.day;
+                              bool isWithinCycle =
+                                  date.isAfter(_containerAddedDate!) &&
+                                      date.isBefore(compostEndDate);
+                              bool isToday = date.year == today.year &&
+                                  date.month == today.month &&
+                                  date.day == today.day;
 
                               if (isWithinCycle || isToday) {
-                                bool isDayOne = date.year == cycleDayOne.year && date.month == cycleDayOne.month && date.day == cycleDayOne.day;
-                                bool isEndDate = date.year == compostEndDate.year && date.month == compostEndDate.month && date.day == compostEndDate.day;
+                                bool isDayOne = date.year == cycleDayOne.year &&
+                                    date.month == cycleDayOne.month &&
+                                    date.day == cycleDayOne.day;
+                                bool isEndDate =
+                                    date.year == compostEndDate.year &&
+                                        date.month == compostEndDate.month &&
+                                        date.day == compostEndDate.day;
 
                                 return Container(
-                                  margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 0),
-                                  padding: const EdgeInsets.symmetric(vertical: 4), // Shortens top and bottom spacing
+                                  margin: const EdgeInsets.symmetric(
+                                      vertical: 6, horizontal: 0),
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical:
+                                          4), // Shortens top and bottom spacing
                                   decoration: BoxDecoration(
                                     color: Colors.grey.withOpacity(
                                         0.3), // Gray shading effect
@@ -1316,7 +1356,6 @@ Future<List<DateTime>> fetchNoteDates(int hardwareId) async {
                           Navigator.pop(context);
                         },
                       ),
-
                       const SizedBox(height: 10),
                       ElevatedButton(
                         onPressed: () => Navigator.pop(context),
@@ -1364,8 +1403,6 @@ Future<List<DateTime>> fetchNoteDates(int hardwareId) async {
 
     return weeks; // ✅ Returns weeks for other functions
   }
-
-
 
 //notes image section
   final SupabaseClient supabase = Supabase.instance.client;
@@ -1550,71 +1587,104 @@ Future<List<DateTime>> fetchNoteDates(int hardwareId) async {
     }
   }
 
-  Future<void> _retrieveCompost() async {
-    final supabase = Supabase.instance.client;
+  Future<void> _retrieveCompost(int hardwareId, int containerId) async {
+    try {
+      final supabase = Supabase.instance.client;
 
-    if (selectedContainerId == null) {
-      print("❌ Error: selectedContainerId is null. Cannot fetch hardware_id.");
-      return;
+      // Step 1: Remove Historical Data
+      await supabase
+          .from('History_Test')
+          .delete()
+          .eq('hardware_id', hardwareId);
+      print("Deleted historical data for container: $containerId");
+
+      // Step 2: Fetch Start Date from Hardware_Sensors_Test
+      final sensorData = await supabase
+          .from('Hardware_Sensors_Test')
+          .select('start_date')
+          .eq('hardware_id', hardwareId)
+          .maybeSingle();
+
+      if (sensorData == null || sensorData['start_date'] == null) {
+        print(
+            "No start date found in Hardware_Sensors_Test for hardware ID: $hardwareId");
+        return;
+      }
+
+      final startDate = sensorData['start_date'];
+      print("Fetched start date: $startDate");
+
+      // Step 3: Store the fetched start_date in Compost_Data
+      await supabase.from('Compost_Data').insert({
+        'hardware_id': hardwareId,
+        'start_date': startDate,
+        'end_date': DateTime.now().toIso8601String(),
+      });
+      print(
+          "Inserted compost data for hardware ID: $hardwareId with start date: $startDate");
+
+// naka comment to kase risky mag null sa Hardware_Sensors_Test
+      // Step 4: Nullify all sensor data in Hardware_Sensors_Test (except hardware_id & qr_value)
+
+      final updateResponse =
+          await supabase.from('Hardware_Sensors_Test').update({
+        'start_date': null,
+        // 'ph_level': null,  comment out muna kase risky i nullify to lahat
+        // 'ph_level2': null,
+        // 'humidity': null,
+        // 'temperature': null,
+        // 'moisture': null,
+        // 'refreshed_date': null,
+      }).eq('hardware_id', hardwareId);
+
+      if (updateResponse.error != null) {
+        print(
+            "Error updating Hardware_Sensors_Test: ${updateResponse.error!.message}");
+      } else {
+        print(
+            "Successfully cleared sensor data in Hardware_Sensors_Test for hardware ID: $hardwareId");
+      }
+
+      // ✅ Refresh the UI to reflect changes
+      if (mounted) {
+        setState(() {});
+      }
+    } catch (e) {
+      print("Error retrieving compost: $e");
     }
+  }
 
-    // Show confirmation dialog before proceeding
-    bool confirm = await showDialog(
+  Future<void> _confirmRetrieveCompost(int hardwareId, int containerId) async {
+    bool? confirm = await showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text("Confirm Compost Retrieval"),
           content: const Text(
-              "Are you sure you want to retrieve the compost? This will reset the compost start date."),
+              "Are you sure you want to retrieve the compost? This action will delete historical data."),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context, false), // Cancel
+              onPressed: () {
+                Navigator.of(context).pop(false); // Cancel
+              },
               child: const Text("Cancel"),
             ),
             TextButton(
-              onPressed: () => Navigator.pop(context, true), // Confirm
-              child: const Text("Retrieve"),
+              onPressed: () {
+                Navigator.of(context).pop(true); // Confirm
+              },
+              child:
+                  const Text("Retrieve", style: TextStyle(color: Colors.red)),
             ),
           ],
         );
       },
     );
 
-    if (!confirm) return; // User canceled
-
-    try {
-      // Get hardware_id from Containers_test
-      final containerResponse = await supabase
-          .from('Containers_test')
-          .select('hardware_id')
-          .eq('container_id', selectedContainerId!)
-          .maybeSingle();
-
-      if (containerResponse == null ||
-          containerResponse['hardware_id'] == null) {
-        print(
-            "❌ Error: No hardware_id found for container_id $selectedContainerId.");
-        return;
-      }
-
-      final hardwareId = containerResponse['hardware_id'];
-      print("✅ Resolved hardware_id: $hardwareId");
-
-      // Update Hardware_Sensors_Test to set start_date as NULL
-      final updateResponse = await supabase
-          .from('Hardware_Sensors_Test')
-          .update({'start_date': null}) // ✅ Set start_date to NULL
-          .eq('hardware_id', hardwareId);
-
-      print("✅ Compost start date reset in database.");
-
-      setState(() {
-        _containerAddedDate = null; // Reset UI state
-        _containerAge = "Empty"; // Update display
-        _ageColor = Colors.black;
-      });
-    } catch (error) {
-      print("❌ Error resetting compost start date: $error");
+    if (confirm == true) {
+      await _retrieveCompost(hardwareId, containerId);
+    } else {
+      print("Compost retrieval canceled.");
     }
   }
 
@@ -1777,7 +1847,20 @@ Future<List<DateTime>> fetchNoteDates(int hardwareId) async {
         // "Retrieve Compost" button for compost between 12 and 16 weeks
         if (weeks >= 12 && weeks <= 16)
           ElevatedButton(
-            onPressed: _retrieveCompost,
+            onPressed: () async {
+              if (selectedContainerId != null) {
+                final hardwareId = await _fetchHardwareId(selectedContainerId!);
+
+                if (hardwareId != null) {
+                  await _confirmRetrieveCompost(
+                      hardwareId, selectedContainerId!);
+                } else {
+                  print("Error: No hardware ID found for selected container.");
+                }
+              } else {
+                print("Error: No container selected.");
+              }
+            },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -1790,6 +1873,7 @@ Future<List<DateTime>> fetchNoteDates(int hardwareId) async {
               style: TextStyle(fontSize: 18, color: Colors.white),
             ),
           ),
+
         // "Start Compost" button should be shown when the state is "Empty"
         if (_containerAge == "Empty" || _containerAddedDate == null)
           ElevatedButton(
@@ -2409,13 +2493,13 @@ Future<List<DateTime>> fetchNoteDates(int hardwareId) async {
                       style: TextStyle(
                           fontSize: 14, fontWeight: FontWeight.normal),
                     ),
-Column(
+                    Column(
                       children: [
                         // Existing historical data graphs go here...
 
                         const SizedBox(height: 20),
 
-                       // Add "Show Data Report" button below historical data
+                        // Add "Show Data Report" button below historical data
                         ElevatedButton(
                           onPressed: () async {
                             if (selectedContainerId != null) {
@@ -2503,10 +2587,6 @@ Column(
                             ],
                           ),
                         ),
-
-
-
-
                       ],
                     ),
                     FutureBuilder(
@@ -3090,6 +3170,28 @@ class _ContainerPageState extends State<ContainerPage> {
     );
   }
 
+  Future<int?> _fetchHardwareId(int containerId) async {
+    try {
+      final response = await Supabase.instance.client
+          .from('Containers_test')
+          .select('hardware_id')
+          .eq('container_id', containerId)
+          .maybeSingle();
+
+      if (response != null && response['hardware_id'] != null) {
+        print(
+            "Fetched hardware_id: ${response['hardware_id']} for container_id: $containerId");
+        return response['hardware_id'] as int;
+      } else {
+        print("No hardware_id found for container_id: $containerId");
+        return null;
+      }
+    } catch (error) {
+      print("Error fetching hardware_id: $error");
+      return null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final containerState = Provider.of<ContainerState>(context);
@@ -3143,19 +3245,27 @@ class _ContainerPageState extends State<ContainerPage> {
                                 if (isSelected)
                                   const Icon(Icons.check_circle,
                                       color: Colors.green),
-                                // IconButton(
-                                //   icon: const Icon(Icons.info,
-                                //       color: Colors.blueAccent),
-                                //   onPressed: () {
-                                //     Navigator.push(
-                                //       context,
-                                //       MaterialPageRoute(
-                                //         builder: (context) =>
-                                //             const ContainerDetails(),
-                                //       ),
-                                //     );
-                                //   },
-                                // ),
+                                IconButton(
+                                  icon: const Icon(Icons.info,
+                                      color: Colors.blueAccent),
+                                  onPressed: () async {
+                                    final hardwareId = await _fetchHardwareId(
+                                        container['container_id']);
+                                    if (hardwareId != null) {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              ContainerDetails(
+                                                  hardwareId: hardwareId),
+                                        ),
+                                      );
+                                    } else {
+                                      print(
+                                          "Error: No hardware ID found for container ${container['container_id']}");
+                                    }
+                                  },
+                                ),
                                 IconButton(
                                   icon: const Icon(Icons.edit,
                                       color: Colors.blue),
