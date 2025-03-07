@@ -3,6 +3,14 @@ import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'shared_prefs_helper.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:path_provider/path_provider.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'dart:ui' as ui;
+import 'package:flutter/rendering.dart';
 
 class DataReportPage extends StatefulWidget {
   final int selectedHardwareId; // ✅ Using hardware_id
@@ -21,6 +29,12 @@ class _DataReportPageState extends State<DataReportPage> {
   Map<String, String> firstDateData = {};
   Map<String, String> secondDateData = {};
   Map<String, List<dynamic>> frequencyAnalysisData = {};
+
+  String comparisonSummary = "";
+String frequencySummary = "";
+
+final GlobalKey comparisonGraphKey = GlobalKey();
+final GlobalKey frequencyGraphKey = GlobalKey();
 
   @override
   void initState() {
@@ -324,7 +338,9 @@ String selectedFilter = "Daily"; // Default filter
             ),
           ),
         ),
+        
       ),
+      
     ],
   );
 }
@@ -416,6 +432,138 @@ FlTitlesData _buildChartTitles(List<String> timestamps) {
 }
 
 
+Future<void> _exportToPDF() async {
+  print("📄 Exporting PDF...");
+
+  final pdf = pw.Document();
+
+  // ✅ Title Page
+  pdf.addPage(
+    pw.Page(
+      build: (pw.Context context) => pw.Center(
+        child: pw.Column(
+          mainAxisAlignment: pw.MainAxisAlignment.center,
+          children: [
+            pw.Text("Data Report Summary", style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
+            pw.SizedBox(height: 8),
+            pw.Text("Generated on ${DateTime.now()}"),
+          ],
+        ),
+      ),
+    ),
+  );
+
+  // ✅ Add Data Comparison Summary (if available)
+  if (comparisonSummary.isNotEmpty) {
+    pdf.addPage(
+      pw.Page(
+        build: (pw.Context context) => pw.Padding(
+          padding: const pw.EdgeInsets.all(16),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text("📊 Data Comparison Summary", style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+              pw.Text(comparisonSummary),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ✅ Add Time-Based Frequency Summary (if available)
+  if (frequencySummary.isNotEmpty) {
+    pdf.addPage(
+      pw.Page(
+        build: (pw.Context context) => pw.Padding(
+          padding: const pw.EdgeInsets.all(16),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text("📈 Time-Based Frequency Summary", style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+              pw.Text(frequencySummary),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+   List<Uint8List> images = await _captureGraphsAsImages();
+
+  if (images.isEmpty) {
+    print("❌ No images captured, aborting PDF export.");
+    return;
+  }
+
+  // ✅ Add Graphs in 2x2 Grid Layout
+  List<pw.Widget> graphWidgets = [];
+  for (var i = 0; i < images.length; i++) {
+    graphWidgets.add(
+      pw.Column(
+        children: [
+          pw.Image(pw.MemoryImage(images[i]), width: 200, height: 200),
+          pw.Text("Graph ${i + 1}"),
+        ],
+      ),
+    );
+  }
+
+  for (var i = 0; i < graphWidgets.length; i += 4) {
+    pdf.addPage(
+      pw.Page(
+        build: (pw.Context context) => pw.GridView(
+          crossAxisCount: 2,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+          children: graphWidgets.sublist(i, i + 4 > graphWidgets.length ? graphWidgets.length : i + 4),
+        ),
+      ),
+    );
+  }
+
+  // ✅ Save and Open the PDF
+  final output = await getTemporaryDirectory();
+  final file = File("${output.path}/data_report.pdf");
+  await file.writeAsBytes(await pdf.save());
+
+  print("✅ PDF Saved at: ${file.path}");
+  await Printing.layoutPdf(
+    onLayout: (PdfPageFormat format) async => pdf.save(),
+  );
+}
+
+Future<List<Uint8List>> _captureGraphsAsImages() async {
+  List<Uint8List> images = [];
+
+  // ✅ Wait for rendering to complete
+  await Future.delayed(const Duration(milliseconds: 500));
+
+  // ✅ Capture _buildComparisonGraph()
+  if (comparisonGraphKey.currentContext != null) {
+    RenderRepaintBoundary boundary =
+        comparisonGraphKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+    ui.Image image = await boundary.toImage(pixelRatio: 3.0);
+    ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    if (byteData != null) images.add(byteData.buffer.asUint8List());
+  } else {
+    print("❌ comparisonGraphKey is NULL!");
+  }
+
+  // ✅ Capture _buildTimeBasedFrequencyGraph()
+  if (frequencyGraphKey.currentContext != null) {
+    RenderRepaintBoundary boundary =
+        frequencyGraphKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+    ui.Image image = await boundary.toImage(pixelRatio: 3.0);
+    ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    if (byteData != null) images.add(byteData.buffer.asUint8List());
+  } else {
+    print("❌ frequencyGraphKey is NULL!");
+  }
+
+  print("📸 Total images captured: ${images.length}");
+  return images;
+}
 
 
 @override
@@ -460,7 +608,11 @@ Widget build(BuildContext context) {
       _buildDataCard("First Date Data", firstDateData, true),
       if (hasSecondDate) _buildDataCard("Second Date Data", secondDateData, false),
       const SizedBox(height: 16), // ✅ Adds spacing between _buildDataCard and _buildComparisonGraph
-      if (hasSecondDate) _buildComparisonGraph(),
+      if (hasSecondDate)
+  RepaintBoundary(
+    key: comparisonGraphKey,
+    child: _buildComparisonGraph(),
+  ),
 
       const SizedBox(height: 12), // ✅ Adds spacing before the graph
 
@@ -503,9 +655,32 @@ Widget build(BuildContext context) {
 
       const SizedBox(height: 16), // ✅ Adds spacing before the graph
       if (frequencyAnalysisData.isNotEmpty)
-                    _buildTimeBasedFrequencyGraph(),
+  RepaintBoundary(
+    key: frequencyGraphKey,
+    child: _buildTimeBasedFrequencyGraph(),
+  ),
                   const SizedBox( height: 16), // Adds spacing before the conclusion
                   _buildConclusionWidget(),
+
+                  // ✅ Export PDF Button
+                  const SizedBox(height: 16),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.picture_as_pdf),
+                      label: const Text("Export as PDF"),
+                      onPressed: () async {
+                        await _exportToPDF(); // ✅ Calls the function to generate PDF
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green[700], // ✅ Green theme
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 12, horizontal: 20),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16), // ✅ Adds spacing after button
 
 
 
@@ -846,7 +1021,8 @@ Widget _buildConclusionWidget() {
   String secondDateStr = DateFormat("yyyy-MM-dd").format(secondSelectedDate);
 
   // 📌 1️⃣ Comparison Summary
-  String comparisonSummary = "";
+  print("📝 Comparison Summary: $comparisonSummary");
+  comparisonSummary = "";
   if (firstDateData.isNotEmpty && secondDateData.isNotEmpty) {
     List<String> labels = ["Temperature", "Moisture Level", "pH Level 1", "pH Level 2", "Humidity"];
 
@@ -870,7 +1046,8 @@ Widget _buildConclusionWidget() {
   }
 
   // 📌 2️⃣ Time-Based Frequency Summary (Updated)
-  String frequencySummary = "";
+  print("📝 Frequency Summary: $frequencySummary");
+  frequencySummary = "";
   if (frequencyAnalysisData.isNotEmpty) {
     List<String> summaries = [];
 

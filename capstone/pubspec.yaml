@@ -51,6 +51,8 @@ dependencies:
   flutter_local_notifications: ^18.0.1
   android_alarm_manager_plus: ^4.0.7
   workmanager: ^0.5.2
+  pdf: ^3.10.4
+  printing: ^5.11.0
   
 
 
