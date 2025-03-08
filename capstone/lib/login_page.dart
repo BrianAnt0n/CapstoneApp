@@ -187,7 +187,7 @@ void _login() async {
                     width: 150,
                     height: 150,
                     decoration: BoxDecoration(
-                      color: Colors.grey[300],
+                      //color: Colors.grey[300],
                       shape: BoxShape.circle, // Makes the container circular
                     ),
                     child: ClipOval(
