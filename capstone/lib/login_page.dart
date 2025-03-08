@@ -6,6 +6,8 @@ import 'home_page_members.dart';
 import 'home_page_guest.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'forgot_password.dart';
+import 'Others tab/account_settings_page.dart';
+import 'forced_password_change_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -78,56 +80,87 @@ class _LoginPageState extends State<LoginPage> {
   //   }
   // }
 
- void _login() async {
-    String email =
-        _emailController.text.trim().toLowerCase(); // ✅ Force lowercase
-    String password = _passwordController.text.trim();
 
-    // ✅ Email format validation
-    final emailRegex = RegExp(r'^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$');
-    if (!emailRegex.hasMatch(email)) {
+void _login() async {
+  String email = _emailController.text.trim().toLowerCase();
+  String password = _passwordController.text.trim();
+
+  // ✅ Email format validation
+  final emailRegex = RegExp(r'^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$');
+  if (!emailRegex.hasMatch(email)) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Invalid email format.')),
+    );
+    return;
+  }
+
+  try {
+    final response = await supabase
+        .from('Users')
+        .select('user_id, user_level, fullname, email, password, reset_requested')
+        .eq('email', email)
+        .maybeSingle();
+
+    if (response == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Invalid email format. Please enter a valid email.')),
+        const SnackBar(content: Text("Email not found. Please try again.")),
       );
       return;
     }
 
-    try {
-      final response = await supabase
-          .from('Users')
-          .select('user_id, user_level, fullname, email, password')
-          .eq('email', email)
-          .single();
+    String storedPassword = response['password'];
+    int storedUserId = response['user_id'];
+    String storedUserLevel = response['user_level'];
+    String storedFullName = response['fullname'];
+    String storedEmail = response['email'];
+    bool resetRequested = response['reset_requested'] ?? false;
 
-      String storedPassword = response['password'];
-      int storedUserId = response['user_id'];
-      String storedUserLevel = response['user_level'];
-      String storedFullName = response['fullname'];
-      String storedEmail = response['email'];
+    if (storedPassword == password) {
+      await SharedPrefsHelper.saveUserLogin(
+          storedUserId.toString(), storedUserLevel, storedFullName, storedEmail);
 
-      String userIdString = storedUserId.toString();
-
-      if (storedPassword == password) {
-        await SharedPrefsHelper.saveUserLogin(
-            userIdString, storedUserLevel, storedFullName, storedEmail);
-
-        if (storedUserLevel == "Admin") {
-          Navigator.pushReplacement(context,
-              MaterialPageRoute(builder: (context) => const HomePage()));
-        } else {
-          Navigator.pushReplacement(context,
-              MaterialPageRoute(builder: (context) => const HomePageMember()));
-        }
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text("Incorrect password. Please try again.")));
+      // ✅ If reset_requested is TRUE, update it to NULL
+      if (resetRequested) {
+        await supabase
+            .from('Users')
+            .update({'reset_requested': null})
+            .eq('user_id', storedUserId);
       }
-    } catch (e) {
+
+      // ✅ If logging in with Temp1234!, force password change
+      if (password == "Temp1234!") {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("You must change your password before continuing.")),
+        );
+
+        // ✅ Redirect to the dedicated Forced Password Change Page
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const ForcedPasswordChangePage()),
+        );
+        return;
+      }
+
+      // ✅ Redirect based on user level
+      if (storedUserLevel == "Admin") {
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const HomePage()));
+      } else {
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const HomePageMember()));
+      }
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Login failed. Please try again.")));
+        const SnackBar(content: Text("Incorrect password. Please try again.")),
+      );
     }
+  } catch (e) {
+    print("❌ Login error: $e");
+    ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Login failed. Please try again.")));
   }
+}
+
+
+
 
 
   @override
