@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:capstone/home_page.dart';
+import 'package:capstone/home_page_members.dart';
+
 
 class AccountSettingsPage extends StatefulWidget {
   const AccountSettingsPage({super.key});
@@ -16,6 +19,10 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
   final TextEditingController _confirmPasswordController = TextEditingController();
   String? _errorText;
   String _fullname = "Loading..."; // Placeholder while fetching data
+  String _email = "Loading..."; // ✅ Store email
+  String _userLevel = "Loading..."; // ✅ Store user level
+  final TextEditingController _fullnameController = TextEditingController(); // ✅ Controller for full name
+
 
   @override
   void initState() {
@@ -24,32 +31,78 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
   }
 
   Future<void> _loadUserDetails() async {
-    final prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getString("user_id_pref");
+  final prefs = await SharedPreferences.getInstance();
+  final userId = prefs.getString("user_id_pref");
 
-    if (userId == null) {
-      setState(() {
-        _fullname = "User"; // Default if no user is logged in
-      });
-      return;
-    }
-
-    try {
-      final response = await supabase
-          .from('Users')
-          .select('fullname')
-          .eq('user_id', int.parse(userId))
-          .single();
-
-      setState(() {
-        _fullname = response['fullname'] ?? "User";
-      });
-    } catch (error) {
-      setState(() {
-        _fullname = "User";
-      });
-    }
+  if (userId == null) {
+    setState(() {
+      _fullname = "User";
+      _email = "No Email"; // ✅ Default value for email
+      _userLevel = "Member"; // ✅ Default value for role
+    });
+    return;
   }
+
+  try {
+    final response = await supabase
+        .from('Users')
+        .select('fullname, email, user_level') // ✅ Fetch email & role
+        .eq('user_id', int.parse(userId))
+        .single();
+
+    setState(() {
+      _fullname = response['fullname'] ?? "User";
+      _email = response['email'] ?? "No Email"; // ✅ Store email
+      _userLevel = response['user_level'] ?? "Member"; // ✅ Store user role
+    });
+  } catch (error) {
+    setState(() {
+      _fullname = "User";
+      _email = "Error loading email";
+      _userLevel = "Member";
+    });
+  }
+}
+
+Future<void> _updateFullName() async {
+  final prefs = await SharedPreferences.getInstance();
+  final userId = prefs.getString("user_id_pref");
+  final newFullName = _fullnameController.text.trim(); // ✅ Get new full name
+
+  if (userId == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('User session not found. Please log in again.')),
+    );
+    return;
+  }
+
+  if (newFullName.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Full Name cannot be empty.")),
+    );
+    return;
+  }
+
+  try {
+    await supabase.from('Users').update({'fullname': newFullName}).eq('user_id', int.parse(userId));
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Full Name updated successfully!')),
+    );
+
+    setState(() {
+      _fullname = newFullName; // ✅ Update UI with new name
+    });
+
+    _fullnameController.clear(); // ✅ Clear the text field after update
+
+  } catch (error) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Error updating full name: $error')),
+    );
+  }
+}
+
 
   Future<void> _updateEmail() async {
   final prefs = await SharedPreferences.getInstance();
@@ -151,11 +204,57 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Welcome message with correct full name
-            Text(
-              "Change your Credentials Here, $_fullname",
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green),
+           Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ✅ Display User Name
+                Text(
+                  "Hello, $_fullname",
+                  style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green),
+                ),
+                const SizedBox(height: 5),
+
+                // ✅ Display Email
+                Text(
+                  "Email: $_email",
+                  style: const TextStyle(fontSize: 16, color: Colors.black),
+                ),
+                const SizedBox(height: 5),
+
+                // ✅ Display User Role
+                Text(
+                  "Role: $_userLevel",
+                  style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue),
+                ),
+                const SizedBox(height: 20),
+              ],
             ),
+
+            const SizedBox(height: 20),
+
+            _buildSectionCard(
+              title: "Update Full Name",
+              child: Column(
+                children: [
+                  TextField(
+                    controller: _fullnameController,
+                    decoration:
+                        const InputDecoration(labelText: 'New Full Name'),
+                  ),
+                  const SizedBox(height: 10),
+                  _buildButton("Update Full Name", _updateFullName),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20), // ✅ Add spacing before "Update Email"
+
+
             const SizedBox(height: 20),
 
             _buildSectionCard(
