@@ -11,6 +11,8 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart'; // ✅ Fixes rootBundle issue
+
 
 class DataReportPage extends StatefulWidget {
   final int selectedHardwareId; // ✅ Using hardware_id
@@ -511,169 +513,336 @@ class _DataReportPageState extends State<DataReportPage> {
     );
   }
 
-  Future<void> _exportToPDF() async {
-    print("📄 Exporting PDF...");
 
-    final pdf = pw.Document();
 
-    // ✅ Title Page
-    pdf.addPage(
-      pw.Page(
-        build:
-            (pw.Context context) => pw.Center(
-              child: pw.Column(
-                mainAxisAlignment: pw.MainAxisAlignment.center,
-                children: [
-                  pw.Text(
-                    "Data Report Summary",
-                    style: pw.TextStyle(
-                      fontSize: 24,
-                      fontWeight: pw.FontWeight.bold,
-                    ),
-                  ),
-                  pw.SizedBox(height: 8),
-                  pw.Text("Generated on ${DateTime.now()}"),
-                ],
-              ),
-            ),
-      ),
-    );
+ Future<void> _exportToPDF() async {
+  print("📄 Exporting PDF...");
 
-    // ✅ Add Data Comparison Summary (if available)
-    if (comparisonSummary.isNotEmpty) {
-      pdf.addPage(
-        pw.Page(
-          build:
-              (pw.Context context) => pw.Padding(
-                padding: const pw.EdgeInsets.all(16),
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Text(
-                      "📊 Data Comparison Summary",
-                      style: pw.TextStyle(
-                        fontSize: 18,
-                        fontWeight: pw.FontWeight.bold,
-                      ),
-                    ),
-                    pw.Text(comparisonSummary),
-                  ],
-                ),
-              ),
-        ),
-      );
-    }
+  final pdf = pw.Document();
 
-    // ✅ Add Time-Based Frequency Summary (if available)
-    if (frequencySummary.isNotEmpty) {
-      pdf.addPage(
-        pw.Page(
-          build:
-              (pw.Context context) => pw.Padding(
-                padding: const pw.EdgeInsets.all(16),
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Text(
-                      "📈 Time-Based Frequency Summary",
-                      style: pw.TextStyle(
-                        fontSize: 18,
-                        fontWeight: pw.FontWeight.bold,
-                      ),
-                    ),
-                    pw.Text(frequencySummary),
-                  ],
-                ),
-              ),
-        ),
-      );
-    }
+   // ✅ Ensure selectedFilter is set correctly before generating summaries
+  print("🔄 Current selectedFilter: $selectedFilter");
 
-    List<Uint8List> images = await _captureGraphsAsImages();
+  // ✅ Regenerate summaries with the latest data before exporting
+  _buildConclusionWidget();  // 🔄 Forces latest frequencySummary update
+  _generateFrequencySummary(); // 🔄 Forces update before PDF export
 
-    if (images.isEmpty) {
-      print("❌ No images captured, aborting PDF export.");
-      return;
-    }
+    // ✅ Load Custom Font
+  final fontData = await rootBundle.load("assets/fonts/Roboto-Regular.ttf");
+  final customFont = pw.Font.ttf(fontData);
 
-    // ✅ Add Graphs in 2x2 Grid Layout
-    List<pw.Widget> graphWidgets = [];
-    for (var i = 0; i < images.length; i++) {
-      graphWidgets.add(
-        pw.Column(
+  // ✅ Ensure summaries are set before exporting
+  if (comparisonSummary.trim().isEmpty) {
+    print("❌ No data for comparisonSummary! Regenerating...");
+    _generateComparisonSummary();
+  }
+
+  if (frequencySummary.trim().isEmpty) {
+    print("❌ No data for frequencySummary! Regenerating...");
+    _generateFrequencySummary();
+  }
+
+    // ✅ Fix: Remove time from the dates
+  String firstDateFormatted = DateFormat('yyyy-MM-dd').format(firstSelectedDate);
+  String secondDateFormatted = DateFormat('yyyy-MM-dd').format(secondSelectedDate);
+
+  // ✅ Replace full timestamp with formatted date in the summary text
+  comparisonSummary = comparisonSummary
+      .replaceAll(firstSelectedDate.toString(), firstDateFormatted)
+      .replaceAll(secondSelectedDate.toString(), secondDateFormatted);
+
+
+
+  print("📌 Final comparisonSummary: $comparisonSummary");
+  print("📌 Final frequencySummary: $frequencySummary");
+
+  // ✅ Title Page
+  pdf.addPage(
+    pw.Page(
+      build: (pw.Context context) => pw.Center(
+        child: pw.Column(
+          mainAxisAlignment: pw.MainAxisAlignment.center,
           children: [
-            pw.Image(pw.MemoryImage(images[i]), width: 200, height: 200),
-            pw.Text("Graph ${i + 1}"),
+            pw.Text(
+              "Data Report Summary",
+              style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold),
+            ),
+            pw.SizedBox(height: 8),
+            pw.Text("Generated on ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now())}"),
           ],
         ),
-      );
-    }
+      ),
+    ),
+  );
 
-    for (var i = 0; i < graphWidgets.length; i += 4) {
+  // ✅ Add Data Comparison Summary (if available)
+  if (comparisonSummary.trim().isNotEmpty) {
+    pdf.addPage(
+      pw.Page(
+        build: (pw.Context context) => pw.Padding(
+          padding: const pw.EdgeInsets.all(16),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text(
+                "Data Comparison Summary",
+                style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
+              ),
+              pw.SizedBox(height: 8),
+              pw.Text(comparisonSummary, style: pw.TextStyle(fontSize: 14)),
+            ],
+          ),
+        ),
+      ),
+    );
+  } else {
+    print("❌ Still no data for comparisonSummary!");
+  }
+
+  // ✅ Add Time-Based Frequency Summary (if available)
+  if (frequencySummary.trim().isNotEmpty) {
+    pdf.addPage(
+      pw.Page(
+        build: (pw.Context context) => pw.Padding(
+          padding: const pw.EdgeInsets.all(16),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text(
+                "Time-Based Frequency Summary",
+                style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
+              ),
+              pw.SizedBox(height: 8),
+              pw.Text(frequencySummary, style: pw.TextStyle(fontSize: 14)),
+            ],
+          ),
+        ),
+      ),
+    );
+  } else {
+    print("❌ Still no data for frequencySummary!");
+  }
+
+  // ✅ Capture and Add Graphs
+  List<Uint8List> images = await _captureGraphsAsImages();
+  if (images.isEmpty) {
+    print("❌ No images captured, skipping graphs in PDF.");
+  } else {
+    for (var image in images) {
       pdf.addPage(
         pw.Page(
-          build:
-              (pw.Context context) => pw.GridView(
-                crossAxisCount: 2,
-                crossAxisSpacing: 10,
-                mainAxisSpacing: 10,
-                children: graphWidgets.sublist(
-                  i,
-                  i + 4 > graphWidgets.length ? graphWidgets.length : i + 4,
-                ),
-              ),
+          build: (pw.Context context) => pw.Center(
+            child: pw.Image(pw.MemoryImage(image), width: 400, height: 300),
+          ),
         ),
       );
     }
-
-    // ✅ Save and Open the PDF
-    final output = await getTemporaryDirectory();
-    final file = File("${output.path}/data_report.pdf");
-    await file.writeAsBytes(await pdf.save());
-
-    print("✅ PDF Saved at: ${file.path}");
-    await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => pdf.save(),
-    );
   }
+
+  // ✅ Save and Open the PDF
+  final output = await getTemporaryDirectory();
+  final file = File("${output.path}/data_report.pdf");
+  await file.writeAsBytes(await pdf.save());
+
+  print("✅ PDF Saved at: ${file.path}");
+  await Printing.layoutPdf(
+    onLayout: (PdfPageFormat format) async => pdf.save(),
+  );
+}
+
+
+
+
+
+
+//////////////////////////////////////////////////////////////////////////////////////////
+
+// ✅ Helper Functions to Recalculate Summaries
+void _generateComparisonSummary() {
+  comparisonSummary = ""; // Clear old data
+  if (firstDateData.isNotEmpty && secondDateData.isNotEmpty) {
+    List<String> labels = ["Temperature", "Moisture Level", "pH Level 1", "pH Level 2", "Humidity"];
+    
+    for (String label in labels) {
+      double firstValue = double.tryParse(firstDateData[label]?.replaceAll(RegExp('[^0-9.]'), '') ?? "0") ?? 0;
+      double secondValue = double.tryParse(secondDateData[label]?.replaceAll(RegExp('[^0-9.]'), '') ?? "0") ?? 0;
+
+      //   // ✅ Format Dates Correctly (Removes Time)
+      // String firstDateFormatted = DateFormat('yyyy-MM-dd').format(firstSelectedDate);
+      // String secondDateFormatted = DateFormat('yyyy-MM-dd').format(secondSelectedDate);
+
+      if (firstValue > secondValue) {
+        double diff = (firstValue - secondValue);
+        comparisonSummary += "• $label on $firstSelectedDate (${firstValue.toStringAsFixed(2)}) was higher than $secondSelectedDate (${secondValue.toStringAsFixed(2)}) by ${diff.toStringAsFixed(2)}.\n\n";
+      } else if (firstValue < secondValue) {
+        double diff = (secondValue - firstValue);
+        comparisonSummary += "• $label on $secondSelectedDate (${secondValue.toStringAsFixed(2)}) was higher than $firstSelectedDate (${firstValue.toStringAsFixed(2)}) by ${diff.toStringAsFixed(2)}.\n\n";
+      } else {
+        comparisonSummary += "• $label was the same on both dates ($firstSelectedDate: ${firstValue.toStringAsFixed(2)}, $secondSelectedDate: ${secondValue.toStringAsFixed(2)}).\n\n";
+      }
+    }
+  }
+}
+
+void _generateFrequencySummary() {
+  print("🔄 Regenerating Frequency Summary...");
+  frequencySummary = ""; // ✅ Clear old data
+
+  print("🔍 selectedFilter: $selectedFilter"); // ✅ Debugging line
+
+  if (frequencyAnalysisData.isNotEmpty) {
+    List<String> summaries = [];
+
+    frequencyAnalysisData.forEach((sensorType, sensorData) {
+      if (sensorData.isNotEmpty) {
+        if (selectedFilter == "Weekly") {
+          double highestWeeklyValue = 0;
+          String highestWeeklyTimestamp = "";
+
+          for (var entry in sensorData) {
+            double sensorValue = double.tryParse(entry["Value"].toString()) ?? 0;
+            if (sensorValue > highestWeeklyValue) {
+              highestWeeklyValue = sensorValue;
+              highestWeeklyTimestamp = entry["Time"];
+            }
+          }
+
+          // ✅ Format timestamp correctly for Weekly mode
+          String formattedTimestamp = "Unknown Time";
+          try {
+            DateTime parsedTime = DateFormat("yyyy-MM-dd hh:mm a").parse(highestWeeklyTimestamp);
+            formattedTimestamp = DateFormat("EEE, yyyy-MM-dd hh:mm a").format(parsedTime);
+          } catch (e) {
+            print("⚠️ Error parsing timestamp: $highestWeeklyTimestamp - $e");
+          }
+
+          summaries.add("• The highest recorded value this week for **$sensorType** was at **$formattedTimestamp** with a value of **${highestWeeklyValue.toStringAsFixed(2)}**.");
+        } else { // ✅ Daily Mode
+          var highestRecord = (sensorData as List<Map<String, dynamic>>).reduce(
+            (a, b) => (double.tryParse(a["Value"].toString()) ?? 0) >
+                       (double.tryParse(b["Value"].toString()) ?? 0) ? a : b,
+          );
+
+          double highestValue = double.tryParse(highestRecord["Value"].toString()) ?? 0;
+          String rawTimestamp = highestRecord["Time"];
+          String formattedTimestamp = "Unknown Time";
+
+          try {
+            DateTime parsedTime = DateFormat("yyyy-MM-dd hh:mm a").parse(rawTimestamp);
+            formattedTimestamp = DateFormat("hh:mm a").format(parsedTime);
+          } catch (e) {
+            print("⚠️ Error parsing timestamp: $rawTimestamp - $e");
+          }
+
+          summaries.add("• The highest recorded value today for **$sensorType** was at **$formattedTimestamp** with a value of **${highestValue.toStringAsFixed(2)}**.");
+        }
+      }
+    });
+
+    // ✅ Combine summaries for all sensor types
+    frequencySummary = summaries.join("\n\n");
+  }
+
+  print("📌 Final frequencySummary: $frequencySummary");
+}
+
+
+
+// ✅ Helper Function: Formats Bullet Points for PDF
+pw.Widget _buildPDFBulletPoints(String summary, pw.Font customFont) {
+  List<String> lines = summary.split("\n").where((line) => line.isNotEmpty).toList();
+
+  return pw.Column(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    children: lines.map((line) {
+      List<String> parts = line.split("by");
+      String firstPart = parts.isNotEmpty ? parts[0].trim() : "";
+      String secondPart = parts.length > 1 ? "by ${parts[1].trim()}" : "";
+
+      return pw.Padding(
+        padding: const pw.EdgeInsets.only(bottom: 4),
+        child: pw.RichText(
+          text: pw.TextSpan(
+            children: [
+              pw.TextSpan(
+                text: "• ", // ✅ Bullet point (now works with custom font!)
+                style: pw.TextStyle(font: customFont, fontSize: 14, fontWeight: pw.FontWeight.bold),
+              ),
+              pw.TextSpan(
+                text: firstPart, // ✅ First part of the sentence
+                style: pw.TextStyle(font: customFont, fontSize: 14),
+              ),
+              if (secondPart.isNotEmpty)
+                pw.TextSpan(
+                  text: " $secondPart", // ✅ Bold the difference value
+                  style: pw.TextStyle(
+                    font: customFont,
+                    fontSize: 14,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColors.blue,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    }).toList(),
+  );
+}
+
+
+
 
   Future<List<Uint8List>> _captureGraphsAsImages() async {
-    List<Uint8List> images = [];
+  List<Uint8List> images = [];
 
-    // ✅ Wait for rendering to complete
-    await Future.delayed(const Duration(milliseconds: 500));
+  // ✅ Ensure both graphs are fully rendered before capturing
+  await _waitForGraphRender(comparisonGraphKey, "comparisonGraphKey");
+  await _waitForGraphRender(frequencyGraphKey, "frequencyGraphKey");
 
-    // ✅ Capture _buildComparisonGraph()
-    if (comparisonGraphKey.currentContext != null) {
-      RenderRepaintBoundary boundary =
-          comparisonGraphKey.currentContext!.findRenderObject()
-              as RenderRepaintBoundary;
-      ui.Image image = await boundary.toImage(pixelRatio: 3.0);
-      ByteData? byteData = await image.toByteData(
-        format: ui.ImageByteFormat.png,
-      );
-      if (byteData != null) images.add(byteData.buffer.asUint8List());
-    } else {
-      print("❌ comparisonGraphKey is NULL!");
-    }
-
-    // ✅ Capture _buildTimeBasedFrequencyGraph()
-    if (frequencyGraphKey.currentContext != null) {
-      RenderRepaintBoundary boundary =
-          frequencyGraphKey.currentContext!.findRenderObject()
-              as RenderRepaintBoundary;
-      ui.Image image = await boundary.toImage(pixelRatio: 3.0);
-      ByteData? byteData = await image.toByteData(
-        format: ui.ImageByteFormat.png,
-      );
-      if (byteData != null) images.add(byteData.buffer.asUint8List());
-    } else {
-      print("❌ frequencyGraphKey is NULL!");
-    }
-
-    print("📸 Total images captured: ${images.length}");
-    return images;
+  // ✅ Capture _buildComparisonGraph()
+  if (comparisonGraphKey.currentContext != null) {
+    RenderRepaintBoundary boundary =
+        comparisonGraphKey.currentContext!.findRenderObject()
+            as RenderRepaintBoundary;
+    ui.Image image = await boundary.toImage(pixelRatio: 3.0);
+    ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    if (byteData != null) images.add(byteData.buffer.asUint8List());
+    print("✅ Successfully captured _buildComparisonGraph()");
+  } else {
+    print("❌ comparisonGraphKey is STILL NULL after waiting!");
   }
+
+  // ✅ Capture _buildTimeBasedFrequencyGraph()
+  if (frequencyGraphKey.currentContext != null) {
+    RenderRepaintBoundary boundary =
+        frequencyGraphKey.currentContext!.findRenderObject()
+            as RenderRepaintBoundary;
+    ui.Image image = await boundary.toImage(pixelRatio: 3.0);
+    ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    if (byteData != null) images.add(byteData.buffer.asUint8List());
+    print("✅ Successfully captured _buildTimeBasedFrequencyGraph()");
+  } else {
+    print("❌ frequencyGraphKey is STILL NULL after waiting!");
+  }
+
+  print("📸 Total images captured: ${images.length}");
+  return images;
+}
+
+// ✅ Helper Function: Waits for a widget to render
+Future<void> _waitForGraphRender(GlobalKey key, String graphName) async {
+  int retries = 10; // ✅ Maximum wait attempts
+  while (key.currentContext == null && retries > 0) {
+    print("⏳ Waiting for $graphName to render... ($retries retries left)");
+    await Future.delayed(const Duration(milliseconds: 500));
+    retries--;
+  }
+}
+
+
+
+//////////////////////////////////////////////////////////////////////////////////////////
 
   @override
   Widget build(BuildContext context) {
@@ -729,10 +898,12 @@ class _DataReportPageState extends State<DataReportPage> {
                   const SizedBox(
                     height: 16,
                   ), // ✅ Adds spacing between _buildDataCard and _buildComparisonGraph
-                  if (hasSecondDate)
-                    RepaintBoundary(
-                      key: comparisonGraphKey,
-                      child: _buildComparisonGraph(),
+                  RepaintBoundary(
+                    key: comparisonGraphKey,
+                    child: hasSecondDate
+                        ? _buildComparisonGraph() // ✅ Show graph if hasSecondDate is true
+                        : const SizedBox(), // ✅ Keeps the widget in the tree when false
+
                     ),
 
                   const SizedBox(height: 12), // ✅ Adds spacing before the graph
@@ -1128,7 +1299,7 @@ class _DataReportPageState extends State<DataReportPage> {
 
                         List<BarChartRodData> bars = [];
 
-                        for (var sensor in sensorTypes) {
+                        
                           var sensorData =
                               frequencyAnalysisData[sensor]
                                   ?.where((data) => data["Time"] == timeLabel)
@@ -1149,7 +1320,7 @@ class _DataReportPageState extends State<DataReportPage> {
                               ),
                             );
                           }
-                        }
+                        
 
                         return BarChartGroupData(x: index, barRods: bars);
                       }),
@@ -1232,154 +1403,218 @@ class _DataReportPageState extends State<DataReportPage> {
   }
 
   Widget _buildConclusionWidget() {
-    if (firstDateData.isEmpty &&
-        secondDateData.isEmpty &&
-        frequencyAnalysisData.isEmpty) {
-      return const Center(child: Text("No data available for conclusion."));
-    }
+  if (firstDateData.isEmpty &&
+      secondDateData.isEmpty &&
+      frequencyAnalysisData.isEmpty) {
+    return const Center(child: Text("No data available for conclusion."));
+  }
 
-    String firstDateStr = DateFormat("yyyy-MM-dd").format(firstSelectedDate);
-    String secondDateStr = DateFormat("yyyy-MM-dd").format(secondSelectedDate);
+  String firstDateStr = DateFormat("yyyy-MM-dd").format(firstSelectedDate);
+  String secondDateStr = DateFormat("yyyy-MM-dd").format(secondSelectedDate);
 
-    // 📌 1️⃣ Comparison Summary
-    print("📝 Comparison Summary: $comparisonSummary");
-    comparisonSummary = "";
-    if (firstDateData.isNotEmpty && secondDateData.isNotEmpty) {
-      List<String> labels = [
-        "Temperature",
-        "Moisture Level",
-        "pH Level 1",
-        "pH Level 2",
-        "Humidity",
-      ];
+  // 📌 1️⃣ Comparison Summary
+  print("📝 Comparison Summary: $comparisonSummary");
+  List<InlineSpan> comparisonSpans = [];
 
-      for (String label in labels) {
-        double firstValue =
-            double.tryParse(
-              firstDateData[label]?.replaceAll(RegExp('[^0-9.]'), '') ?? "0",
-            ) ??
-            0;
-        double secondValue =
-            double.tryParse(
-              secondDateData[label]?.replaceAll(RegExp('[^0-9.]'), '') ?? "0",
-            ) ??
-            0;
+  if (firstDateData.isNotEmpty && secondDateData.isNotEmpty) {
+    List<String> labels = [
+      "Temperature",
+      "Moisture Level",
+      "pH Level 1",
+      "pH Level 2",
+      "Humidity",
+    ];
 
-        if (firstValue > secondValue) {
+    String formatSensorValue(String sensor, double value) {
+  if (sensor.contains("Temperature")) {
+    return "${value.toStringAsFixed(1)}°C"; // ✅ 1 decimal + °C
+  } else if (sensor.contains("Moisture") || sensor.contains("Humidity")) {
+    return "${value.toStringAsFixed(0)}%"; // ✅ Whole number + %
+  } else if (sensor.contains("pH")) {
+    return value.toStringAsFixed(2); // ✅ 2 decimal places for pH
+  }
+  return value.toString(); // Default case (not expected)
+}
+
+
+    for (String label in labels) {
+      double firstValue =
+          double.tryParse(firstDateData[label]?.replaceAll(RegExp('[^0-9.]'), '') ?? "0") ?? 0;
+      double secondValue =
+          double.tryParse(secondDateData[label]?.replaceAll(RegExp('[^0-9.]'), '') ?? "0") ?? 0;
+
+      if (firstValue > secondValue) {
           double diff = (firstValue - secondValue);
-          comparisonSummary +=
-              "$label on **$firstDateStr** was higher than on **$secondDateStr** by ${diff.toStringAsFixed(2)}.\n";
+          comparisonSpans.add(_buildBulletSpan(
+            label,
+            "on $firstDateStr (${formatSensorValue(label, firstValue)}) was higher than $secondDateStr (${formatSensorValue(label, secondValue)}) by ",
+            formatSensorValue(label, diff),
+          ));
         } else if (firstValue < secondValue) {
           double diff = (secondValue - firstValue);
-          comparisonSummary +=
-              "$label on **$secondDateStr** was higher than on **$firstDateStr** by ${diff.toStringAsFixed(2)}.\n";
+          comparisonSpans.add(_buildBulletSpan(
+            label,
+            "on $secondDateStr (${formatSensorValue(label, secondValue)}) was higher than $firstDateStr (${formatSensorValue(label, firstValue)}) by ",
+            formatSensorValue(label, diff),
+          ));
         } else {
-          comparisonSummary +=
-              "$label was the same on **both dates** ($firstDateStr & $secondDateStr).\n";
+          comparisonSpans.add(_buildBulletSpan(
+            label,
+            "was the same on both dates ($firstDateStr: ${formatSensorValue(label, firstValue)}, $secondDateStr: ${formatSensorValue(label, secondValue)}).",
+            "",
+          ));
         }
+
+
+    }
+  }
+
+  // 📌 2️⃣ Time-Based Frequency Summary
+  print("📝 Frequency Summary: $frequencySummary");
+  List<InlineSpan> frequencySpans = [];
+
+  if (frequencyAnalysisData.isNotEmpty) {
+    frequencyAnalysisData.forEach((sensorType, sensorData) {
+      if (sensorData.isNotEmpty) {
+        var highestRecord = (sensorData as List<Map<String, dynamic>>).reduce(
+          (a, b) =>
+              (double.tryParse(a["Value"].toString()) ?? 0) >
+                      (double.tryParse(b["Value"].toString()) ?? 0)
+                  ? a
+                  : b,
+        );
+
+        double highestValue =
+            double.tryParse(highestRecord["Value"].toString()) ?? 0;
+        String highestValueStr = formatSensorValue(sensorType, highestValue);
+        String rawTimestamp = highestRecord["Time"];
+        String formattedTimestamp = "Unknown Time";
+
+        try {
+          DateTime parsedTime = DateFormat("yyyy-MM-dd hh:mm a").parse(rawTimestamp);
+          formattedTimestamp = (selectedFilter == "Weekly")
+              ? DateFormat("EEE hh:mm a").format(parsedTime) // Example: Mon 08:00 AM
+              : DateFormat("hh:mm a").format(parsedTime); // Example: 08:00 AM
+        } catch (e) {
+          print("⚠️ Error parsing timestamp: $rawTimestamp - $e");
+        }
+
+        frequencySpans.add(_buildBulletSpan(
+          sensorType,
+          "was highest at $formattedTimestamp with a value of ",
+          highestValueStr,
+        ));
       }
-    }
+    });
+  }
 
-    // 📌 2️⃣ Time-Based Frequency Summary (Updated)
-    print("📝 Frequency Summary: $frequencySummary");
-    frequencySummary = "";
-    if (frequencyAnalysisData.isNotEmpty) {
-      List<String> summaries = [];
+  // 📌 UI Layout
+  return Card(
+    color: Colors.white,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    elevation: 3,
+    margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+    child: Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ✅ Title
+          const Text(
+            "📌 Conclusion & Findings",
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.green,
+            ),
+          ),
+          const Divider(color: Colors.black45),
+          const SizedBox(height: 10),
 
-      frequencyAnalysisData.forEach((sensorType, sensorData) {
-        if (sensorData.isNotEmpty) {
-          // ✅ Find the highest value for this sensor type
-          var highestRecord = (sensorData as List<Map<String, dynamic>>).reduce(
-            (a, b) =>
-                (double.tryParse(a["Value"].toString()) ?? 0) >
-                        (double.tryParse(b["Value"].toString()) ?? 0)
-                    ? a
-                    : b,
-          );
-
-          double highestValue =
-              double.tryParse(highestRecord["Value"].toString()) ?? 0;
-          String highestValueStr = formatSensorValue(sensorType, highestValue);
-          String rawTimestamp = highestRecord["Time"];
-          String formattedTimestamp = "Unknown Time";
-
-          try {
-            DateTime parsedTime = DateFormat(
-              "yyyy-MM-dd hh:mm a",
-            ).parse(rawTimestamp);
-            if (selectedFilter == "Weekly") {
-              formattedTimestamp = DateFormat(
-                "yyyy-MM-dd hh:mm a",
-              ).format(parsedTime);
-            } else {
-              formattedTimestamp = DateFormat("hh:mm a").format(parsedTime);
-            }
-          } catch (e) {
-            print("⚠️ Error parsing timestamp: $rawTimestamp - $e");
-          }
-
-          // ✅ Add summary for this sensor type
-          summaries.add(
-            selectedFilter == "Weekly"
-                ? "The highest recorded value this week for **$sensorType** was at **$formattedTimestamp** with a value of **$highestValueStr**."
-                : "The highest recorded value today for **$sensorType** was at **$formattedTimestamp** with a value of **$highestValueStr**.",
-          );
-        }
-      });
-
-      // ✅ Combine summaries for all sensor types
-      frequencySummary = summaries.join("\n");
-    }
-
-    // 📌 UI Layout
-    return Card(
-      color: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      elevation: 3,
-      margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              "Conclusion & Findings",
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
+          // ✅ Comparison Summary
+          if (comparisonSpans.isNotEmpty) ...[
+            Text(
+              "📊 Date Comparison Summary ($firstDateStr vs. $secondDateStr)",
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            RichText(
+              text: TextSpan(
+                style: const TextStyle(fontSize: 16, color: Colors.black87),
+                children: comparisonSpans,
               ),
             ),
-            const Divider(color: Colors.black45),
-
-            if (comparisonSummary.isNotEmpty) ...[
-              Text(
-                "📊 Date Comparison Summary ($firstDateStr vs. $secondDateStr)",
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              Text(
-                comparisonSummary,
-                style: const TextStyle(fontSize: 16, color: Colors.black54),
-              ),
-              const SizedBox(height: 10),
-            ],
-
-            if (frequencySummary.isNotEmpty) ...[
-              const Text(
-                "📈 Time-Based Frequency Summary",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              Text(
-                frequencySummary,
-                style: const TextStyle(fontSize: 16, color: Colors.black54),
-              ),
-            ],
+            const SizedBox(height: 20),
           ],
-        ),
+
+          // ✅ Time-Based Frequency Summary
+          if (frequencySpans.isNotEmpty) ...[
+            const Text(
+              "📈 Time-Based Frequency Summary",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            RichText(
+              text: TextSpan(
+                style: const TextStyle(fontSize: 16, color: Colors.black87),
+                children: frequencySpans,
+              ),
+            ),
+          ],
+        ],
       ),
-    );
-  }
+    ),
+  );
+}
+
+// ✅ Helper Function: Formats text into bullet points with bold values
+InlineSpan _buildBulletSpan(String label, String text, String boldValue) {
+  return WidgetSpan(
+    child: Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "• ", // Bullet point
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          Expanded(
+            child: RichText(
+              text: TextSpan(
+                children: [
+                  TextSpan(
+                    text: "$label ", // Sensor name
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  ),
+                  TextSpan(
+                    text: text, // Regular text
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  TextSpan(
+                    text: boldValue, // Highlighted Value
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+
 }

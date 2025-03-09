@@ -73,6 +73,7 @@ dev_dependencies:
 # The following section is specific to Flutter packages.
 flutter:
   assets:
+    - assets/fonts/Roboto-Regular.ttf
     - assets/logo_login.png
     - assets/main_logo.png
     - assets/onboard_1.png
