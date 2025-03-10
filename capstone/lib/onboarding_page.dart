@@ -23,18 +23,21 @@ class _OnboardingPageState extends State<OnboardingPage> {
             children: [
               const OnboardingScreen(
                 image: 'assets/onboard_1.png',
-                title: '',
-                description: '',
+                title: 'Purpose',
+                description:
+                    'E-ComposThink is a technologically advanced system that utilizes real-time monitoring and sensor technology to reduce food waste through composting.',
               ),
               const OnboardingScreen(
                 image: 'assets/onboard_2.png',
-                title: '',
-                description: '',
+                title: 'Significance',
+                description:
+                    'Having an Innovative Organic Waste Conversion can contribute to a better urban environment.',
               ),
               const OnboardingScreen(
                 image: 'assets/onboard_3.png',
-                title: '',
-                description: '',
+                title: 'Solution',
+                description:
+                    'E-ComposThink project offers a promising solution to address the growing issue of food waste and promote sustainable urban farming, it transforms how we approach food waste and urban farming.',
               ),
               OnboardingScreenWithButton(
                 image: 'assets/onboard_4.png',
@@ -81,7 +84,8 @@ class OnboardingScreen extends StatelessWidget {
   final String title;
   final String description;
 
-  const OnboardingScreen({super.key, 
+  const OnboardingScreen({
+    super.key,
     required this.image,
     required this.title,
     required this.description,
@@ -89,6 +93,9 @@ class OnboardingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    bool shouldDarken =
+        image == 'assets/onboard_2.png' || image == 'assets/onboard_3.png';
+
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -96,34 +103,36 @@ class OnboardingScreen extends StatelessWidget {
           image,
           fit: BoxFit.cover,
         ),
-        Column(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    description,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      color: Colors.white70,
-                    ),
-                  ),
-                ],
+        if (shouldDarken)
+          Container(
+            color: Colors.black.withOpacity(0.3),
+          ),
+        Positioned(
+          bottom: 85,
+          left: 24,
+          right: 24,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 10),
+              Text(
+                description,
+                textAlign: TextAlign.left,
+                style: TextStyle(
+                  fontSize: 20,
+                  color: Colors.white.withOpacity(0.85),
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -137,7 +146,8 @@ class OnboardingScreenWithButton extends StatelessWidget {
   final String description;
   final VoidCallback onButtonPressed;
 
-  const OnboardingScreenWithButton({super.key, 
+  const OnboardingScreenWithButton({
+    super.key,
     required this.image,
     required this.title,
     required this.description,
@@ -178,27 +188,29 @@ class OnboardingScreenWithButton extends StatelessWidget {
                     ),
                   ),
                   SizedBox(
-  width: double.infinity, // Button stretches to screen width
-  child: ElevatedButton(
-    style: ElevatedButton.styleFrom(
-      padding: const EdgeInsets.symmetric(vertical: 16.0), // Height of the button
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8.0), // Slightly rounded corners
-      ),
-      backgroundColor: const Color.fromARGB(255, 9, 133, 0), // Button background color
-    ),
-    onPressed: onButtonPressed,
-    child: const Text(
-      'Get Started',
-      style: TextStyle(
-        fontSize: 18,
-        fontWeight: FontWeight.bold,
-        color: Colors.white, // Set text color to white
-      ),
-    ),
-  ),
-),
-
+                    width: double.infinity, // Button stretches to screen width
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 16.0), // Height of the button
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(
+                              8.0), // Slightly rounded corners
+                        ),
+                        backgroundColor: const Color.fromARGB(
+                            255, 9, 133, 0), // Button background color
+                      ),
+                      onPressed: onButtonPressed,
+                      child: const Text(
+                        'Get Started',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white, // Set text color to white
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
