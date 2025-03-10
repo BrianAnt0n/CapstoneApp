@@ -12,6 +12,7 @@ import 'package:printing/printing.dart';
 import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart'; // ✅ Fixes rootBundle issue
+import 'package:flutter/foundation.dart';
 
 
 class DataReportPage extends StatefulWidget {
@@ -36,7 +37,12 @@ class _DataReportPageState extends State<DataReportPage> {
   String frequencySummary = "";
 
   final GlobalKey comparisonGraphKey = GlobalKey();
-  final GlobalKey frequencyGraphKey = GlobalKey();
+final GlobalKey frequencyGraphKey = GlobalKey();
+
+
+  final GlobalKey<_ComparisonGraphWidgetState> comparisonGraphWidgetKey = GlobalKey<_ComparisonGraphWidgetState>();
+// final GlobalKey<_FrequencyGraphWidgetState> frequencyGraphWidgetKey = GlobalKey<_FrequencyGraphWidgetState>();
+
 
   @override
   void initState() {
@@ -77,6 +83,8 @@ class _DataReportPageState extends State<DataReportPage> {
       print("🔄 UI Updated with fetched data for User: $storedEmail");
     });
   }
+
+  
 
   // Date Picker Tile Widget
   Widget _buildDatePickerTile(
@@ -506,29 +514,22 @@ List<double> secondValues = labels.map((label) {
 
   await Future.delayed(const Duration(milliseconds: 1000)); // ✅ Ensure time for UI updates
   print("🔍 Checking comparisonGraphKey BEFORE capturing images: ${comparisonGraphKey.currentContext != null}");
+  print("🔍 comparisonGraphKey exists in UI: ${comparisonGraphKey.currentContext != null}");
 
-
-print("🔍 comparisonGraphKey exists in UI: ${comparisonGraphKey.currentContext != null}");
-
- // ✅ Wait for the graphs to finish rendering
+  // ✅ Wait for graphs to finish rendering
   await _waitForGraphRender(comparisonGraphKey, "comparisonGraphKey");
   await _waitForGraphRender(frequencyGraphKey, "frequencyGraphKey");
 
-
   final pdf = pw.Document();
 
-   // ✅ Ensure selectedFilter is set correctly before generating summaries
+  // ✅ Ensure summaries are updated before exporting
   print("🔄 Current selectedFilter: $selectedFilter");
+  _buildConclusionWidget();  
+  _generateFrequencySummary();
 
-  // ✅ Regenerate summaries with the latest data before exporting
-  _buildConclusionWidget();  // 🔄 Forces latest frequencySummary update
-  _generateFrequencySummary(); // 🔄 Forces update before PDF export
-
-    // ✅ Load Custom Font
   final fontData = await rootBundle.load("assets/fonts/Roboto-Regular.ttf");
   final customFont = pw.Font.ttf(fontData);
 
-  // ✅ Ensure summaries are set before exporting
   if (comparisonSummary.trim().isEmpty) {
     print("❌ No data for comparisonSummary! Regenerating...");
     _generateComparisonSummary();
@@ -539,32 +540,26 @@ print("🔍 comparisonGraphKey exists in UI: ${comparisonGraphKey.currentContext
     _generateFrequencySummary();
   }
 
-    // ✅ Fix: Remove time from the dates
+  // ✅ Format dates correctly
   String firstDateFormatted = DateFormat('yyyy-MM-dd').format(firstSelectedDate);
   String secondDateFormatted = DateFormat('yyyy-MM-dd').format(secondSelectedDate);
 
-  // ✅ Replace full timestamp with formatted date in the summary text
   comparisonSummary = comparisonSummary
       .replaceAll(firstSelectedDate.toString(), firstDateFormatted)
       .replaceAll(secondSelectedDate.toString(), secondDateFormatted);
 
-
-
   print("📌 Final comparisonSummary: $comparisonSummary");
   print("📌 Final frequencySummary: $frequencySummary");
 
-  // ✅ Title Page
+  // ✅ Page 1: Title Page
   pdf.addPage(
     pw.Page(
       build: (pw.Context context) => pw.Center(
         child: pw.Column(
           mainAxisAlignment: pw.MainAxisAlignment.center,
           children: [
-            pw.Text(
-              "Data Report Summary",
-              style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, font: customFont),
-
-            ),
+            pw.Text("Data Report Summary",
+              style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, font: customFont)),
             pw.SizedBox(height: 8),
             pw.Text("Generated on ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now())}"),
           ],
@@ -573,7 +568,7 @@ print("🔍 comparisonGraphKey exists in UI: ${comparisonGraphKey.currentContext
     ),
   );
 
-  // ✅ Add Data Comparison Summary (if available)
+  // ✅ Page 2: Data Comparison Summary
   if (comparisonSummary.trim().isNotEmpty) {
     pdf.addPage(
       pw.Page(
@@ -582,13 +577,10 @@ print("🔍 comparisonGraphKey exists in UI: ${comparisonGraphKey.currentContext
           child: pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              pw.Text(
-                "Data Comparison Summary",
-               style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, font: customFont),
-
-              ),
+              pw.Text("Data Comparison Summary",
+                style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, font: customFont)),
               pw.SizedBox(height: 8),
-              pw.Text(comparisonSummary, style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, font: customFont)),
+              pw.Text(comparisonSummary, style: pw.TextStyle(fontSize: 16, font: customFont)),
             ],
           ),
         ),
@@ -598,7 +590,7 @@ print("🔍 comparisonGraphKey exists in UI: ${comparisonGraphKey.currentContext
     print("❌ Still no data for comparisonSummary!");
   }
 
-  // ✅ Add Time-Based Frequency Summary (if available)
+  // ✅ Page 3: Time-Based Frequency Summary
   if (frequencySummary.trim().isNotEmpty) {
     pdf.addPage(
       pw.Page(
@@ -607,13 +599,10 @@ print("🔍 comparisonGraphKey exists in UI: ${comparisonGraphKey.currentContext
           child: pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              pw.Text(
-                "Time-Based Frequency Summary",
-                style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, font: customFont),
-
-              ),
+              pw.Text("Time-Based Frequency Summary",
+                style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, font: customFont)),
               pw.SizedBox(height: 8),
-              pw.Text(frequencySummary, style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, font: customFont)),
+              pw.Text(frequencySummary, style: pw.TextStyle(fontSize: 16, font: customFont)),
             ],
           ),
         ),
@@ -624,22 +613,63 @@ print("🔍 comparisonGraphKey exists in UI: ${comparisonGraphKey.currentContext
   }
 
   setState(() {}); // ✅ Force UI rebuild first
-await Future.delayed(const Duration(milliseconds: 500)); // ✅ Allow UI to update
-print("🔍 Checking comparisonGraphKey BEFORE capturing images: ${comparisonGraphKey.currentContext != null}");
+  await Future.delayed(const Duration(milliseconds: 1000)); // ✅ Allow UI to update
 
-  // ✅ Capture and Add Graphs
-  List<Uint8List> images = await _captureGraphsAsImages();
+  // ✅ Capture comparisonGraphKey
+Uint8List? comparisonGraphImage = await _captureGraph(
+  comparisonGraphKey, 
+  "comparisonGraphKey", 
+  () => comparisonGraphWidgetKey.currentState?.forceRebuild() // 🔄 Trigger rebuild if needed
+);
+
+Uint8List? frequencyGraphImage = await _captureGraph(
+  frequencyGraphKey, 
+  "frequencyGraphKey", 
+  () => setState(() {}) // ✅ Just force a UI rebuild
+);
+
+List<Uint8List> images = [];
+if (comparisonGraphImage != null) images.add(comparisonGraphImage);
+if (frequencyGraphImage != null) images.add(frequencyGraphImage);
   if (images.isEmpty) {
     print("❌ No images captured, skipping graphs in PDF.");
   } else {
-    for (var image in images) {
+    // ✅ Page 4: comparisonGraphKey
+    if (images.length > 0) {
       pdf.addPage(
         pw.Page(
           build: (pw.Context context) => pw.Center(
-            child: pw.Image(pw.MemoryImage(image), width: 400, height: 300),
+            child: pw.Column(
+              children: [
+                pw.Text("Comparison Graph",
+                  style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold, font: customFont)),
+                pw.SizedBox(height: 10),
+                pw.Image(pw.MemoryImage(images[0]), width: 400, height: 300),
+              ],
+            ),
           ),
         ),
       );
+      print("✅ comparisonGraphKey added to Page 4.");
+    }
+
+    // ✅ Page 5: frequencyGraphKey
+    if (images.length > 1) {
+      pdf.addPage(
+        pw.Page(
+          build: (pw.Context context) => pw.Center(
+            child: pw.Column(
+              children: [
+                pw.Text("Frequency Graph",
+                  style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold, font: customFont)),
+                pw.SizedBox(height: 10),
+                pw.Image(pw.MemoryImage(images[1]), width: 400, height: 300),
+              ],
+            ),
+          ),
+        ),
+      );
+      print("✅ frequencyGraphKey added to Page 5.");
     }
   }
 
@@ -798,50 +828,79 @@ pw.Widget _buildPDFBulletPoints(String summary, pw.Font customFont) {
 
 
   Future<List<Uint8List>> _captureGraphsAsImages() async {
-   List<Uint8List> images = [];
+  List<Uint8List> images = [];
 
-   // ✅ Ensure both graphs are fully rendered before capturing
-   await _waitForGraphRender(comparisonGraphKey, "comparisonGraphKey");
-   await _waitForGraphRender(frequencyGraphKey, "frequencyGraphKey");
+  // ❌ No need to manually wait anymore; _captureGraph() handles it!
+  // await _waitForGraphRender(comparisonGraphKey, "comparisonGraphKey");
+  // await _waitForGraphRender(frequencyGraphKey, "frequencyGraphKey");
 
-   // ✅ Retry capturing if `comparisonGraphKey.currentContext` is still null
-   int retries = 5;
-   while (comparisonGraphKey.currentContext == null && retries > 0) {
-       print("🔄 Retrying capturing _buildComparisonGraph()... ($retries retries left)");
-       await Future.delayed(const Duration(milliseconds: 500));
-       retries--;
-   }
+   // ✅ Capture _buildComparisonGraph() and force rebuild if needed
+  Uint8List? comparisonGraphImage = await _captureGraph(
+    comparisonGraphKey, 
+    "comparisonGraphKey", 
+    () => setState(() {})  // 🔄 Forces a rebuild!
+  );
+  if (comparisonGraphImage != null) images.add(comparisonGraphImage);
 
-   // ✅ Capture _buildComparisonGraph()
-   if (comparisonGraphKey.currentContext != null) {
-      RenderRepaintBoundary boundary =
-           comparisonGraphKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
-      ui.Image image = await boundary.toImage(pixelRatio: 3.0);
-      ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-      if (byteData != null) images.add(byteData.buffer.asUint8List());
-      print("✅ Successfully captured _buildComparisonGraph()");
-   } else {
-      print("❌ comparisonGraphKey is STILL NULL after waiting!");
-   }
+  // ✅ Capture _buildTimeBasedFrequencyGraph() and force rebuild if needed
+  Uint8List? frequencyGraphImage = await _captureGraph(
+    frequencyGraphKey, 
+    "frequencyGraphKey", 
+    () => setState(() {})  // 🔄 Forces a rebuild!
+  );
+  if (frequencyGraphImage != null) images.add(frequencyGraphImage);
 
-   // ✅ Capture _buildTimeBasedFrequencyGraph()
-   if (frequencyGraphKey.currentContext != null) {
-      RenderRepaintBoundary boundary =
-           frequencyGraphKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
-      ui.Image image = await boundary.toImage(pixelRatio: 3.0);
-      ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-      if (byteData != null) images.add(byteData.buffer.asUint8List());
-      print("✅ Successfully captured _buildTimeBasedFrequencyGraph()");
-   } else {
-      print("❌ frequencyGraphKey is STILL NULL after waiting!");
-   }
-
-   print("📸 Total images captured: ${images.length}");
-   return images;
+  print("📸 Total images captured: ${images.length}");
+  return images;
 }
 
 
-// ✅ Helper Function: Waits for a widget to render
+// ✅ Helper Function: Captures a widget as an image
+Future<Uint8List?> _captureGraph(GlobalKey key, String graphName, VoidCallback forceRebuild) async {
+  print("🔍 Attempting to capture $graphName...");
+
+  // ✅ Force rebuild if widget is null
+  if (key.currentContext == null) {
+    print("⚠ $graphName context is NULL! Forcing rebuild...");
+    forceRebuild();  // 🔄 Calls setState() to trigger a rebuild
+    await Future.delayed(Duration(milliseconds: 500)); // Allow rebuild time
+  }
+
+  // ✅ Double-check after rebuild attempt
+  if (key.currentContext == null) {
+    print("⚠ $graphName context is STILL NULL after rebuild attempt. Skipping capture.");
+    return null;
+  }
+
+  // ✅ Ensure widget is fully rendered before proceeding
+  await _waitForGraphRender(key, graphName);
+
+  if (key.currentContext == null || key.currentContext!.findRenderObject() == null) {
+    print("⚠ $graphName is still NULL, skipping capture.");
+    return null;
+  }
+
+  RenderRepaintBoundary? boundary = key.currentContext!.findRenderObject() as RenderRepaintBoundary?;
+
+  if (boundary == null || boundary.debugNeedsPaint) {
+    print("⚠ $graphName is not fully painted! Retrying...");
+    await Future.delayed(Duration(seconds: 1));
+
+    boundary = key.currentContext!.findRenderObject() as RenderRepaintBoundary?;
+    if (boundary == null || boundary.debugNeedsPaint) {
+      print("❌ $graphName is STILL NOT READY after waiting!");
+      return null;
+    }
+  }
+
+  print("✅ $graphName is fully rendered and painted.");
+  ui.Image image = await boundary.toImage(pixelRatio: 3.0);
+  ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+  return byteData?.buffer.asUint8List();
+}
+
+
+// ✅ Moved `_waitForGraphRender()` inside `_captureGraph()`
 Future<void> _waitForGraphRender(GlobalKey key, String graphName) async {
   int retries = 15; // ✅ Increased retries
   while (retries > 0) {
@@ -851,7 +910,7 @@ Future<void> _waitForGraphRender(GlobalKey key, String graphName) async {
       RenderRepaintBoundary? boundary = key.currentContext!.findRenderObject() as RenderRepaintBoundary?;
       if (boundary != null && !boundary.debugNeedsPaint) {
         print("✅ $graphName is fully rendered and painted.");
-        return; // ✅ Exit once rendering is complete
+        return;
       }
     }
 
@@ -861,6 +920,30 @@ Future<void> _waitForGraphRender(GlobalKey key, String graphName) async {
 
   print("❌ $graphName is STILL NULL or not painted after waiting!");
 }
+
+
+
+
+// // ✅ Helper Function: Waits for a widget to render
+// Future<void> _waitForGraphRender(GlobalKey key, String graphName) async {
+//   int retries = 15; // ✅ Increased retries
+//   while (retries > 0) {
+//     await Future.delayed(const Duration(milliseconds: 700)); // ✅ Increased delay
+
+//     if (key.currentContext != null) {
+//       RenderRepaintBoundary? boundary = key.currentContext!.findRenderObject() as RenderRepaintBoundary?;
+//       if (boundary != null && !boundary.debugNeedsPaint) {
+//         print("✅ $graphName is fully rendered and painted.");
+//         return; // ✅ Exit once rendering is complete
+//       }
+//     }
+
+//     print("⏳ Waiting for $graphName to finish rendering... ($retries retries left)");
+//     retries--;
+//   }
+
+//   print("❌ $graphName is STILL NULL or not painted after waiting!");
+// }
 
 
 
@@ -927,9 +1010,6 @@ Future<void> _waitForGraphRender(GlobalKey key, String graphName) async {
   }
 }),
 
-
-            
-
             Expanded(
               child: ListView(
                 children: [
@@ -937,11 +1017,14 @@ Future<void> _waitForGraphRender(GlobalKey key, String graphName) async {
                   _buildDataCard("Second Date Data", secondDateData, true),
                   const SizedBox(height: 16),
 
-                  ComparisonGraphWidget(
+                 ComparisonGraphWidget(
+                    key: comparisonGraphWidgetKey, // ✅ Add this line
                     repaintKey: comparisonGraphKey,
                     firstDateData: firstDateData,
                     secondDateData: secondDateData,
+                    widgetKey: comparisonGraphWidgetKey, // ✅ Add this line
                   ),
+
 
 
                   const SizedBox(height: 12),
@@ -1661,22 +1744,31 @@ InlineSpan _buildBulletSpan(String label, String text, String boldValue) {
 }
 
 class ComparisonGraphWidget extends StatefulWidget {
+  final GlobalKey<_ComparisonGraphWidgetState> widgetKey; // ✅ Added GlobalKey
   final GlobalKey repaintKey;
   final Map<String, String> firstDateData;
   final Map<String, String> secondDateData;
+  
 
   const ComparisonGraphWidget({
     Key? key,
+    required this.widgetKey,  // ✅ Assign the key
     required this.repaintKey,
     required this.firstDateData,
     required this.secondDateData,
-  }) : super(key: key);
+  }) : super(key: widgetKey); // ✅ Pass key to parent
 
   @override
   _ComparisonGraphWidgetState createState() => _ComparisonGraphWidgetState();
 }
 
 class _ComparisonGraphWidgetState extends State<ComparisonGraphWidget> {
+
+   // ✅ Add this method
+  void forceRebuild() {
+    setState(() {}); // 🔄 Triggers a rebuild
+  }
+
   @override
   Widget build(BuildContext context) {
     print("🟢 _buildComparisonGraph() is rebuilding. comparisonGraphKey exists: ${widget.repaintKey.currentContext != null}");
@@ -1688,80 +1780,100 @@ class _ComparisonGraphWidgetState extends State<ComparisonGraphWidget> {
   }
 
   Widget _buildComparisonGraph() {
-    if (widget.firstDateData.isEmpty || widget.secondDateData.isEmpty) {
-      return const SizedBox(height: 300); // Maintain layout
-    }
+  print("🔍 comparisonGraph Data Check: First - ${widget.firstDateData}, Second - ${widget.secondDateData}");
 
-    List<String> labels = [
-      "Temperature",
-      "Moisture Level",
-      "pH Level 1",
-      "pH Level 2",
-      "Humidity",
-    ];
+  if (widget.firstDateData.isEmpty || widget.secondDateData.isEmpty) {
+    return const SizedBox(height: 300); // Maintain layout
+  }
 
-    List<double> firstValues = labels.map((label) {
-      String rawValue = widget.firstDateData[label]?.toString() ?? "0";
-      return double.tryParse(rawValue) ?? 0;
-    }).toList();
+  List<String> labels = [
+    "Temperature",
+    "Moisture Level",
+    "pH Level 1",
+    "pH Level 2",
+    "Humidity",
+  ];
 
-    List<double> secondValues = labels.map((label) {
-      String rawValue = widget.secondDateData[label]?.toString() ?? "0";
-      return double.tryParse(rawValue) ?? 0;
-    }).toList();
+  List<double> firstValues = labels.map((label) {
+    String rawValue = widget.firstDateData[label]?.toString() ?? "0";
+    return double.tryParse(rawValue) ?? 0;
+  }).toList();
 
-    return Column(
-      children: [
-        Wrap(
-          spacing: 12,
-          children: labels.map((sensor) {
-            return Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.circle, size: 12, color: Colors.black),
-                const SizedBox(width: 5),
-                Text(sensor, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-              ],
-            );
-          }).toList(),
-        ),
-        const SizedBox(height: 13),
-        SizedBox(
-          height: 300,
-          child: BarChart(
-            BarChartData(
-              barGroups: List.generate(labels.length, (index) {
-                return BarChartGroupData(
-                  x: index,
-                  barRods: [
-                    BarChartRodData(
-                      toY: firstValues[index],
-                      color: Colors.blue,
-                      width: 16,
-                    ),
-                    BarChartRodData(
-                      toY: secondValues[index],
-                      color: Colors.green,
-                      width: 16,
-                    ),
-                  ],
-                );
-              }),
-              titlesData: FlTitlesData(
-                leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 40)),
-                bottomTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    getTitlesWidget: (value, _) {
-                      return Icon(Icons.circle, size: 24, color: Colors.black54);
-                    },
+  List<double> secondValues = labels.map((label) {
+    String rawValue = widget.secondDateData[label]?.toString() ?? "0";
+    return double.tryParse(rawValue) ?? 0;
+  }).toList();
+
+  return Column(
+    children: [
+      Wrap(
+        spacing: 12,
+        children: labels.map((sensor) {
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(_getSensorIcon(sensor), size: 18, color: Colors.black),
+              const SizedBox(width: 5),
+              Text(sensor, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            ],
+          );
+        }).toList(),
+      ),
+      const SizedBox(height: 13),
+      SizedBox(
+        height: 300,
+        child: BarChart(
+          BarChartData(
+            barGroups: List.generate(labels.length, (index) {
+              return BarChartGroupData(
+                x: index,
+                barRods: [
+                  BarChartRodData(
+                    toY: firstValues[index],
+                    color: Colors.blue,
+                    width: 16,
                   ),
+                  BarChartRodData(
+                    toY: secondValues[index],
+                    color: Colors.green,
+                    width: 16,
+                  ),
+                ],
+              );
+            }),
+            titlesData: FlTitlesData(
+              leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 40)),
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  getTitlesWidget: (value, _) {
+                    return Icon(_getSensorIcon(labels[value.toInt()]), size: 24, color: Colors.black54);
+                  },
                 ),
               ),
             ),
           ),
         ),
-      ],
-    );
+      ),
+    ],
+  );
+}
+
+// Function to Map Sensor Type to Icons
+IconData _getSensorIcon(String sensorType) {
+  switch (sensorType.toLowerCase()) {
+    case "temperature":
+      return Icons.thermostat; // 🌡️ Temperature
+    case "moisture level":
+      return Icons.water_drop; // 💧 Moisture Level
+    case "ph level 1":
+    case "ph level 2":
+      return Icons.science; // 🧪 pH Levels
+    case "humidity":
+      return Icons.cloud; // ☁️ Humidity
+    default:
+      return Icons.device_unknown; // ❓ Default Icon
   }
+}
+
 }
