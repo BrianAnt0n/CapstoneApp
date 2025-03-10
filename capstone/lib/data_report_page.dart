@@ -937,13 +937,10 @@ Future<void> _waitForGraphRender(GlobalKey key, String graphName) async {
                   _buildDataCard("Second Date Data", secondDateData, true),
                   const SizedBox(height: 16),
 
-                  Visibility(
-                    visible:
-                        true, // ✅ Ensures it's never removed from the widget tree
-                    child: RepaintBoundary(
-                      key: comparisonGraphKey,
-                      child: _buildComparisonGraph(), // ✅ Always renders
-                    ),
+                  ComparisonGraphWidget(
+                    repaintKey: comparisonGraphKey,
+                    firstDateData: firstDateData,
+                    secondDateData: secondDateData,
                   ),
 
 
@@ -1661,4 +1658,110 @@ InlineSpan _buildBulletSpan(String label, String text, String boldValue) {
 }
 
 
+}
+
+class ComparisonGraphWidget extends StatefulWidget {
+  final GlobalKey repaintKey;
+  final Map<String, String> firstDateData;
+  final Map<String, String> secondDateData;
+
+  const ComparisonGraphWidget({
+    Key? key,
+    required this.repaintKey,
+    required this.firstDateData,
+    required this.secondDateData,
+  }) : super(key: key);
+
+  @override
+  _ComparisonGraphWidgetState createState() => _ComparisonGraphWidgetState();
+}
+
+class _ComparisonGraphWidgetState extends State<ComparisonGraphWidget> {
+  @override
+  Widget build(BuildContext context) {
+    print("🟢 _buildComparisonGraph() is rebuilding. comparisonGraphKey exists: ${widget.repaintKey.currentContext != null}");
+
+    return RepaintBoundary(
+      key: widget.repaintKey,
+      child: _buildComparisonGraph(), // Now defined inside this widget
+    );
+  }
+
+  Widget _buildComparisonGraph() {
+    if (widget.firstDateData.isEmpty || widget.secondDateData.isEmpty) {
+      return const SizedBox(height: 300); // Maintain layout
+    }
+
+    List<String> labels = [
+      "Temperature",
+      "Moisture Level",
+      "pH Level 1",
+      "pH Level 2",
+      "Humidity",
+    ];
+
+    List<double> firstValues = labels.map((label) {
+      String rawValue = widget.firstDateData[label]?.toString() ?? "0";
+      return double.tryParse(rawValue) ?? 0;
+    }).toList();
+
+    List<double> secondValues = labels.map((label) {
+      String rawValue = widget.secondDateData[label]?.toString() ?? "0";
+      return double.tryParse(rawValue) ?? 0;
+    }).toList();
+
+    return Column(
+      children: [
+        Wrap(
+          spacing: 12,
+          children: labels.map((sensor) {
+            return Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.circle, size: 12, color: Colors.black),
+                const SizedBox(width: 5),
+                Text(sensor, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              ],
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 13),
+        SizedBox(
+          height: 300,
+          child: BarChart(
+            BarChartData(
+              barGroups: List.generate(labels.length, (index) {
+                return BarChartGroupData(
+                  x: index,
+                  barRods: [
+                    BarChartRodData(
+                      toY: firstValues[index],
+                      color: Colors.blue,
+                      width: 16,
+                    ),
+                    BarChartRodData(
+                      toY: secondValues[index],
+                      color: Colors.green,
+                      width: 16,
+                    ),
+                  ],
+                );
+              }),
+              titlesData: FlTitlesData(
+                leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 40)),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    getTitlesWidget: (value, _) {
+                      return Icon(Icons.circle, size: 24, color: Colors.black54);
+                    },
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
