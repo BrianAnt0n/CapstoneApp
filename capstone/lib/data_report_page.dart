@@ -41,8 +41,11 @@ class _DataReportPageState extends State<DataReportPage> {
   @override
   void initState() {
     super.initState();
-    firstSelectedDate = DateTime.now();
-    secondSelectedDate = DateTime.now();
+
+    firstSelectedDate = DateTime.now().subtract(const Duration(days: 1)); // ✅ Default to Yesterday
+  secondSelectedDate = DateTime.now().subtract(const Duration(days: 2)); // ✅ Default to 2 days ago
+
+
     _initializeData();
   }
 
@@ -66,8 +69,8 @@ class _DataReportPageState extends State<DataReportPage> {
     });
 
     firstDateData = await _fetchHistoricalData(firstSelectedDate, hardwareId!);
-    frequencyAnalysisData =
-        await _fetchFrequencyAnalysis(hardwareId!) ??
+    secondDateData = await _fetchHistoricalData(secondSelectedDate, hardwareId!); // ✅ Fetch second date data
+    frequencyAnalysisData = await _fetchFrequencyAnalysis(hardwareId!) ??
         {}; // ✅ Fetch data for the graph
 
     setState(() {
@@ -169,42 +172,43 @@ class _DataReportPageState extends State<DataReportPage> {
     DateTime date,
     int hardwareId,
   ) async {
-    String startOfDay = "${DateFormat('yyyy-MM-dd').format(date)} 00:00:00";
-    String endOfDay = "${DateFormat('yyyy-MM-dd').format(date)} 23:59:59";
+  String startOfDay = "${DateFormat('yyyy-MM-dd').format(date)} 00:00:00";
+  String endOfDay = "${DateFormat('yyyy-MM-dd').format(date)} 23:59:59";
 
-    print(
-      "🔍 Fetching historical data for hardware_id: $hardwareId between $startOfDay and $endOfDay",
-    );
+  print("🔍 Fetching historical data for hardware_id: $hardwareId between $startOfDay and $endOfDay");
 
-    try {
-      final response =
-          await Supabase.instance.client
-              .from('History_Test')
-              .select()
-              .eq('hardware_id', hardwareId)
-              .gte('timestamp', startOfDay)
-              .lte('timestamp', endOfDay)
-              .order('timestamp', ascending: false)
-              .limit(1)
-              .maybeSingle();
+  try {
+    final response = await Supabase.instance.client
+        .from('History_Test')
+        .select()
+        .eq('hardware_id', hardwareId)
+        .gte('timestamp', startOfDay)
+        .lte('timestamp', endOfDay)
+        .order('timestamp', ascending: false)
+        .limit(1)
+        .maybeSingle();
 
-      if (response == null) {
-        print("🚨 No data found for hardware_id: $hardwareId on $startOfDay");
-        return _defaultData("N/A");
-      }
-
-      return {
-        "Temperature": "${response['temperature'] ?? 'N/A'}°C",
-        "Moisture Level": "${response['moisture'] ?? 'N/A'}%",
-        "pH Level 1": "${response['ph_level1'] ?? 'N/A'}",
-        "pH Level 2": "${response['ph_level2'] ?? 'N/A'}",
-        "Humidity": "${response['humidity'] ?? 'N/A'}%",
-      };
-    } catch (e) {
-      print("❌ Error fetching historical data: $e");
-      return _defaultData("Error");
+    if (response == null) {
+      print("🚨 No data found for hardware_id: $hardwareId on $startOfDay");
+      return _defaultData("N/A");
     }
+
+    Map<String, String> parsedData = {
+      "Temperature": "${response['temperature'] ?? 'N/A'}°C",
+      "Moisture Level": "${response['moisture'] ?? 'N/A'}%",
+      "pH Level 1": "${response['ph_level1'] ?? 'N/A'}",
+      "pH Level 2": "${response['ph_level2'] ?? 'N/A'}",
+      "Humidity": "${response['humidity'] ?? 'N/A'}%",
+    };
+
+    print("✅ Parsed Data for $date: $parsedData");
+    return parsedData;
+  } catch (e) {
+    print("❌ Error fetching historical data: $e");
+    return _defaultData("Error");
   }
+}
+
 
   Future<Map<String, List<Map<String, dynamic>>>> _fetchFrequencyAnalysis(
     int hardwareId,
@@ -315,108 +319,90 @@ class _DataReportPageState extends State<DataReportPage> {
   }
 
   Widget _buildComparisonGraph() {
-    if (firstDateData.isEmpty || secondDateData.isEmpty) {
-      return const Center(child: Text("Select two dates to compare data."));
-    }
+    print("🟢 _buildComparisonGraph() is rebuilding. comparisonGraphKey exists: ${comparisonGraphKey.currentContext != null}");
 
-    List<String> labels = [
-      "Temperature",
-      "Moisture Level",
-      "pH Level 1",
-      "pH Level 2",
-      "Humidity",
-    ];
-    List<double> firstValues =
-        labels.map((label) {
-          return double.tryParse(
-                firstDateData[label]?.replaceAll(RegExp('[^0-9.]'), '') ?? "0",
-              ) ??
-              0;
-        }).toList();
+if (firstDateData.isEmpty || secondDateData.isEmpty) {
+   return const SizedBox(height: 300); // ✅ Maintain layout
+}
 
-    List<double> secondValues =
-        labels.map((label) {
-          return double.tryParse(
-                secondDateData[label]?.replaceAll(RegExp('[^0-9.]'), '') ?? "0",
-              ) ??
-              0;
-        }).toList();
+  List<String> labels = [
 
-    return Column(
-      children: [
-        // ✅ Legend Row
-        Wrap(
-          spacing: 12,
-          children:
-              labels.map((sensor) {
-                return Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(_getSensorIcon(sensor), size: 18, color: Colors.black),
-                    const SizedBox(width: 5),
-                    Text(
-                      sensor,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                );
-              }).toList(),
-        ),
+    "Temperature",
+    "Moisture Level",
+    "pH Level 1",
+    "pH Level 2",
+    "Humidity",
+  ];
 
-        const SizedBox(height: 13), // ✅ Adds spacing before the graph
-        // ✅ The Graph
-        SizedBox(
-          height: 300,
-          child: BarChart(
-            BarChartData(
-              barGroups: List.generate(labels.length, (index) {
-                return BarChartGroupData(
-                  x: index, // ✅ Use index directly for positioning
-                  barRods: [
-                    BarChartRodData(
-                      toY: firstValues[index],
-                      color: Colors.blue,
-                      width: 16,
-                    ),
-                    BarChartRodData(
-                      toY: secondValues[index],
-                      color: Colors.green,
-                      width: 16,
-                    ),
-                  ],
-                );
-              }),
-              titlesData: FlTitlesData(
-                topTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: false,
-                  ), // ✅ Hide numbers on top
-                ),
-                leftTitles: AxisTitles(
-                  sideTitles: SideTitles(showTitles: true, reservedSize: 40),
-                ),
-                bottomTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    getTitlesWidget: (value, _) {
-                      return Icon(
-                        _getSensorIcon(labels[value.toInt()]),
-                        size: 24,
-                        color: Colors.black54,
-                      );
-                    },
+  List<double> firstValues = labels.map((label) {
+  String rawValue = firstDateData[label]?.toString() ?? "0"; // ✅ Ensure it's a String
+  return double.tryParse(rawValue) ?? 0; // ✅ Convert String to double safely
+}).toList();
+
+List<double> secondValues = labels.map((label) {
+  String rawValue = secondDateData[label]?.toString() ?? "0"; // ✅ Ensure it's a String
+  return double.tryParse(rawValue) ?? 0; // ✅ Convert String to double safely
+}).toList();
+
+
+
+  return Column(
+    children: [
+      Wrap(
+        spacing: 12,
+        children: labels.map((sensor) {
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(_getSensorIcon(sensor), size: 18, color: Colors.black),
+              const SizedBox(width: 5),
+              Text(sensor, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            ],
+          );
+        }).toList(),
+      ),
+      const SizedBox(height: 13),
+      
+      SizedBox(
+        height: 300,
+        child: BarChart(
+          BarChartData(
+            barGroups: List.generate(labels.length, (index) {
+              return BarChartGroupData(
+                x: index,
+                barRods: [
+                  BarChartRodData(
+                    toY: firstValues[index],
+                    color: firstDateData.isNotEmpty ? Colors.blue : Colors.grey.withOpacity(0.3),
+                    width: 16,
                   ),
+                  BarChartRodData(
+                    toY: secondValues[index],
+                    color: secondDateData.isNotEmpty ? Colors.green : Colors.grey.withOpacity(0.3),
+                    width: 16,
+                  ),
+                ],
+              );
+            }),
+            titlesData: FlTitlesData(
+              topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 40)),
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  getTitlesWidget: (value, _) {
+                    return Icon(_getSensorIcon(labels[value.toInt()]), size: 24, color: Colors.black54);
+                  },
                 ),
               ),
             ),
           ),
         ),
-      ],
-    );
-  }
+      ),
+    ],
+  );
+}
+
 
   // Function to Map Sensor Type to Icons
   IconData _getSensorIcon(String sensorType) {
@@ -518,6 +504,17 @@ class _DataReportPageState extends State<DataReportPage> {
  Future<void> _exportToPDF() async {
   print("📄 Exporting PDF...");
 
+  await Future.delayed(const Duration(milliseconds: 1000)); // ✅ Ensure time for UI updates
+  print("🔍 Checking comparisonGraphKey BEFORE capturing images: ${comparisonGraphKey.currentContext != null}");
+
+
+print("🔍 comparisonGraphKey exists in UI: ${comparisonGraphKey.currentContext != null}");
+
+ // ✅ Wait for the graphs to finish rendering
+  await _waitForGraphRender(comparisonGraphKey, "comparisonGraphKey");
+  await _waitForGraphRender(frequencyGraphKey, "frequencyGraphKey");
+
+
   final pdf = pw.Document();
 
    // ✅ Ensure selectedFilter is set correctly before generating summaries
@@ -565,7 +562,8 @@ class _DataReportPageState extends State<DataReportPage> {
           children: [
             pw.Text(
               "Data Report Summary",
-              style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold),
+              style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, font: customFont),
+
             ),
             pw.SizedBox(height: 8),
             pw.Text("Generated on ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now())}"),
@@ -586,10 +584,11 @@ class _DataReportPageState extends State<DataReportPage> {
             children: [
               pw.Text(
                 "Data Comparison Summary",
-                style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
+               style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, font: customFont),
+
               ),
               pw.SizedBox(height: 8),
-              pw.Text(comparisonSummary, style: pw.TextStyle(fontSize: 14)),
+              pw.Text(comparisonSummary, style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, font: customFont)),
             ],
           ),
         ),
@@ -610,10 +609,11 @@ class _DataReportPageState extends State<DataReportPage> {
             children: [
               pw.Text(
                 "Time-Based Frequency Summary",
-                style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
+                style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, font: customFont),
+
               ),
               pw.SizedBox(height: 8),
-              pw.Text(frequencySummary, style: pw.TextStyle(fontSize: 14)),
+              pw.Text(frequencySummary, style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, font: customFont)),
             ],
           ),
         ),
@@ -622,6 +622,10 @@ class _DataReportPageState extends State<DataReportPage> {
   } else {
     print("❌ Still no data for frequencySummary!");
   }
+
+  setState(() {}); // ✅ Force UI rebuild first
+await Future.delayed(const Duration(milliseconds: 500)); // ✅ Allow UI to update
+print("🔍 Checking comparisonGraphKey BEFORE capturing images: ${comparisonGraphKey.currentContext != null}");
 
   // ✅ Capture and Add Graphs
   List<Uint8List> images = await _captureGraphsAsImages();
@@ -766,11 +770,11 @@ pw.Widget _buildPDFBulletPoints(String summary, pw.Font customFont) {
             children: [
               pw.TextSpan(
                 text: "• ", // ✅ Bullet point (now works with custom font!)
-                style: pw.TextStyle(font: customFont, fontSize: 14, fontWeight: pw.FontWeight.bold),
+                style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, font: customFont),
               ),
               pw.TextSpan(
                 text: firstPart, // ✅ First part of the sentence
-                style: pw.TextStyle(font: customFont, fontSize: 14),
+                style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, font: customFont),
               ),
               if (secondPart.isNotEmpty)
                 pw.TextSpan(
@@ -794,51 +798,70 @@ pw.Widget _buildPDFBulletPoints(String summary, pw.Font customFont) {
 
 
   Future<List<Uint8List>> _captureGraphsAsImages() async {
-  List<Uint8List> images = [];
+   List<Uint8List> images = [];
 
-  // ✅ Ensure both graphs are fully rendered before capturing
-  await _waitForGraphRender(comparisonGraphKey, "comparisonGraphKey");
-  await _waitForGraphRender(frequencyGraphKey, "frequencyGraphKey");
+   // ✅ Ensure both graphs are fully rendered before capturing
+   await _waitForGraphRender(comparisonGraphKey, "comparisonGraphKey");
+   await _waitForGraphRender(frequencyGraphKey, "frequencyGraphKey");
 
-  // ✅ Capture _buildComparisonGraph()
-  if (comparisonGraphKey.currentContext != null) {
-    RenderRepaintBoundary boundary =
-        comparisonGraphKey.currentContext!.findRenderObject()
-            as RenderRepaintBoundary;
-    ui.Image image = await boundary.toImage(pixelRatio: 3.0);
-    ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-    if (byteData != null) images.add(byteData.buffer.asUint8List());
-    print("✅ Successfully captured _buildComparisonGraph()");
-  } else {
-    print("❌ comparisonGraphKey is STILL NULL after waiting!");
-  }
+   // ✅ Retry capturing if `comparisonGraphKey.currentContext` is still null
+   int retries = 5;
+   while (comparisonGraphKey.currentContext == null && retries > 0) {
+       print("🔄 Retrying capturing _buildComparisonGraph()... ($retries retries left)");
+       await Future.delayed(const Duration(milliseconds: 500));
+       retries--;
+   }
 
-  // ✅ Capture _buildTimeBasedFrequencyGraph()
-  if (frequencyGraphKey.currentContext != null) {
-    RenderRepaintBoundary boundary =
-        frequencyGraphKey.currentContext!.findRenderObject()
-            as RenderRepaintBoundary;
-    ui.Image image = await boundary.toImage(pixelRatio: 3.0);
-    ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-    if (byteData != null) images.add(byteData.buffer.asUint8List());
-    print("✅ Successfully captured _buildTimeBasedFrequencyGraph()");
-  } else {
-    print("❌ frequencyGraphKey is STILL NULL after waiting!");
-  }
+   // ✅ Capture _buildComparisonGraph()
+   if (comparisonGraphKey.currentContext != null) {
+      RenderRepaintBoundary boundary =
+           comparisonGraphKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+      ui.Image image = await boundary.toImage(pixelRatio: 3.0);
+      ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData != null) images.add(byteData.buffer.asUint8List());
+      print("✅ Successfully captured _buildComparisonGraph()");
+   } else {
+      print("❌ comparisonGraphKey is STILL NULL after waiting!");
+   }
 
-  print("📸 Total images captured: ${images.length}");
-  return images;
+   // ✅ Capture _buildTimeBasedFrequencyGraph()
+   if (frequencyGraphKey.currentContext != null) {
+      RenderRepaintBoundary boundary =
+           frequencyGraphKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+      ui.Image image = await boundary.toImage(pixelRatio: 3.0);
+      ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData != null) images.add(byteData.buffer.asUint8List());
+      print("✅ Successfully captured _buildTimeBasedFrequencyGraph()");
+   } else {
+      print("❌ frequencyGraphKey is STILL NULL after waiting!");
+   }
+
+   print("📸 Total images captured: ${images.length}");
+   return images;
 }
+
 
 // ✅ Helper Function: Waits for a widget to render
 Future<void> _waitForGraphRender(GlobalKey key, String graphName) async {
-  int retries = 10; // ✅ Maximum wait attempts
-  while (key.currentContext == null && retries > 0) {
-    print("⏳ Waiting for $graphName to render... ($retries retries left)");
-    await Future.delayed(const Duration(milliseconds: 500));
+  int retries = 15; // ✅ Increased retries
+  while (retries > 0) {
+    await Future.delayed(const Duration(milliseconds: 700)); // ✅ Increased delay
+
+    if (key.currentContext != null) {
+      RenderRepaintBoundary? boundary = key.currentContext!.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary != null && !boundary.debugNeedsPaint) {
+        print("✅ $graphName is fully rendered and painted.");
+        return; // ✅ Exit once rendering is complete
+      }
+    }
+
+    print("⏳ Waiting for $graphName to finish rendering... ($retries retries left)");
     retries--;
   }
+
+  print("❌ $graphName is STILL NULL or not painted after waiting!");
 }
+
 
 
 
@@ -846,6 +869,18 @@ Future<void> _waitForGraphRender(GlobalKey key, String graphName) async {
 
   @override
   Widget build(BuildContext context) {
+
+      print("🔍 BUILDING PAGE - comparisonGraphKey exists: ${comparisonGraphKey.currentContext != null}");
+
+    // 🔍 Debugging Log
+      print("🔍 comparisonGraphKey exists in UI: ${comparisonGraphKey.currentContext != null}");
+
+       // 🔍 Check if first and second date data are updating
+    print("🔍 First Date Data: $firstDateData");
+    print("🔍 Second Date Data: $secondDateData");
+
+
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -881,32 +916,41 @@ Future<void> _waitForGraphRender(GlobalKey key, String graphName) async {
                   secondSelectedDate = pickedDate;
                   hasSecondDate = true;
                 });
-                secondDateData = await _fetchHistoricalData(
-                  secondSelectedDate,
-                  hardwareId!,
-                );
-                setState(() {});
-              }
-            }),
+
+    print("🔍 Fetching data for second date: $pickedDate");
+    
+    secondDateData = await _fetchHistoricalData(secondSelectedDate, hardwareId!);
+    
+    print("🔍 Updated secondDateData: $secondDateData");
+    
+    setState(() {}); // 🔄 Ensure UI updates
+  }
+}),
+
+
+            
 
             Expanded(
               child: ListView(
                 children: [
                   _buildDataCard("First Date Data", firstDateData, true),
-                  if (hasSecondDate)
-                    _buildDataCard("Second Date Data", secondDateData, false),
-                  const SizedBox(
-                    height: 16,
-                  ), // ✅ Adds spacing between _buildDataCard and _buildComparisonGraph
-                  RepaintBoundary(
-                    key: comparisonGraphKey,
-                    child: hasSecondDate
-                        ? _buildComparisonGraph() // ✅ Show graph if hasSecondDate is true
-                        : const SizedBox(), // ✅ Keeps the widget in the tree when false
+                  _buildDataCard("Second Date Data", secondDateData, true),
+                  const SizedBox(height: 16),
 
+                  Visibility(
+                    visible:
+                        true, // ✅ Ensures it's never removed from the widget tree
+                    child: RepaintBoundary(
+                      key: comparisonGraphKey,
+                      child: _buildComparisonGraph(), // ✅ Always renders
                     ),
+                  ),
 
-                  const SizedBox(height: 12), // ✅ Adds spacing before the graph
+
+                  const SizedBox(height: 12),
+
+
+
 
                   const Divider(
                     thickness: 2,
