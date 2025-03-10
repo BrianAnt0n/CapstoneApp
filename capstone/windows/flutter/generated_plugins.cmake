@@ -5,6 +5,7 @@
 list(APPEND FLUTTER_PLUGIN_LIST
   app_links
   permission_handler_windows
+  printing
   url_launcher_windows
 )
 
