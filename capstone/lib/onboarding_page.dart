@@ -93,6 +93,9 @@ class OnboardingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    bool shouldDarken =
+        image == 'assets/onboard_2.png' || image == 'assets/onboard_3.png';
+
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -100,6 +103,10 @@ class OnboardingScreen extends StatelessWidget {
           image,
           fit: BoxFit.cover,
         ),
+        if (shouldDarken)
+          Container(
+            color: Colors.black.withOpacity(0.3),
+          ),
         Positioned(
           bottom: 85,
           left: 24,
@@ -121,7 +128,7 @@ class OnboardingScreen extends StatelessWidget {
                 textAlign: TextAlign.left,
                 style: TextStyle(
                   fontSize: 20,
-                  color: Colors.white.withOpacity(0.85), // ✅ Reduced opacity
+                  color: Colors.white.withOpacity(0.85),
                 ),
               ),
             ],
