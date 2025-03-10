@@ -1214,6 +1214,7 @@ class _DashboardPageState extends State<DashboardPage> {
                             return null; // Default calendar rendering
                           },
                           todayBuilder: (context, date, _) {
+                            if (_containerAddedDate != null) {
                             return Stack(
                               alignment: Alignment.center,
                               children: [
@@ -1260,8 +1261,40 @@ class _DashboardPageState extends State<DashboardPage> {
                                 ),
                               ],
                             );
+                          }
+                          else {
+                            return Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                // Today indicator
+                                Container(
+                                  height: 36,
+                                  width: 36,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Colors.green.withOpacity(
+                                        0.5), // Highlight today's date
+                                  ),
+                                ),
+
+                                // Date number
+                                Center(
+                                  child: Text(
+                                    date.day.toString(),
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color:
+                                          Colors.black87, // Ensure visibility
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          }
                           },
                           selectedBuilder: (context, date, _) {
+                            if (_containerAddedDate != null) {
                             DateTime compostEndDate =
                                 _containerAddedDate != null
                                     ? _containerAddedDate!
@@ -1333,6 +1366,40 @@ class _DashboardPageState extends State<DashboardPage> {
                                 ),
                               ],
                             );
+                            }
+                            else {
+                              return Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                // Selection circle (on top)
+                                Container(
+                                  height: 36,
+                                  width: 36,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                        color: Colors.green,
+                                        width:
+                                            2), // Green outline for selection
+                                    color: Colors
+                                        .transparent, // Keep shading visible
+                                  ),
+                                ),
+                                // Date number (ensures readability)
+                                Center(
+                                  child: Text(
+                                    date.day.toString(),
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color:
+                                          Colors.black87, // Keep text readable
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                            }
                           },
                         ),
                         selectedDayPredicate: (day) =>
