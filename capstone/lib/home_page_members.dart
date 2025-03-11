@@ -1438,35 +1438,51 @@ class _DashboardPageState extends State<DashboardPage> {
 
   int _calculateContainerAge() {
     if (_containerAddedDate == null) {
-      _containerAge = "Unknown";
+      _containerAge = "NOT YET STARTED";
       _ageColor = Colors.black;
-      return 0; // Default to 0 when no date is available
+      return 0;
     }
 
     final difference = _selectedDate.difference(_containerAddedDate!);
-    int weeks = (difference.inDays / 7).floor(); // Always display in weeks
 
-    if (weeks > 16) {
-      _containerAge = "Over-composted";
-      _ageColor = Colors.grey;
+    if (difference.isNegative) {
+      _containerAge = "NOT STARTED YET";
+      _ageColor = Colors.black;
+      return 0;
+    }
+
+    int weeks = difference.inDays ~/ 7;
+    int days = difference.inDays % 7;
+
+    // Handle singular/plural properly
+    String weekText = weeks == 1 ? "1 WEEK" : "$weeks WEEKS";
+    String dayText = days == 1 ? "1 DAY" : "$days DAYS";
+
+    if (weeks == 0) {
+      _containerAge = dayText; // Only display days if weeks is 0
+    } else if (days == 0) {
+      _containerAge = weekText; // Only display weeks if days is 0
     } else {
-      _containerAge = "$weeks ${weeks == 1 ? 'WEEK' : 'WEEKS'}";
+      _containerAge = "$weekText AND $dayText"; // Display both
+    }
 
-      if (weeks >= 12) {
-        _ageColor = Colors.green;
-      } else if (weeks >= 7) {
-        _ageColor = Colors.orange;
-      } else {
-        _ageColor = Colors.red;
-      }
+    if (weeks >= 16) {
+      _ageColor = Colors.grey;
+    } else if (weeks >= 12) {
+      _ageColor = Colors.green;
+    } else if (weeks >= 7) {
+      _ageColor = Colors.orange;
+    } else {
+      _ageColor = Colors.red;
     }
 
     if (mounted) {
-      setState(() {}); // Update UI
+      setState(() {});
     }
 
-    return weeks; // ✅ Returns weeks for other functions
+    return weeks;
   }
+
 
 //notes image section
   final SupabaseClient supabase = Supabase.instance.client;
@@ -1655,14 +1671,6 @@ class _DashboardPageState extends State<DashboardPage> {
     try {
       final supabase = Supabase.instance.client;
 
-      // ✅ Step 1: Remove Historical Data
-      await supabase
-          .from('History_Test')
-          .delete()
-          .eq('hardware_id', hardwareId);
-      print("Deleted historical data for container: $containerId");
-
-      // ✅ Step 2: Fetch Start Date from Hardware_Sensors_Test
       final sensorData = await supabase
           .from('Hardware_Sensors_Test')
           .select('start_date')
