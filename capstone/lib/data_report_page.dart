@@ -32,6 +32,7 @@ class _DataReportPageState extends State<DataReportPage> {
   Map<String, String> firstDateData = {};
   Map<String, String> secondDateData = {};
   Map<String, List<dynamic>> frequencyAnalysisData = {};
+  bool isExportingPDF = false;
 
   String comparisonSummary = "";
   String frequencySummary = "";
@@ -510,6 +511,30 @@ List<double> secondValues = labels.map((label) {
 
 
  Future<void> _exportToPDF() async {
+
+  setState(() {
+    isExportingPDF = true; // 🔄 Show Loading Indicator
+  });
+
+  showDialog(
+    context: context,
+    barrierDismissible: false, // Prevent user from closing it
+    builder: (context) {
+      return AlertDialog(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(), // ⏳ Show Spinner
+            SizedBox(height: 16),
+            Text("Generating PDF, please wait..."),
+          ],
+        ),
+      );
+    },
+  );
+
+  try {
+  
   print("📄 Exporting PDF...");
 
   await Future.delayed(const Duration(milliseconds: 1000)); // ✅ Ensure time for UI updates
@@ -611,29 +636,44 @@ List<double> secondValues = labels.map((label) {
   } else {
     print("❌ Still no data for frequencySummary!");
   }
+// Before Capturing Graphs
 
-  setState(() {}); // ✅ Force UI rebuild first
-  await Future.delayed(const Duration(milliseconds: 1000)); // ✅ Allow UI to update
+ // ✅ Force a full UI rebuild before capturing
+setState(() {}); 
+await Future.delayed(const Duration(milliseconds: 700)); 
+
+// ✅ Force a rebuild of comparisonGraph before capturing
+comparisonGraphWidgetKey.currentState?.forceRebuild();  
+await Future.delayed(const Duration(milliseconds: 700)); // Ensure repaint before capturing
 
   // ✅ Capture comparisonGraphKey
-Uint8List? comparisonGraphImage = await _captureGraph(
-  comparisonGraphKey, 
-  "comparisonGraphKey", 
-  () => comparisonGraphWidgetKey.currentState?.forceRebuild() // 🔄 Trigger rebuild if needed
-);
+  
+// Uint8List? comparisonGraphImage = await _captureGraph(
+//   comparisonGraphKey, 
+//   "comparisonGraphKey", 
+//   () => comparisonGraphWidgetKey.currentState?.forceRebuild() // 🔄 Trigger rebuild if needed
+// );
 
-Uint8List? frequencyGraphImage = await _captureGraph(
-  frequencyGraphKey, 
-  "frequencyGraphKey", 
-  () => setState(() {}) // ✅ Just force a UI rebuild
-);
 
-List<Uint8List> images = [];
-if (comparisonGraphImage != null) images.add(comparisonGraphImage);
-if (frequencyGraphImage != null) images.add(frequencyGraphImage);
+
+// Uint8List? frequencyGraphImage = await _captureGraph(
+//   frequencyGraphKey, 
+//   "frequencyGraphKey", 
+//   () => setState(() {}) // ✅ Just force a UI rebuild
+// );
+
+// List<Uint8List> images = [];
+// if (comparisonGraphImage != null) images.add(comparisonGraphImage);
+// if (frequencyGraphImage != null) images.add(frequencyGraphImage);
+
+
+// ✅ Capture both graphs in one function
+List<Uint8List> images = await _captureGraphsAsImages();
+
   if (images.isEmpty) {
     print("❌ No images captured, skipping graphs in PDF.");
   } else {
+
     // ✅ Page 4: comparisonGraphKey
     if (images.length > 0) {
       pdf.addPage(
@@ -682,6 +722,14 @@ if (frequencyGraphImage != null) images.add(frequencyGraphImage);
   await Printing.layoutPdf(
     onLayout: (PdfPageFormat format) async => pdf.save(),
   );
+
+   } finally {
+    setState(() {
+      isExportingPDF = false; // ✅ Hide Loading Indicator
+    });
+
+    Navigator.of(context).pop(); // ✅ Close Dialog
+  }
 }
 
 
@@ -857,6 +905,7 @@ pw.Widget _buildPDFBulletPoints(String summary, pw.Font customFont) {
 
 // ✅ Helper Function: Captures a widget as an image
 Future<Uint8List?> _captureGraph(GlobalKey key, String graphName, VoidCallback forceRebuild) async {
+
   print("🔍 Attempting to capture $graphName...");
 
   // ✅ Force rebuild if widget is null
@@ -883,15 +932,18 @@ Future<Uint8List?> _captureGraph(GlobalKey key, String graphName, VoidCallback f
   RenderRepaintBoundary? boundary = key.currentContext!.findRenderObject() as RenderRepaintBoundary?;
 
   if (boundary == null || boundary.debugNeedsPaint) {
-    print("⚠ $graphName is not fully painted! Retrying...");
-    await Future.delayed(Duration(seconds: 1));
+  print("⚠ $graphName is not fully painted! Retrying...");
 
-    boundary = key.currentContext!.findRenderObject() as RenderRepaintBoundary?;
-    if (boundary == null || boundary.debugNeedsPaint) {
-      print("❌ $graphName is STILL NOT READY after waiting!");
-      return null;
-    }
+  // ✅ Force UI rebuild and delay again
+  forceRebuild();
+  await Future.delayed(Duration(milliseconds: 700));
+
+  boundary = key.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+  if (boundary == null || boundary.debugNeedsPaint) {
+    print("❌ $graphName is STILL NOT READY after waiting! Skipping...");
+    return null;
   }
+}
 
   print("✅ $graphName is fully rendered and painted.");
   ui.Image image = await boundary.toImage(pixelRatio: 3.0);
@@ -913,9 +965,9 @@ Future<void> _waitForGraphRender(GlobalKey key, String graphName) async {
         return;
       }
     }
-
+retries--;
     print("⏳ Waiting for $graphName to finish rendering... ($retries retries left)");
-    retries--;
+    
   }
 
   print("❌ $graphName is STILL NULL or not painted after waiting!");
@@ -1085,6 +1137,7 @@ Future<void> _waitForGraphRender(GlobalKey key, String graphName) async {
                   _buildFrequencyAnalysisCard(),
 
                   const SizedBox(height: 16), // ✅ Adds spacing before the graph
+                  // Build Time Based Frequency Graph
                   if (frequencyAnalysisData.isNotEmpty)
                     RepaintBoundary(
                       key: frequencyGraphKey,
@@ -1101,12 +1154,16 @@ Future<void> _waitForGraphRender(GlobalKey key, String graphName) async {
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: ElevatedButton.icon(
                       icon: const Icon(Icons.picture_as_pdf),
-                      label: const Text("Export as PDF"),
-                      onPressed: () async {
-                        await _exportToPDF(); // ✅ Calls the function to generate PDF
-                      },
+                      label: Text(isExportingPDF
+                          ? "Exporting..."
+                          : "Export as PDF"), // 🔄 Update text while exporting
+                      onPressed: isExportingPDF
+                          ? null // ⛔ Disable button while exporting
+                          : () async {
+                              await _exportToPDF();
+                            },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green[700], // ✅ Green theme
+                        backgroundColor: Colors.green[700],
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(
                           vertical: 12,
@@ -1115,6 +1172,7 @@ Future<void> _waitForGraphRender(GlobalKey key, String graphName) async {
                       ),
                     ),
                   ),
+
                   const SizedBox(height: 16), // ✅ Adds spacing after button
                 ],
               ),
@@ -1762,118 +1820,130 @@ class ComparisonGraphWidget extends StatefulWidget {
   _ComparisonGraphWidgetState createState() => _ComparisonGraphWidgetState();
 }
 
-class _ComparisonGraphWidgetState extends State<ComparisonGraphWidget> {
+class _ComparisonGraphWidgetState extends State<ComparisonGraphWidget> with AutomaticKeepAliveClientMixin {
+  
+  // ✅ Ensures the widget stays in memory and doesn’t get disposed
+  @override
+  bool get wantKeepAlive => true;
 
-   // ✅ Add this method
+  // ✅ Add this method to trigger a rebuild
   void forceRebuild() {
-    setState(() {}); // 🔄 Triggers a rebuild
+    setState(() {}); // 🔄 Triggers a rebuild when called
   }
+  
 
   @override
   Widget build(BuildContext context) {
-    print("🟢 _buildComparisonGraph() is rebuilding. comparisonGraphKey exists: ${widget.repaintKey.currentContext != null}");
+    super.build(context); // ✅ Required for AutomaticKeepAliveClientMixin
 
-    return RepaintBoundary(
-      key: widget.repaintKey,
-      child: _buildComparisonGraph(), // Now defined inside this widget
+    print("🟢 _buildComparisonGraph() is rebuilding. comparisonGraphKey exists: ${widget.repaintKey.currentContext != null}");
+    print("🔄 _buildComparisonGraph() is rebuilding. comparisonGraphKey is attached: ${widget.repaintKey.currentContext != null}");
+
+
+    return Visibility( // ✅ Ensures widget is always built
+      visible: true,
+      maintainState: true,
+      child: RepaintBoundary(
+        key: widget.repaintKey,
+        child: _buildComparisonGraph(),
+      ),
     );
   }
 
   Widget _buildComparisonGraph() {
-  print("🔍 comparisonGraph Data Check: First - ${widget.firstDateData}, Second - ${widget.secondDateData}");
+    print("🔍 comparisonGraph Data Check: First - ${widget.firstDateData}, Second - ${widget.secondDateData}");
 
-  if (widget.firstDateData.isEmpty || widget.secondDateData.isEmpty) {
-    return const SizedBox(height: 300); // Maintain layout
-  }
+    if (widget.firstDateData.isEmpty || widget.secondDateData.isEmpty) {
+      return const SizedBox(height: 300); // Maintain layout
+    }
 
-  List<String> labels = [
-    "Temperature",
-    "Moisture Level",
-    "pH Level 1",
-    "pH Level 2",
-    "Humidity",
-  ];
+    List<String> labels = [
+      "Temperature",
+      "Moisture Level",
+      "pH Level 1",
+      "pH Level 2",
+      "Humidity",
+    ];
 
-  List<double> firstValues = labels.map((label) {
-    String rawValue = widget.firstDateData[label]?.toString() ?? "0";
-    return double.tryParse(rawValue) ?? 0;
-  }).toList();
+    List<double> firstValues = labels.map((label) {
+      String rawValue = widget.firstDateData[label]?.toString() ?? "0";
+      return double.tryParse(rawValue) ?? 0;
+    }).toList();
 
-  List<double> secondValues = labels.map((label) {
-    String rawValue = widget.secondDateData[label]?.toString() ?? "0";
-    return double.tryParse(rawValue) ?? 0;
-  }).toList();
+    List<double> secondValues = labels.map((label) {
+      String rawValue = widget.secondDateData[label]?.toString() ?? "0";
+      return double.tryParse(rawValue) ?? 0;
+    }).toList();
 
-  return Column(
-    children: [
-      Wrap(
-        spacing: 12,
-        children: labels.map((sensor) {
-          return Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(_getSensorIcon(sensor), size: 18, color: Colors.black),
-              const SizedBox(width: 5),
-              Text(sensor, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-            ],
-          );
-        }).toList(),
-      ),
-      const SizedBox(height: 13),
-      SizedBox(
-        height: 300,
-        child: BarChart(
-          BarChartData(
-            barGroups: List.generate(labels.length, (index) {
-              return BarChartGroupData(
-                x: index,
-                barRods: [
-                  BarChartRodData(
-                    toY: firstValues[index],
-                    color: Colors.blue,
-                    width: 16,
+    return Column(
+      children: [
+        Wrap(
+          spacing: 12,
+          children: labels.map((sensor) {
+            return Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(_getSensorIcon(sensor), size: 18, color: Colors.black),
+                const SizedBox(width: 5),
+                Text(sensor, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              ],
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 13),
+        SizedBox(
+          height: 300,
+          child: BarChart(
+            BarChartData(
+              barGroups: List.generate(labels.length, (index) {
+                return BarChartGroupData(
+                  x: index,
+                  barRods: [
+                    BarChartRodData(
+                      toY: firstValues[index],
+                      color: Colors.blue,
+                      width: 16,
+                    ),
+                    BarChartRodData(
+                      toY: secondValues[index],
+                      color: Colors.green,
+                      width: 16,
+                    ),
+                  ],
+                );
+              }),
+              titlesData: FlTitlesData(
+                leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 40)),
+                bottomTitles: AxisTitles(
+                  sideTitles: SideTitles(
+                    showTitles: true,
+                    getTitlesWidget: (value, _) {
+                      return Icon(_getSensorIcon(labels[value.toInt()]), size: 24, color: Colors.black54);
+                    },
                   ),
-                  BarChartRodData(
-                    toY: secondValues[index],
-                    color: Colors.green,
-                    width: 16,
-                  ),
-                ],
-              );
-            }),
-            titlesData: FlTitlesData(
-              leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 40)),
-              bottomTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  getTitlesWidget: (value, _) {
-                    return Icon(_getSensorIcon(labels[value.toInt()]), size: 24, color: Colors.black54);
-                  },
                 ),
               ),
             ),
           ),
         ),
-      ),
-    ],
-  );
-}
-
-// Function to Map Sensor Type to Icons
-IconData _getSensorIcon(String sensorType) {
-  switch (sensorType.toLowerCase()) {
-    case "temperature":
-      return Icons.thermostat; // 🌡️ Temperature
-    case "moisture level":
-      return Icons.water_drop; // 💧 Moisture Level
-    case "ph level 1":
-    case "ph level 2":
-      return Icons.science; // 🧪 pH Levels
-    case "humidity":
-      return Icons.cloud; // ☁️ Humidity
-    default:
-      return Icons.device_unknown; // ❓ Default Icon
+      ],
+    );
   }
-}
 
+  // Function to Map Sensor Type to Icons
+  IconData _getSensorIcon(String sensorType) {
+    switch (sensorType.toLowerCase()) {
+      case "temperature":
+        return Icons.thermostat; // 🌡️ Temperature
+      case "moisture level":
+        return Icons.water_drop; // 💧 Moisture Level
+      case "ph level 1":
+      case "ph level 2":
+        return Icons.science; // 🧪 pH Levels
+      case "humidity":
+        return Icons.cloud; // ☁️ Humidity
+      default:
+        return Icons.device_unknown; // ❓ Default Icon
+    }
+  }
 }
