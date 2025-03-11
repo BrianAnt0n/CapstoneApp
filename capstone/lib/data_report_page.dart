@@ -42,7 +42,7 @@ final GlobalKey frequencyGraphKey = GlobalKey();
 
 
   final GlobalKey<_ComparisonGraphWidgetState> comparisonGraphWidgetKey = GlobalKey<_ComparisonGraphWidgetState>();
-// final GlobalKey<_FrequencyGraphWidgetState> frequencyGraphWidgetKey = GlobalKey<_FrequencyGraphWidgetState>();
+ final GlobalKey<_FrequencyGraphWidgetState> frequencyGraphWidgetKey = GlobalKey<_FrequencyGraphWidgetState>();
 
 
   @override
@@ -646,6 +646,8 @@ await Future.delayed(const Duration(milliseconds: 700));
 comparisonGraphWidgetKey.currentState?.forceRebuild();  
 await Future.delayed(const Duration(milliseconds: 700)); // Ensure repaint before capturing
 
+
+
   // ✅ Capture comparisonGraphKey
   
 // Uint8List? comparisonGraphImage = await _captureGraph(
@@ -908,6 +910,8 @@ Future<Uint8List?> _captureGraph(GlobalKey key, String graphName, VoidCallback f
 
   print("🔍 Attempting to capture $graphName...");
 
+  print("🔍 Checking $graphName BEFORE capturing images: ${key.currentContext != null}");
+
   // ✅ Force rebuild if widget is null
   if (key.currentContext == null) {
     print("⚠ $graphName context is NULL! Forcing rebuild...");
@@ -1137,12 +1141,24 @@ retries--;
                   _buildFrequencyAnalysisCard(),
 
                   const SizedBox(height: 16), // ✅ Adds spacing before the graph
+
                   // Build Time Based Frequency Graph
-                  if (frequencyAnalysisData.isNotEmpty)
-                    RepaintBoundary(
-                      key: frequencyGraphKey,
-                      child: _buildTimeBasedFrequencyGraph(),
+
+                  // if (frequencyAnalysisData.isNotEmpty)
+                  //   RepaintBoundary(
+                  //     key: frequencyGraphKey,
+                  //     child: _buildTimeBasedFrequencyGraph(),
+                  //   ),
+
+
+                // if (frequencyAnalysisData.isNotEmpty)
+                    FrequencyGraphWidget(
+                      key: frequencyGraphWidgetKey,
+                      repaintKey: frequencyGraphKey,
+                      frequencyData: frequencyAnalysisData,
+                      selectedFilter: selectedFilter,
                     ),
+
                   const SizedBox(
                     height: 16,
                   ), // Adds spacing before the conclusion
@@ -1944,6 +1960,226 @@ class _ComparisonGraphWidgetState extends State<ComparisonGraphWidget> with Auto
         return Icons.cloud; // ☁️ Humidity
       default:
         return Icons.device_unknown; // ❓ Default Icon
+    }
+  }
+}
+
+
+class FrequencyGraphWidget extends StatefulWidget {
+  final GlobalKey repaintKey;
+  final Map<String, dynamic> frequencyData;
+  final String selectedFilter;
+
+  const FrequencyGraphWidget({
+    Key? key,
+    required this.repaintKey,
+    required this.frequencyData,
+    required this.selectedFilter,
+  }) : super(key: key);
+
+  @override
+  _FrequencyGraphWidgetState createState() => _FrequencyGraphWidgetState();
+}
+
+class _FrequencyGraphWidgetState extends State<FrequencyGraphWidget> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true; // ✅ Keeps widget in memory
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context); // ✅ Required for AutomaticKeepAliveClientMixin
+
+    print("🟢 _buildTimeBasedFrequencyGraph() is rebuilding. frequencyGraphKey exists: ${widget.repaintKey.currentContext != null}");
+    print("🟢 FrequencyGraphWidget is building. Attached to UI? ${widget.repaintKey.currentContext != null}");
+    print("🔍 Frequency Data Check: ${widget.frequencyData}");
+
+
+
+    return KeepAlive(
+      keepAlive: true,
+      child: SizedBox(
+        height: 400,
+        child: RepaintBoundary(
+          key: widget.repaintKey,
+          child: _buildTimeBasedFrequencyGraph(),
+        ),
+      ),
+    );
+}
+
+  Widget _buildTimeBasedFrequencyGraph() {
+    if (widget.frequencyData.isEmpty) {
+      return const Center(child: Text("No alerts recorded to display."));
+    }
+
+    List<String> sensorTypes = widget.frequencyData.keys.toList();
+    List<String> timestamps = [];
+
+    for (var sensor in sensorTypes) {
+      for (var entry in widget.frequencyData[sensor] ?? []) {
+        if (!timestamps.contains(entry["Time"])) {
+          timestamps.add(entry["Time"]);
+        }
+      }
+    }
+
+    if (widget.selectedFilter == "Daily") {
+      return Column(
+        children: [
+          Wrap(
+            spacing: 10,
+            children: sensorTypes.map((sensor) {
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: _getSensorColor(sensor),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    sensor,
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              );
+            }).toList(),
+          ),
+
+          const SizedBox(height: 12),
+
+          SizedBox(
+            height: 300,
+            child: BarChart(
+              BarChartData(
+                barGroups: List.generate(timestamps.length, (index) {
+                  String timeLabel = timestamps[index];
+                  List<BarChartRodData> bars = [];
+
+                  for (var sensor in sensorTypes) {
+                    var sensorData = widget.frequencyData[sensor]
+                            ?.where((data) => data["Time"] == timeLabel)
+                            .toList() ??
+                        [];
+                    if (sensorData.isNotEmpty) {
+                      double sensorValue = double.tryParse(sensorData.first["Value"].toString()) ?? 0;
+                      bars.add(
+                        BarChartRodData(
+                          toY: sensorValue,
+                          color: _getSensorColor(sensor),
+                          width: 16,
+                        ),
+                      );
+                    }
+                  }
+
+                  return BarChartGroupData(x: index, barRods: bars);
+                }),
+
+                barTouchData: BarTouchData(
+                  touchTooltipData: BarTouchTooltipData(
+                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                      String formattedTime = _formatTimestamp(timestamps[groupIndex]);
+                      return BarTooltipItem(
+                        "Sensor Value: ${rod.toY}\nTime: $formattedTime",
+                        const TextStyle(color: Colors.white, fontSize: 12),
+                      );
+                    },
+                    getTooltipColor: (group) => Colors.black87,
+                    tooltipRoundedRadius: 8,
+                    tooltipPadding: const EdgeInsets.all(8),
+                    tooltipMargin: 10,
+                  ),
+                ),
+
+                titlesData: _buildChartTitles(timestamps),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return const SizedBox();
+  }
+
+  /// ✅ **Move `_buildChartTitles` inside `FrequencyGraphWidget`**
+  FlTitlesData _buildChartTitles(List<String> timestamps) {
+    return FlTitlesData(
+      topTitles: AxisTitles(
+        sideTitles: SideTitles(showTitles: false), // ✅ Hide top numbers
+      ),
+      leftTitles: AxisTitles(
+        sideTitles: SideTitles(showTitles: true, reservedSize: 40),
+      ),
+      bottomTitles: AxisTitles(
+        sideTitles: SideTitles(
+          showTitles: true,
+          reservedSize: 60,
+          getTitlesWidget: (value, meta) {
+            int index = value.toInt();
+            if (index >= 0 && index < timestamps.length) {
+              return _buildFormattedTimestampLabel(index, timestamps);
+            }
+            return const Text("");
+          },
+        ),
+      ),
+    );
+  }
+
+  /// ✅ **Move `_formatTimestamp` inside `FrequencyGraphWidget`**
+  String _formatTimestamp(String timestamp) {
+    try {
+      DateTime parsedTime;
+      if (timestamp.contains("AM") || timestamp.contains("PM")) {
+        parsedTime = DateFormat("yyyy-MM-dd hh:mm a").parse(timestamp);
+      } else {
+        parsedTime = DateFormat("yyyy-MM-dd HH:mm:ss").parse(timestamp);
+      }
+
+      return (widget.selectedFilter == "Weekly")
+          ? DateFormat("EEE hh:mm a").format(parsedTime)
+          : DateFormat("hh:mm a").format(parsedTime);
+    } catch (e) {
+      print("⚠️ Error parsing timestamp: $timestamp - $e");
+      return "Invalid Time";
+    }
+  }
+
+  /// ✅ **Helper to show labels at correct intervals**
+  Widget _buildFormattedTimestampLabel(int index, List<String> timestamps) {
+    String formattedTime = _formatTimestamp(timestamps[index]);
+
+    bool showLabel = timestamps.length <= 4 || index % 2 == 0;
+
+    return showLabel
+        ? Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              formattedTime,
+              style: const TextStyle(fontSize: 10),
+              textAlign: TextAlign.center,
+            ),
+          )
+        : const SizedBox.shrink();
+  }
+
+  /// ✅ **Move `_getSensorColor` inside `FrequencyGraphWidget`**
+  Color _getSensorColor(String sensor) {
+    switch (sensor.toLowerCase()) {
+      case "temperature":
+        return Colors.red;
+      case "moisture level":
+        return Colors.blue;
+      case "ph level":
+        return Colors.green;
+      default:
+        return Colors.grey;
     }
   }
 }
