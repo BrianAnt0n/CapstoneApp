@@ -1671,14 +1671,6 @@ class _DashboardPageState extends State<DashboardPage> {
     try {
       final supabase = Supabase.instance.client;
 
-      // ✅ Step 1: Remove Historical Data
-      await supabase
-          .from('History_Test')
-          .delete()
-          .eq('hardware_id', hardwareId);
-      print("Deleted historical data for container: $containerId");
-
-      // ✅ Step 2: Fetch Start Date from Hardware_Sensors_Test
       final sensorData = await supabase
           .from('Hardware_Sensors_Test')
           .select('start_date')
