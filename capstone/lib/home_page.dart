@@ -276,8 +276,19 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   void initState() {
     super.initState();
+    _loadUserId(); //
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _refreshData(); // ✅ Automatically refresh data when opening the dashboard
+      _refreshData();
+    });
+  }
+
+  int? userId;
+
+  Future<void> _loadUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      userId = prefs.getInt('user_id'); // Ensure key name matches storage
     });
   }
 
@@ -1440,34 +1451,49 @@ class _DashboardPageState extends State<DashboardPage> {
 
   int _calculateContainerAge() {
     if (_containerAddedDate == null) {
-      _containerAge = "Unknown";
+      _containerAge = "NOT YET STARTED";
       _ageColor = Colors.black;
-      return 0; // Default to 0 when no date is available
+      return 0;
     }
 
     final difference = _selectedDate.difference(_containerAddedDate!);
-    int weeks = (difference.inDays / 7).floor(); // Always display in weeks
 
-    if (weeks > 16) {
-      _containerAge = "Over-composted";
-      _ageColor = Colors.grey;
+    if (difference.isNegative) {
+      _containerAge = "NOT STARTED YET";
+      _ageColor = Colors.black;
+      return 0;
+    }
+
+    int weeks = difference.inDays ~/ 7;
+    int days = difference.inDays % 7;
+
+    // Handle singular/plural properly
+    String weekText = weeks == 1 ? "1 WEEK" : "$weeks WEEKS";
+    String dayText = days == 1 ? "1 DAY" : "$days DAYS";
+
+    if (weeks == 0) {
+      _containerAge = dayText; // Only display days if weeks is 0
+    } else if (days == 0) {
+      _containerAge = weekText; // Only display weeks if days is 0
     } else {
-      _containerAge = "$weeks ${weeks == 1 ? 'WEEK' : 'WEEKS'}";
+      _containerAge = "$weekText AND $dayText"; // Display both
+    }
 
-      if (weeks >= 12) {
-        _ageColor = Colors.green;
-      } else if (weeks >= 7) {
-        _ageColor = Colors.orange;
-      } else {
-        _ageColor = Colors.red;
-      }
+    if (weeks >= 16) {
+      _ageColor = Colors.grey;
+    } else if (weeks >= 12) {
+      _ageColor = Colors.green;
+    } else if (weeks >= 7) {
+      _ageColor = Colors.orange;
+    } else {
+      _ageColor = Colors.red;
     }
 
     if (mounted) {
-      setState(() {}); // Update UI
+      setState(() {});
     }
 
-    return weeks; // ✅ Returns weeks for other functions
+    return weeks;
   }
 
 //notes image section
@@ -2473,7 +2499,6 @@ class _DashboardPageState extends State<DashboardPage> {
 
                     const SizedBox(height: 10),
 
-// Styled TextField for Notes with Inline Buttons
                     Container(
                       decoration: BoxDecoration(
                         color: Colors.grey[200],
@@ -2484,37 +2509,55 @@ class _DashboardPageState extends State<DashboardPage> {
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          // Expanded TextField
+                          // ✅ Enable TextField when `start_date` is NOT null
                           Expanded(
                             child: TextField(
                               controller: _notesController,
                               maxLines: 3,
                               style: const TextStyle(fontSize: 16),
-                              decoration: const InputDecoration(
-                                hintText: 'Write your note here...',
+                              readOnly: _containerAddedDate ==
+                                  null, // ✅ Disable if start_date is null
+                              decoration: InputDecoration(
+                                hintText: _containerAddedDate == null
+                                    ? "Notes are disabled until compost starts."
+                                    : "Write your note here...",
                                 border: InputBorder.none,
+                                hintStyle: TextStyle(
+                                  color: _containerAddedDate == null
+                                      ? Colors.grey
+                                      : Colors.black,
+                                ),
                               ),
                             ),
                           ),
 
                           const SizedBox(width: 8),
 
-                          // Column for Buttons (Stacked Vertically)
+                          // ✅ Enable Buttons when `start_date` is NOT null
                           Column(
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
                               IconButton(
-                                onPressed: _isLoading ? null : _addNote,
+                                onPressed:
+                                    (_containerAddedDate == null || _isLoading)
+                                        ? null
+                                        : _addNote,
                                 icon: _isLoading
                                     ? const CircularProgressIndicator()
                                     : const Icon(Icons.add_comment_outlined),
-                                color: Colors.green,
+                                color: _containerAddedDate == null
+                                    ? Colors.grey
+                                    : Colors.green,
                                 tooltip: "Add Note",
                               ),
                               IconButton(
-                                onPressed: _uploadPicture,
+                                onPressed: _containerAddedDate == null
+                                    ? null
+                                    : _uploadPicture,
                                 icon: const Icon(Icons.image),
-                                color: Colors.brown,
+                                color: _containerAddedDate == null
+                                    ? Colors.grey
+                                    : Colors.brown,
                                 tooltip: "Upload Picture",
                               ),
                             ],
@@ -2531,7 +2574,16 @@ class _DashboardPageState extends State<DashboardPage> {
                       builder: (context, snapshot) {
                         print(
                             "Notes FutureBuilder State: ${snapshot.connectionState}");
-                        print("Notes Data: ${snapshot.data}");
+
+                        if (_containerAddedDate == null) {
+                          return const Center(
+                            child: Text(
+                              "Notes are disabled. Compost not started.",
+                              style:
+                                  TextStyle(fontSize: 16, color: Colors.grey),
+                            ),
+                          );
+                        }
 
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {
@@ -2539,10 +2591,15 @@ class _DashboardPageState extends State<DashboardPage> {
                               child: CircularProgressIndicator());
                         } else if (snapshot.hasError || snapshot.data == null) {
                           print("Error fetching notes: ${snapshot.error}");
-                          return const Text('No notes found.');
+                          return const Center(child: Text('No notes found.'));
                         } else {
                           final notes =
                               snapshot.data as List<Map<String, dynamic>>;
+
+                          if (notes.isEmpty) {
+                            return const Center(
+                                child: Text('No notes available.'));
+                          }
 
                           print("Fetched ${notes.length} notes.");
                           return Column(
