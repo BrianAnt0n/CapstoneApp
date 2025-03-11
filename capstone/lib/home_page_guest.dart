@@ -328,46 +328,46 @@ class _DashboardPageState extends State<DashboardPage> {
           .from('Hardware_Sensors_Test')
           .select('start_date')
           .eq('hardware_id', containerId)
-          .single();
+          .maybeSingle(); // Use maybeSingle() to prevent exceptions
 
-      if (response['start_date'] != null) {
-        setState(() {
-          _containerAddedDate =
-              DateTime.parse(response['start_date']); // ✅ Store the date
-          _calculateContainerAge(); // ✅ Call the function without arguments
-        });
-      }
+      setState(() {
+        _containerAddedDate = response != null && response['start_date'] != null
+            ? DateTime.parse(response['start_date'])
+            : null; // Reset to null if no start_date
+      });
     } catch (error) {
       print("Error fetching container details: $error");
     }
   }
 
- void _openFullCalendar() {
-    //Ensure keyboard is fully dismissed before opening the calendar
-    FocusScope.of(context).requestFocus(FocusNode());
+// Function to check if a date is within the compost cycle
+  bool isWithinCompostCycle(DateTime day, DateTime? startDate) {
+    if (startDate == null) return false;
+    final endDate =
+        startDate.add(const Duration(days: 16 * 7)); // 16-week cycle
+    return day.isAfter(startDate.subtract(const Duration(days: 1))) &&
+        day.isBefore(endDate.add(const Duration(days: 1)));
+  }
 
-    //Use Future.delayed to wait for the keyboard to close completely
-    Future.delayed(const Duration(milliseconds: 200), () {
-      showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return Builder(
-            builder: (context) {
-              return Dialog(
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      TableCalendar(
-                        focusedDay: _selectedDate,
-                        firstDay: DateTime(2000),
-                        lastDay: DateTime(2100),
-                        calendarFormat:
-                            CalendarFormat.month, // Show the full month
-                        headerStyle: HeaderStyle(
+  void _openFullCalendar() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Full Calendar inside the popup
+                TableCalendar(
+                  focusedDay: _selectedDate,
+                  firstDay: DateTime(2000),
+                  lastDay: DateTime(2100),
+                  calendarFormat: CalendarFormat.month,
+                                          headerStyle: HeaderStyle(
                           titleCentered: true,
                           formatButtonVisible: false,
                           leftChevronIcon: const Icon(Icons.chevron_left),
@@ -376,68 +376,64 @@ class _DashboardPageState extends State<DashboardPage> {
                             return DateFormat.yMMMM(locale).format(date);
                           },
                         ),
-                        calendarBuilders: CalendarBuilders(
-                          defaultBuilder: (context, date, _) {
-                            DateTime today = DateTime.now();
+                  calendarBuilders: CalendarBuilders(
+                      defaultBuilder: (context, day, focusedDay) {
+                    if (isWithinCompostCycle(day, _containerAddedDate)) {
+                      DateTime today = DateTime.now();
+                      if (_containerAddedDate != null) {
+                        DateTime compostEndDate = _containerAddedDate!
+                            .add(const Duration(days: 112)); // 16 weeks later
+                        DateTime cycleDayOne = _containerAddedDate!
+                            .add(const Duration(days: 1)); // Day 1 of the cycle
 
-                            if (_containerAddedDate != null) {
-                              DateTime compostEndDate = _containerAddedDate!
-                                  .add(const Duration(
-                                      days: 112)); // 16 weeks later
-                              DateTime cycleDayOne = _containerAddedDate!.add(
-                                  const Duration(
-                                      days: 1)); // Day 1 of the cycle
+                        bool isWithinCycle =
+                            day.isAfter(_containerAddedDate!) &&
+                                day.isBefore(compostEndDate);
+                        bool isToday = day.year == today.year &&
+                            day.month == today.month &&
+                            day.day == today.day;
 
-                              bool isWithinCycle =
-                                  date.isAfter(_containerAddedDate!) &&
-                                      date.isBefore(compostEndDate);
-                              bool isToday = date.year == today.year &&
-                                  date.month == today.month &&
-                                  date.day == today.day;
-
-                              if (isWithinCycle || isToday) {
-                                bool isDayOne = date.year == cycleDayOne.year &&
-                                    date.month == cycleDayOne.month &&
-                                    date.day == cycleDayOne.day;
-                                bool isEndDate =
-                                    date.year == compostEndDate.year &&
-                                        date.month == compostEndDate.month &&
-                                        date.day == compostEndDate.day;
-
-                                return Container(
-                                  margin: const EdgeInsets.symmetric(
-                                      vertical: 6, horizontal: 0),
-                                  padding: const EdgeInsets.symmetric(
-                                      vertical:
-                                          4), // Shortens top and bottom spacing
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey.withOpacity(
-                                        0.3), // Gray shading effect
-                                    borderRadius: BorderRadius.horizontal(
-                                      left: isDayOne
-                                          ? const Radius.circular(20)
-                                          : Radius.zero,
-                                      right: isEndDate
-                                          ? const Radius.circular(20)
-                                          : Radius.zero,
-                                    ),
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      date.day.toString(),
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.black87,
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              }
-                            }
-                            return null; // Default calendar rendering
-                          },
-                          todayBuilder: (context, date, _) {
+                        if (isWithinCycle || isToday) {
+                          bool isDayOne = day.year == cycleDayOne.year &&
+                              day.month == cycleDayOne.month &&
+                              day.day == cycleDayOne.day;
+                          bool isEndDate = day.year == compostEndDate.year &&
+                              day.month == compostEndDate.month &&
+                              day.day == compostEndDate.day;
+                          return Container(
+                            margin: const EdgeInsets.symmetric(
+                                vertical: 6, horizontal: 0),
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 4), // Shortens top and bottom spacing
+                            decoration: BoxDecoration(
+                              color: Colors.grey
+                                  .withOpacity(0.3), // Gray shading effect
+                              borderRadius: BorderRadius.horizontal(
+                                left: isDayOne
+                                    ? const Radius.circular(20)
+                                    : Radius.zero,
+                                right: isEndDate
+                                    ? const Radius.circular(20)
+                                    : Radius.zero,
+                              ),
+                            ),
+                            child: Center(
+                              child: Text(
+                                day.day.toString(),
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                            ),
+                          );
+                        }
+                      }
+                      return null;
+                    }
+                  },
+                  todayBuilder: (context, day, _) {
                             if (_containerAddedDate != null) {
                             return Stack(
                               alignment: Alignment.center,
@@ -474,7 +470,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                 // Date number
                                 Center(
                                   child: Text(
-                                    date.day.toString(),
+                                    day.day.toString(),
                                     style: const TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
@@ -504,7 +500,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                 // Date number
                                 Center(
                                   child: Text(
-                                    date.day.toString(),
+                                    day.day.toString(),
                                     style: const TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
@@ -517,7 +513,7 @@ class _DashboardPageState extends State<DashboardPage> {
                             );
                           }
                           },
-                          selectedBuilder: (context, date, _) {
+                          selectedBuilder: (context, day, _) {
                             if (_containerAddedDate != null) {
                             DateTime compostEndDate =
                                 _containerAddedDate != null
@@ -530,15 +526,15 @@ class _DashboardPageState extends State<DashboardPage> {
                                 : DateTime.now();
 
                             bool isWithinCycle =
-                                date.isAfter(_containerAddedDate!) &&
-                                    date.isBefore(compostEndDate);
-                            bool isDayOne = date.year == cycleDayOne.year &&
-                                date.month == cycleDayOne.month &&
-                                date.day == cycleDayOne.day;
+                                day.isAfter(_containerAddedDate!) &&
+                                    day.isBefore(compostEndDate);
+                            bool isDayOne = day.year == cycleDayOne.year &&
+                                day.month == cycleDayOne.month &&
+                                day.day == cycleDayOne.day;
 
-                            bool isEndDate = date.year == compostEndDate.year &&
-                                date.month == compostEndDate.month &&
-                                date.day == compostEndDate.day;
+                            bool isEndDate = day.year == compostEndDate.year &&
+                                day.month == compostEndDate.month &&
+                                day.day == compostEndDate.day;
 
                             return Stack(
                               alignment: Alignment.center,
@@ -579,7 +575,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                 // Date number (ensures readability)
                                 Center(
                                   child: Text(
-                                    date.day.toString(),
+                                    day.day.toString(),
                                     style: const TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
@@ -612,7 +608,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                 // Date number (ensures readability)
                                 Center(
                                   child: Text(
-                                    date.day.toString(),
+                                    day.day.toString(),
                                     style: const TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
@@ -624,32 +620,27 @@ class _DashboardPageState extends State<DashboardPage> {
                               ],
                             );
                             }
-                          },
-                        ),
-                        selectedDayPredicate: (day) =>
+                          },),
+                           selectedDayPredicate: (day) =>
                             isSameDay(_selectedDate, day),
                         onDaySelected: (selectedDay, focusedDay) async {
                           setState(() {
                             _selectedDate = selectedDay;
                           });
-                          // Close the dialog after selecting a date
                           Navigator.pop(context);
                         },
-                      ),
-                      const SizedBox(height: 10),
-                      ElevatedButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text("Close"),
-                      ),
-                    ],
-                  ),
                 ),
-              );
-            },
-          );
-        },
-      );
-    });
+                const SizedBox(height: 10),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("Close"),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   void _calculateContainerAge() {
@@ -817,194 +808,6 @@ class _DashboardPageState extends State<DashboardPage> {
                                 ],
                               );
                             },
-                            todayBuilder: (context, date, _) {
-                            if (_containerAddedDate != null) {
-                            return Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                // Background shading extending to adjacent dates
-                                Container(
-                                  margin: const EdgeInsets.symmetric(
-                                      vertical: 6, horizontal: 0),
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey.withOpacity(
-                                        0.3), // Maintain shading effect
-                                    // borderRadius: BorderRadius.horizontal(
-                                    //   left: const Radius.circular(20), // Smooth connection on the left
-                                    //   right: const Radius.circular(20), // Smooth connection on the right
-                                    // ),
-                                  ),
-                                  height: 40, // Maintain shading visibility
-                                  width: double.infinity,
-                                ),
-
-                                // Today indicator
-                                Container(
-                                  height: 36,
-                                  width: 36,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: Colors.green.withOpacity(
-                                        0.5), // Highlight today's date
-                                  ),
-                                ),
-
-                                // Date number
-                                Center(
-                                  child: Text(
-                                    date.day.toString(),
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color:
-                                          Colors.black87, // Ensure visibility
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            );
-                          }
-                          else {
-                            return Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                // Today indicator
-                                Container(
-                                  height: 36,
-                                  width: 36,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: Colors.green.withOpacity(
-                                        0.5), // Highlight today's date
-                                  ),
-                                ),
-
-                                // Date number
-                                Center(
-                                  child: Text(
-                                    date.day.toString(),
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color:
-                                          Colors.black87, // Ensure visibility
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            );
-                          }
-                          },
-                          selectedBuilder: (context, date, _) {
-                            if (_containerAddedDate != null) {
-                            DateTime compostEndDate =
-                                _containerAddedDate != null
-                                    ? _containerAddedDate!
-                                        .add(const Duration(days: 112))
-                                    : DateTime.now();
-                            DateTime cycleDayOne = _containerAddedDate != null
-                                ? _containerAddedDate!
-                                    .add(const Duration(days: 1))
-                                : DateTime.now();
-
-                            bool isWithinCycle =
-                                date.isAfter(_containerAddedDate!) &&
-                                    date.isBefore(compostEndDate);
-                            bool isDayOne = date.year == cycleDayOne.year &&
-                                date.month == cycleDayOne.month &&
-                                date.day == cycleDayOne.day;
-
-                            bool isEndDate = date.year == compostEndDate.year &&
-                                date.month == compostEndDate.month &&
-                                date.day == compostEndDate.day;
-
-                            return Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                // Preserve shading effect
-                                if (isWithinCycle)
-                                  Container(
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey
-                                          .withOpacity(0.3), // Shading effect
-                                      borderRadius: BorderRadius.horizontal(
-                                        left: isDayOne
-                                            ? const Radius.circular(20)
-                                            : Radius.zero,
-                                        right: isEndDate
-                                            ? const Radius.circular(20)
-                                            : Radius.zero,
-                                      ),
-                                    ),
-                                    height: 40, // Maintain shading visibility
-                                    width: double.infinity,
-                                  ),
-
-                                // Selection circle (on top)
-                                Container(
-                                  height: 36,
-                                  width: 36,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                        color: Colors.green,
-                                        width:
-                                            2), // Green outline for selection
-                                    color: Colors
-                                        .transparent, // Keep shading visible
-                                  ),
-                                ),
-                                // Date number (ensures readability)
-                                Center(
-                                  child: Text(
-                                    date.day.toString(),
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color:
-                                          Colors.black87, // Keep text readable
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            );
-                            }
-                            else {
-                              return Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                // Selection circle (on top)
-                                Container(
-                                  height: 36,
-                                  width: 36,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                        color: Colors.green,
-                                        width:
-                                            2), // Green outline for selection
-                                    color: Colors
-                                        .transparent, // Keep shading visible
-                                  ),
-                                ),
-                                // Date number (ensures readability)
-                                Center(
-                                  child: Text(
-                                    date.day.toString(),
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color:
-                                          Colors.black87, // Keep text readable
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            );
-                            }
-                          },
                           ),
                           selectedDayPredicate: (day) =>
                               isSameDay(_selectedDate, day),
@@ -1372,17 +1175,18 @@ class _ContainerPageState extends State<ContainerPage> {
                 final isSelected = containerState.selectedContainerId ==
                     container['hardware_id'];
                 if (container['start_date'] == null) {
-                String formattedDate = "Not Set";
-                return Card(
-                    color: isSelected ? Colors.green[100] : null,
-                    child: ListTile(
-                      title: Text('Container: ${container['hardware_id']}'),
-                      subtitle: Text('Date Started: $formattedDate'),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (isSelected)
-                            const Icon(Icons.check_circle, color: Colors.green),
+                  String formattedDate = "Not Set";
+                  return Card(
+                      color: isSelected ? Colors.green[100] : null,
+                      child: ListTile(
+                        title: Text('Container: ${container['hardware_id']}'),
+                        subtitle: Text('Date Started: $formattedDate'),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (isSelected)
+                              const Icon(Icons.check_circle,
+                                  color: Colors.green),
                             // IconButton(
                             //       icon: const Icon(Icons.delete,
                             //           color: Colors.red),
@@ -1391,27 +1195,28 @@ class _ContainerPageState extends State<ContainerPage> {
                             //             context, container['container_id']);
                             //       },
                             //     ),
-                        ],
-                      ),
-                      onTap: () {
-                        containerState
-                            .selectContainer(container['hardware_id']);
-                      },
-                    ));
-                } else {
-                DateTime dateTime = DateTime.parse(container['start_date']);
-                String formattedDate =
-                    DateFormat('yyyy-MM-dd').format(dateTime);
-                return Card(
-                    color: isSelected ? Colors.green[100] : null,
-                    child: ListTile(
-                      title: Text('Container: ${container['hardware_id']}'),
-                      subtitle: Text('Date Started: $formattedDate'),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (isSelected)
-                            const Icon(Icons.check_circle, color: Colors.green),
+                          ],
+                        ),
+                        onTap: () {
+                          containerState
+                              .selectContainer(container['hardware_id']);
+                        },
+                      ));
+                } else if (container['start_date'] != null) {
+                  DateTime dateTime = DateTime.parse(container['start_date']);
+                  String formattedDate =
+                      DateFormat('yyyy-MM-dd').format(dateTime);
+                  return Card(
+                      color: isSelected ? Colors.green[100] : null,
+                      child: ListTile(
+                        title: Text('Container: ${container['hardware_id']}'),
+                        subtitle: Text('Date Started: $formattedDate'),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (isSelected)
+                              const Icon(Icons.check_circle,
+                                  color: Colors.green),
                             // IconButton(
                             //       icon: const Icon(Icons.delete,
                             //           color: Colors.red),
@@ -1420,13 +1225,13 @@ class _ContainerPageState extends State<ContainerPage> {
                             //             context, container['container_id']);
                             //       },
                             //     ),
-                        ],
-                      ),
-                      onTap: () {
-                        containerState
-                            .selectContainer(container['hardware_id']);
-                      },
-                    ));
+                          ],
+                        ),
+                        onTap: () {
+                          containerState
+                              .selectContainer(container['hardware_id']);
+                        },
+                      ));
                 }
               },
             ),
@@ -1436,37 +1241,38 @@ class _ContainerPageState extends State<ContainerPage> {
     );
   }
 
-void _showDeleteConfirmationDialog(BuildContext context, int containerId) {
-  showDialog(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: const Text("Delete Container"),
-      content: const Text("Are you sure you want to delete this container?"),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text("Cancel"),
-        ),
-        TextButton(
-          onPressed: () {
-            final containerState = Provider.of<ContainerState>(context, listen: false);
-            containerState.guestContainers.removeWhere((container) => container['hardware_id'] == containerId);
+  void _showDeleteConfirmationDialog(BuildContext context, int containerId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Delete Container"),
+        content: const Text("Are you sure you want to delete this container?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () {
+              final containerState =
+                  Provider.of<ContainerState>(context, listen: false);
+              containerState.guestContainers.removeWhere(
+                  (container) => container['hardware_id'] == containerId);
 
-            // Reset selected container if it's deleted
-            if (containerState.selectedContainerId == containerId) {
-              containerState.selectedContainerId = null;
-            }
+              // Reset selected container if it's deleted
+              if (containerState.selectedContainerId == containerId) {
+                containerState.selectedContainerId = null;
+              }
 
-            containerState.notifyListeners();
-            Navigator.pop(context); // Close the dialog
-          },
-          child: const Text("Delete"),
-        ),
-      ],
-    ),
-  );
-}
-
+              containerState.notifyListeners();
+              Navigator.pop(context); // Close the dialog
+            },
+            child: const Text("Delete"),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // Others Page: Displays options like Sign In and App Guide
