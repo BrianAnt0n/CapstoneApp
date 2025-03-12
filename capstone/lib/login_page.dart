@@ -80,88 +80,89 @@ class _LoginPageState extends State<LoginPage> {
   //   }
   // }
 
+  void _login() async {
+    String email = _emailController.text.trim().toLowerCase();
+    String password = _passwordController.text.trim();
 
-void _login() async {
-  String email = _emailController.text.trim().toLowerCase();
-  String password = _passwordController.text.trim();
-
-  // ✅ Email format validation
-  final emailRegex = RegExp(r'^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$');
-  if (!emailRegex.hasMatch(email)) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Invalid email format.')),
-    );
-    return;
-  }
-
-  try {
-    final response = await supabase
-        .from('Users')
-        .select('user_id, user_level, fullname, email, password, reset_requested')
-        .eq('email', email)
-        .maybeSingle();
-
-    if (response == null) {
+    // ✅ Email format validation
+    final emailRegex = RegExp(r'^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$');
+    if (!emailRegex.hasMatch(email)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Email not found. Please try again.")),
+        const SnackBar(content: Text('Invalid email format.')),
       );
       return;
     }
 
-    String storedPassword = response['password'];
-    int storedUserId = response['user_id'];
-    String storedUserLevel = response['user_level'];
-    String storedFullName = response['fullname'];
-    String storedEmail = response['email'];
-    bool resetRequested = response['reset_requested'] ?? false;
+    try {
+      final response = await supabase
+          .from('Users')
+          .select(
+              'user_id, user_level, fullname, email, password, reset_requested')
+          .eq('email', email)
+          .maybeSingle();
 
-    if (storedPassword == password) {
-      await SharedPrefsHelper.saveUserLogin(
-          storedUserId.toString(), storedUserLevel, storedFullName, storedEmail);
-
-      // ✅ If reset_requested is TRUE, update it to NULL
-      if (resetRequested) {
-        await supabase
-            .from('Users')
-            .update({'reset_requested': null})
-            .eq('user_id', storedUserId);
-      }
-
-      // ✅ If logging in with Temp1234!, force password change
-      if (password == "Temp1234!") {
+      if (response == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("You must change your password before continuing.")),
-        );
-
-        // ✅ Redirect to the dedicated Forced Password Change Page
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const ForcedPasswordChangePage()),
+          const SnackBar(content: Text("Email not found. Please try again.")),
         );
         return;
       }
 
-      // ✅ Redirect based on user level
-      if (storedUserLevel == "Admin") {
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const HomePage()));
+      String storedPassword = response['password'];
+      int storedUserId = response['user_id'];
+      String storedUserLevel = response['user_level'];
+      String storedFullName = response['fullname'];
+      String storedEmail = response['email'];
+      bool resetRequested = response['reset_requested'] ?? false;
+
+      if (storedPassword == password) {
+        await SharedPrefsHelper.saveUserLogin(storedUserId.toString(),
+            storedUserLevel, storedFullName, storedEmail);
+
+        // ✅ If reset_requested is TRUE, update it to NULL
+        if (resetRequested) {
+          await supabase
+              .from('Users')
+              .update({'reset_requested': null}).eq('user_id', storedUserId);
+        }
+
+        // ✅ If logging in with Temp1234!, force password change
+        if (password == "Temp1234!") {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content:
+                    Text("You must change your password before continuing.")),
+          );
+
+          // ✅ Redirect to the dedicated Forced Password Change Page
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+                builder: (context) => const ForcedPasswordChangePage()),
+          );
+          return;
+        }
+
+        // ✅ Redirect based on user level
+        if (storedUserLevel == "Admin") {
+          Navigator.pushReplacement(context,
+              MaterialPageRoute(builder: (context) => const HomePage()));
+        } else {
+          Navigator.pushReplacement(context,
+              MaterialPageRoute(builder: (context) => const HomePageMember()));
+        }
       } else {
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const HomePageMember()));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text("Incorrect password. Please try again.")),
+        );
       }
-    } else {
+    } catch (e) {
+      print("❌ Login error: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Incorrect password. Please try again.")),
-      );
+          const SnackBar(content: Text("Login failed. Please try again.")));
     }
-  } catch (e) {
-    print("❌ Login error: $e");
-    ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Login failed. Please try again.")));
   }
-}
-
-
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -184,18 +185,16 @@ void _login() async {
                 children: [
                   // Placeholder for Logo
                   Container(
-                    width: 150,
-                    height: 150,
-                    decoration: BoxDecoration(
-                      //color: Colors.grey[300],
-                      shape: BoxShape.circle, // Makes the container circular
-                    ),
-                    child: ClipOval(
-                      child: Image.asset(
-                        'assets/logo_login.png', // Path to your logo image
-                        fit: BoxFit
-                            .contain, // Ensures the whole image is visible
-                      ),
+                    width: 200,
+                    height: 200,
+                    // decoration: BoxDecoration(
+                    //   //color: Colors.grey[300],
+                    //   shape: BoxShape.circle, // Makes the container circular
+                    // ),
+
+                    child: Image.asset(
+                      'assets/logo_login.png', // Path to your logo image
+                      fit: BoxFit.contain, // Ensures the whole image is visible
                     ),
                   ),
 
