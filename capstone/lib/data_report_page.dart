@@ -116,64 +116,87 @@ final GlobalKey frequencyGraphKey = GlobalKey();
   }
 
   // Data Card Widget
-  Widget _buildDataCard(
-    String title,
-    Map<String, String> data,
-    bool isFirstDate,
-  ) {
-    return Card(
-      color: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      elevation: 3,
-      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
-              ),
+Widget _buildDataCard(String title, Map<String, String> data, bool isFirstDate) {
+  return Card(
+    color: Colors.white,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    elevation: 3,
+    margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+    child: Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
             ),
-            const Divider(color: Colors.black45),
-            ...data.entries.map((entry) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      entry.key,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        color: Colors.black54,
-                      ),
+          ),
+          const Divider(color: Colors.black45),
+          ...data.entries.map((entry) {
+            String formattedValue = _formatSensorValue(entry.key, entry.value); // ✅ Format the value
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    entry.key,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Colors.black54,
                     ),
-                    Text(
-                      entry.value,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color:
-                            isFirstDate
-                                ? Colors.blue
-                                : Colors
-                                    .green, // ✅ Dynamic Color Matching Graph
-                      ),
+                  ),
+                  Text(
+                    formattedValue, // ✅ Use formatted value
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: isFirstDate ? Colors.blue : Colors.green, 
                     ),
-                  ],
-                ),
-              );
-            }),
-          ],
-        ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
       ),
-    );
+    ),
+  );
+}
+
+// Helper function to format sensor values in Data Card
+String _formatSensorValue(String sensor, dynamic value) {
+  double? parsedValue;
+
+  // ✅ If value is already a double, use it directly
+  if (value is double) {
+    parsedValue = value;
+  } else if (value is String) {
+    parsedValue = double.tryParse(value.replaceAll("°C", "").replaceAll("%", ""));
   }
+
+  if (parsedValue == null) return value.toString(); // Return original value if parsing fails
+
+  switch (sensor.toLowerCase()) {
+    case "temperature":
+      return "${parsedValue.toStringAsFixed(1)}°C"; // 1 decimal place
+    case "moisture level":
+      return "${parsedValue.toInt()}%"; // Whole number
+    case "ph level 1":
+    case "ph level 2":
+      return parsedValue.toStringAsFixed(2); // 2 decimal places
+    case "humidity":
+      return "${parsedValue.toInt()}%"; // Whole number
+    default:
+      return value.toString(); // Fallback case
+  }
+}
+
+
 
   String selectedFilter = "Daily"; // Default filter
 
@@ -430,19 +453,19 @@ List<double> secondValues = labels.map((label) {
     }
   }
 
-  String _formatSensorValue(String sensorType, dynamic value) {
-    double parsedValue =
-        double.tryParse(value.toString()) ?? 0; // ✅ Ensure it's a number
+  // String _formatSensorValue(String sensorType, dynamic value) {
+  //   double parsedValue =
+  //       double.tryParse(value.toString()) ?? 0; // ✅ Ensure it's a number
 
-    if (sensorType.toLowerCase() == "moisture" ||
-        sensorType.toLowerCase() == "humidity") {
-      return "${parsedValue.round()}%"; // ✅ Round to whole number
-    } else if (sensorType.toLowerCase() == "temperature") {
-      return "${parsedValue.toStringAsFixed(1)}°C"; // ✅ Keep 1 decimal place
-    }
+  //   if (sensorType.toLowerCase() == "moisture" ||
+  //       sensorType.toLowerCase() == "humidity") {
+  //     return "${parsedValue.round()}%"; // ✅ Round to whole number
+  //   } else if (sensorType.toLowerCase() == "temperature") {
+  //     return "${parsedValue.toStringAsFixed(1)}°C"; // ✅ Keep 1 decimal place
+  //   }
 
-    return value.toString(); // ✅ Keep pH values as-is
-  }
+  //   return value.toString(); // ✅ Keep pH values as-is
+  // }
 
   FlTitlesData _buildChartTitles(List<String> timestamps) {
     return FlTitlesData(
@@ -511,20 +534,19 @@ List<double> secondValues = labels.map((label) {
 
 
  Future<void> _exportToPDF() async {
-
   setState(() {
     isExportingPDF = true; // 🔄 Show Loading Indicator
   });
 
   showDialog(
     context: context,
-    barrierDismissible: false, // Prevent user from closing it
+    barrierDismissible: false,
     builder: (context) {
       return AlertDialog(
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircularProgressIndicator(), // ⏳ Show Spinner
+            CircularProgressIndicator(),
             SizedBox(height: 16),
             Text("Generating PDF, please wait..."),
           ],
@@ -534,157 +556,287 @@ List<double> secondValues = labels.map((label) {
   );
 
   try {
-  
-  print("📄 Exporting PDF...");
+    print("📄 Exporting PDF...");
 
-  await Future.delayed(const Duration(milliseconds: 1000)); // ✅ Ensure time for UI updates
-  print("🔍 Checking comparisonGraphKey BEFORE capturing images: ${comparisonGraphKey.currentContext != null}");
-  print("🔍 comparisonGraphKey exists in UI: ${comparisonGraphKey.currentContext != null}");
+    await Future.delayed(const Duration(milliseconds: 1000)); // Ensure UI updates
 
-  // ✅ Wait for graphs to finish rendering
-  await _waitForGraphRender(comparisonGraphKey, "comparisonGraphKey");
-  await _waitForGraphRender(frequencyGraphKey, "frequencyGraphKey");
+    // 📂 Load Fonts
+    final regularFont = pw.Font.ttf(await rootBundle.load("assets/fonts/Roboto-Regular.ttf"));
+    final blackFont = pw.Font.ttf(await rootBundle.load("assets/fonts/Roboto-Black.ttf"));
+    final boldFont = pw.Font.ttf(await rootBundle.load("assets/fonts/Roboto-Bold.ttf"));
+    final lightFont = pw.Font.ttf(await rootBundle.load("assets/fonts/Roboto-Light.ttf"));
+    final italicFont = pw.Font.ttf(await rootBundle.load("assets/fonts/Roboto-Italic.ttf"));
 
-  final pdf = pw.Document();
+    final generatedDate = DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now());
 
-  // ✅ Ensure summaries are updated before exporting
-  print("🔄 Current selectedFilter: $selectedFilter");
-  _buildConclusionWidget();  
-  _generateFrequencySummary();
+    // ✅ Ensure summaries are generated
+    if (comparisonSummary.trim().isEmpty) {
+      print("❌ No data for comparisonSummary! Regenerating...");
+      _generateComparisonSummary();
+    }
 
-  final fontData = await rootBundle.load("assets/fonts/Roboto-Regular.ttf");
-  final customFont = pw.Font.ttf(fontData);
+    if (frequencySummary.trim().isEmpty) {
+      print("❌ No data for frequencySummary! Regenerating...");
+      _generateFrequencySummary();
+    }
 
-  if (comparisonSummary.trim().isEmpty) {
-    print("❌ No data for comparisonSummary! Regenerating...");
-    _generateComparisonSummary();
-  }
+    // ✅ Format dates correctly
+    String firstDateFormatted = DateFormat('yyyy-MM-dd').format(firstSelectedDate);
+    String secondDateFormatted = DateFormat('yyyy-MM-dd').format(secondSelectedDate);
 
-  if (frequencySummary.trim().isEmpty) {
-    print("❌ No data for frequencySummary! Regenerating...");
-    _generateFrequencySummary();
-  }
+    comparisonSummary = comparisonSummary
+        .replaceAll(firstSelectedDate.toString(), firstDateFormatted)
+        .replaceAll(secondSelectedDate.toString(), secondDateFormatted);
 
-  // ✅ Format dates correctly
-  String firstDateFormatted = DateFormat('yyyy-MM-dd').format(firstSelectedDate);
-  String secondDateFormatted = DateFormat('yyyy-MM-dd').format(secondSelectedDate);
+    final pdf = pw.Document();
 
-  comparisonSummary = comparisonSummary
-      .replaceAll(firstSelectedDate.toString(), firstDateFormatted)
-      .replaceAll(secondSelectedDate.toString(), secondDateFormatted);
+    /// ✅ Page 1: Title Page
+    pdf.addPage(
+      pw.Page(
+        build: (pw.Context context) => pw.Center(
+          child: pw.Column(
+            mainAxisAlignment: pw.MainAxisAlignment.center,
+            crossAxisAlignment: pw.CrossAxisAlignment.center,
+            children: [
+              pw.Text("DATA REPORT SUMMARY", style: pw.TextStyle(fontSize: 32, font: blackFont, letterSpacing: 1.5)),
+              pw.SizedBox(height: 16),
+              pw.Text("Generated on $generatedDate", style: pw.TextStyle(font: italicFont, fontSize: 12, color: PdfColors.grey)),
+              pw.SizedBox(height: 24),
+              pw.Text("Confidential Document", style: pw.TextStyle(font: lightFont, fontSize: 10, color: PdfColors.grey500)),
+            ],
+          ),
+        ),
+      ),
+    );
 
-  print("📌 Final comparisonSummary: $comparisonSummary");
-  print("📌 Final frequencySummary: $frequencySummary");
+    /// ✅ Helper for Bullet Points with Bold Formatting for Frequency Summary
+   pw.Widget _buildBulletPoints(String summary) {
+  List<String> lines = summary.split("\n").where((line) => line.isNotEmpty).toList();
 
-  // ✅ Page 1: Title Page
-  pdf.addPage(
-    pw.Page(
-      build: (pw.Context context) => pw.Center(
-        child: pw.Column(
-          mainAxisAlignment: pw.MainAxisAlignment.center,
+  return pw.Column(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    children: lines.map((line) {
+      pw.Widget bulletPoint;
+
+      // ✅ Remove ** formatting completely before parsing
+      String cleanLine = line.replaceAll("**", "");
+
+      // ✅ Detect "Daily" format
+      final dailyMatch = RegExp(r"The highest recorded value today for (.+?) was at (.+?) with a value of (.+?)\.").firstMatch(cleanLine);
+
+      // ✅ Detect "Weekly" format
+      final weeklyMatch = RegExp(r"The highest recorded (.+?) this week was (.+?) at (.+?)\.").firstMatch(cleanLine);
+
+      if (dailyMatch != null) {
+        final sensorType = dailyMatch.group(1)!;
+        final timestamp = dailyMatch.group(2)!;
+        final value = dailyMatch.group(3)!;
+
+        bulletPoint = pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            pw.Text("Data Report Summary",
-              style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, font: customFont)),
-            pw.SizedBox(height: 8),
-            pw.Text("Generated on ${DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now())}"),
+            pw.Text("• ", style: pw.TextStyle(font: boldFont, fontSize: 17)),
+            pw.Expanded(
+              child: pw.RichText(
+                text: pw.TextSpan(
+                  style: pw.TextStyle(font: regularFont, fontSize: 16),
+                  children: [
+                    const pw.TextSpan(text: "The highest recorded value today for "),
+                    pw.TextSpan(text: sensorType, style: pw.TextStyle(font: boldFont)), 
+                    const pw.TextSpan(text: " was at "),
+                    pw.TextSpan(text: timestamp, style: pw.TextStyle(font: boldFont)),
+                    const pw.TextSpan(text: " with a value of "),
+                    pw.TextSpan(text: value, style: pw.TextStyle(font: boldFont)),
+                    const pw.TextSpan(text: "."),
+                  ],
+                ),
+              ),
+            ),
           ],
-        ),
-      ),
-    ),
+        );
+      } 
+      else if (weeklyMatch != null) {
+        final sensorType = weeklyMatch.group(1)!;
+        final value = weeklyMatch.group(2)!;
+        final timestamp = weeklyMatch.group(3)!;
+
+        bulletPoint = pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text("• ", style: pw.TextStyle(font: boldFont, fontSize: 17)),
+            pw.Expanded(
+              child: pw.RichText(
+                text: pw.TextSpan(
+                  style: pw.TextStyle(font: regularFont, fontSize: 16),
+                  children: [
+                    const pw.TextSpan(text: "The highest recorded "),
+                    pw.TextSpan(text: sensorType, style: pw.TextStyle(font: boldFont)), 
+                    const pw.TextSpan(text: " this week was "),
+                    pw.TextSpan(text: value, style: pw.TextStyle(font: boldFont)),
+                    const pw.TextSpan(text: " at "),
+                    pw.TextSpan(text: timestamp, style: pw.TextStyle(font: boldFont)),
+                    const pw.TextSpan(text: "."),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      } 
+      else {
+        bulletPoint = pw.Text(cleanLine, style: pw.TextStyle(font: regularFont, fontSize: 16));
+      }
+
+      // ✅ Add spacing after each bullet point
+      return pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          bulletPoint,
+          pw.SizedBox(height: 10), // Adjust for more or less spacing
+        ],
+      );
+    }).toList(),
   );
+}
 
-  // ✅ Page 2: Data Comparison Summary
-  if (comparisonSummary.trim().isNotEmpty) {
-    pdf.addPage(
-      pw.Page(
-        build: (pw.Context context) => pw.Padding(
-          padding: const pw.EdgeInsets.all(16),
-          child: pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Text("Data Comparison Summary",
-                style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, font: customFont)),
-              pw.SizedBox(height: 8),
-              pw.Text(comparisonSummary, style: pw.TextStyle(fontSize: 16, font: customFont)),
-            ],
+
+
+    /// ✅ Helper for Comparison Summary with Rich Formatting
+    pw.Widget _buildComparisonBulletPoints(String summary) {
+  List<String> lines = summary.split("\n").where((line) => line.isNotEmpty).toList();
+
+  return pw.Column(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    children: lines.map((line) {
+      final match = RegExp(r"• (.+?) on (.+?) \((.+?)\) was higher than (.+?) \((.+?)\) by (.+?)\.").firstMatch(line) ??
+          RegExp(r"• (.+?) was the same on both dates \((.+?): (.+?), (.+?): (.+?)\)\.").firstMatch(line);
+
+      pw.Widget bulletPoint;
+
+      if (match != null && match.groupCount == 6) {
+        bulletPoint = pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text("• ", style: pw.TextStyle(font: boldFont, fontSize: 17)),
+            pw.Expanded(
+              child: pw.RichText(
+                text: pw.TextSpan(
+                  style: pw.TextStyle(font: regularFont, fontSize: 16),
+                  children: [
+                    pw.TextSpan(text: match.group(1)!, style: pw.TextStyle(font: boldFont)),
+                    const pw.TextSpan(text: " on "),
+                    pw.TextSpan(text: match.group(2)!, style: pw.TextStyle(font: italicFont)),
+                    const pw.TextSpan(text: " ("),
+                    pw.TextSpan(text: match.group(3)!, style: pw.TextStyle(font: boldFont)),
+                    const pw.TextSpan(text: ") was higher than "),
+                    pw.TextSpan(text: match.group(4)!, style: pw.TextStyle(font: italicFont)),
+                    const pw.TextSpan(text: " ("),
+                    pw.TextSpan(text: match.group(5)!, style: pw.TextStyle(font: boldFont)),
+                    const pw.TextSpan(text: ") by "),
+                    pw.TextSpan(text: match.group(6)!, style: pw.TextStyle(font: boldFont)),
+                    const pw.TextSpan(text: "."),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      } else if (match != null && match.groupCount == 5) {
+        bulletPoint = pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text("• ", style: pw.TextStyle(font: boldFont, fontSize: 17)),
+            pw.Expanded(
+              child: pw.RichText(
+                text: pw.TextSpan(
+                  style: pw.TextStyle(font: regularFont, fontSize: 16),
+                  children: [
+                    pw.TextSpan(text: match.group(1)!, style: pw.TextStyle(font: boldFont)),
+                    const pw.TextSpan(text: " was the same on both dates ("),
+                    pw.TextSpan(text: match.group(2)!, style: pw.TextStyle(font: italicFont)),
+                    const pw.TextSpan(text: ": "),
+                    pw.TextSpan(text: match.group(3)!, style: pw.TextStyle(font: boldFont)),
+                    const pw.TextSpan(text: ", "),
+                    pw.TextSpan(text: match.group(4)!, style: pw.TextStyle(font: italicFont)),
+                    const pw.TextSpan(text: ": "),
+                    pw.TextSpan(text: match.group(5)!, style: pw.TextStyle(font: boldFont)),
+                    const pw.TextSpan(text: ")."),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      } else {
+        bulletPoint = pw.Text(line, style: pw.TextStyle(font: regularFont, fontSize: 16));
+      }
+
+      // Add spacing after each bullet
+      return pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          bulletPoint,
+          pw.SizedBox(height: 10), // Adjust this for more or less spacing
+        ],
+      );
+    }).toList(),
+  );
+}
+
+
+     /// ✅ Page 2: Data Comparison Summary
+    if (comparisonSummary.trim().isNotEmpty) {
+      pdf.addPage(
+        pw.Page(
+          build: (pw.Context context) => pw.Padding(
+            padding: const pw.EdgeInsets.all(24),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text("Data Comparison Summary", style: pw.TextStyle(fontSize: 24, font: boldFont, color: PdfColors.blue900)),
+                pw.SizedBox(height: 12),
+                pw.Divider(),
+                pw.SizedBox(height: 12),
+                _buildComparisonBulletPoints(comparisonSummary),
+              ],
+            ),
           ),
         ),
-      ),
-    );
-  } else {
-    print("❌ Still no data for comparisonSummary!");
-  }
+      );
+    }
 
-  // ✅ Page 3: Time-Based Frequency Summary
-  if (frequencySummary.trim().isNotEmpty) {
-    pdf.addPage(
-      pw.Page(
-        build: (pw.Context context) => pw.Padding(
-          padding: const pw.EdgeInsets.all(16),
-          child: pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Text("Time-Based Frequency Summary",
-                style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, font: customFont)),
-              pw.SizedBox(height: 8),
-              pw.Text(frequencySummary, style: pw.TextStyle(fontSize: 16, font: customFont)),
-            ],
+    /// ✅ Page 3: Time-Based Frequency Summary
+    if (frequencySummary.trim().isNotEmpty) {
+      pdf.addPage(
+        pw.Page(
+          build: (pw.Context context) => pw.Padding(
+            padding: const pw.EdgeInsets.all(24),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text("Time-Based Frequency Summary", style: pw.TextStyle(fontSize: 24, font: boldFont, color: PdfColors.blue900)),
+                pw.SizedBox(height: 12),
+                pw.Divider(),
+                pw.SizedBox(height: 12),
+                _buildBulletPoints(frequencySummary),
+              ],
+            ),
           ),
         ),
-      ),
-    );
-  } else {
-    print("❌ Still no data for frequencySummary!");
-  }
-// Before Capturing Graphs
+      );
+    }
 
- // ✅ Force a full UI rebuild before capturing
-setState(() {}); 
-await Future.delayed(const Duration(milliseconds: 700)); 
+    // ✅ Capture Graphs
+    List<Uint8List> images = await _captureGraphsAsImages();
 
-// ✅ Force a rebuild of comparisonGraph before capturing
-comparisonGraphWidgetKey.currentState?.forceRebuild();  
-await Future.delayed(const Duration(milliseconds: 700)); // Ensure repaint before capturing
-
-
-
-  // ✅ Capture comparisonGraphKey
-  
-// Uint8List? comparisonGraphImage = await _captureGraph(
-//   comparisonGraphKey, 
-//   "comparisonGraphKey", 
-//   () => comparisonGraphWidgetKey.currentState?.forceRebuild() // 🔄 Trigger rebuild if needed
-// );
-
-
-
-// Uint8List? frequencyGraphImage = await _captureGraph(
-//   frequencyGraphKey, 
-//   "frequencyGraphKey", 
-//   () => setState(() {}) // ✅ Just force a UI rebuild
-// );
-
-// List<Uint8List> images = [];
-// if (comparisonGraphImage != null) images.add(comparisonGraphImage);
-// if (frequencyGraphImage != null) images.add(frequencyGraphImage);
-
-
-// ✅ Capture both graphs in one function
-List<Uint8List> images = await _captureGraphsAsImages();
-
-  if (images.isEmpty) {
-    print("❌ No images captured, skipping graphs in PDF.");
-  } else {
-
-    // ✅ Page 4: comparisonGraphKey
-    if (images.length > 0) {
+    // ✅ Page 4: Comparison Graph
+    if (images.isNotEmpty) {
       pdf.addPage(
         pw.Page(
           build: (pw.Context context) => pw.Center(
             child: pw.Column(
               children: [
-                pw.Text("Comparison Graph",
-                  style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold, font: customFont)),
+                pw.Text("Comparison Graph", style: pw.TextStyle(fontSize: 20, font: boldFont)),
                 pw.SizedBox(height: 10),
                 pw.Image(pw.MemoryImage(images[0]), width: 400, height: 300),
               ],
@@ -692,18 +844,16 @@ List<Uint8List> images = await _captureGraphsAsImages();
           ),
         ),
       );
-      print("✅ comparisonGraphKey added to Page 4.");
     }
 
-    // ✅ Page 5: frequencyGraphKey
+    // ✅ Page 5: Frequency Graph
     if (images.length > 1) {
       pdf.addPage(
         pw.Page(
           build: (pw.Context context) => pw.Center(
             child: pw.Column(
               children: [
-                pw.Text("Frequency Graph",
-                  style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold, font: customFont)),
+                pw.Text("Frequency Graph", style: pw.TextStyle(fontSize: 20, font: boldFont)),
                 pw.SizedBox(height: 10),
                 pw.Image(pw.MemoryImage(images[1]), width: 400, height: 300),
               ],
@@ -711,30 +861,23 @@ List<Uint8List> images = await _captureGraphsAsImages();
           ),
         ),
       );
-      print("✅ frequencyGraphKey added to Page 5.");
     }
-  }
 
-  // ✅ Save and Open the PDF
-  final output = await getTemporaryDirectory();
-  final file = File("${output.path}/data_report.pdf");
-  await file.writeAsBytes(await pdf.save());
+    // ✅ Save and Open the PDF
+    final output = await getTemporaryDirectory();
+    final file = File("${output.path}/data_report.pdf");
+    await file.writeAsBytes(await pdf.save());
 
-  print("✅ PDF Saved at: ${file.path}");
-  await Printing.layoutPdf(
-    onLayout: (PdfPageFormat format) async => pdf.save(),
-  );
+    print("✅ PDF Saved at: ${file.path}");
+    await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdf.save());
 
-   } finally {
+  } finally {
     setState(() {
-      isExportingPDF = false; // ✅ Hide Loading Indicator
+      isExportingPDF = false;
     });
-
-    Navigator.of(context).pop(); // ✅ Close Dialog
+    Navigator.of(context).pop();
   }
 }
-
-
 
 
 
@@ -800,7 +943,11 @@ void _generateFrequencySummary() {
             print("⚠️ Error parsing timestamp: $highestWeeklyTimestamp - $e");
           }
 
-          summaries.add("• The highest recorded value this week for **$sensorType** was at **$formattedTimestamp** with a value of **${highestWeeklyValue.toStringAsFixed(2)}**.");
+          // ✅ Apply proper units
+          String formattedValue = _formatSensorValue(sensorType, highestWeeklyValue);
+
+          // ✅ Better formatting
+          summaries.add("• The highest recorded **$sensorType** this week was **$formattedValue** at **$formattedTimestamp**.");
         } else { // ✅ Daily Mode
           var highestRecord = (sensorData as List<Map<String, dynamic>>).reduce(
             (a, b) => (double.tryParse(a["Value"].toString()) ?? 0) >
@@ -818,7 +965,11 @@ void _generateFrequencySummary() {
             print("⚠️ Error parsing timestamp: $rawTimestamp - $e");
           }
 
-          summaries.add("• The highest recorded value today for **$sensorType** was at **$formattedTimestamp** with a value of **${highestValue.toStringAsFixed(2)}**.");
+          // ✅ Apply proper units
+          String formattedValue = _formatSensorValue(sensorType, highestValue);
+
+          // ✅ Improved formatting
+          summaries.add("• The highest recorded **$sensorType** today was **$formattedValue** at **$formattedTimestamp**.");
         }
       }
     });
@@ -958,7 +1109,7 @@ Future<Uint8List?> _captureGraph(GlobalKey key, String graphName, VoidCallback f
 
 // ✅ Moved `_waitForGraphRender()` inside `_captureGraph()`
 Future<void> _waitForGraphRender(GlobalKey key, String graphName) async {
-  int retries = 15; // ✅ Increased retries
+  int retries = 6; // ✅ Increased retries
   while (retries > 0) {
     await Future.delayed(const Duration(milliseconds: 700)); // ✅ Increased delay
 
@@ -1070,7 +1221,7 @@ retries--;
               child: ListView(
                 children: [
                   _buildDataCard("First Date Data", firstDateData, true),
-                  _buildDataCard("Second Date Data", secondDateData, true),
+                  _buildDataCard("Second Date Data", secondDateData, false),
                   const SizedBox(height: 16),
 
                  ComparisonGraphWidget(
@@ -1088,10 +1239,8 @@ retries--;
 
 
 
-                  const Divider(
-                    thickness: 2,
-                    color: Colors.black26,
-                  ), // ✅ Adds a Visual Separator
+                  const Divider(thickness: 2,color: Colors.black26,), // ✅ Adds a Visual Separator
+
                   // ✅ Filter Dropdown for Daily/Weekly (AFTER Divider)
                   Padding(
                     padding: const EdgeInsets.symmetric(
@@ -1140,7 +1289,7 @@ retries--;
                   // Build Frequency Analysis Card
                   _buildFrequencyAnalysisCard(),
 
-                  const SizedBox(height: 16), // ✅ Adds spacing before the graph
+                  const SizedBox(height: 32), // ✅ Adds spacing before the graph
 
                   // Build Time Based Frequency Graph
 
@@ -1159,9 +1308,11 @@ retries--;
                       selectedFilter: selectedFilter,
                     ),
 
-                  const SizedBox(
-                    height: 16,
-                  ), // Adds spacing before the conclusion
+
+                  const SizedBox(height: 16,), // Adds spacing before the conclusion
+                   const Divider(thickness: 2, color: Colors.black26,), // ✅ Adds a Visual Separator
+
+                  // ✅ Conclusion
                   _buildConclusionWidget(),
 
                   // ✅ Export PDF Button
@@ -1302,291 +1453,305 @@ retries--;
     );
   }
 
-  Widget _buildTimeBasedFrequencyGraph() {
-    if (frequencyAnalysisData.isEmpty) {
-      return const Center(child: Text("No alerts recorded to display."));
-    }
+  // Widget _buildTimeBasedFrequencyGraph() {
+  //   if (frequencyAnalysisData.isEmpty) {
+  //     return const Center(child: Text("No alerts recorded to display."));
+  //   }
 
-    List<String> sensorTypes = frequencyAnalysisData.keys.toList();
-    List<String> timestamps = [];
+  //   List<String> sensorTypes = frequencyAnalysisData.keys.toList();
+  //   List<String> timestamps = [];
 
-    // ✅ Collect unique timestamps for X-axis labels
-    for (var sensor in sensorTypes) {
-      for (var entry in frequencyAnalysisData[sensor] ?? []) {
-        if (!timestamps.contains(entry["Time"])) {
-          timestamps.add(entry["Time"]);
-        }
-      }
-    }
+  //   // ✅ Collect unique timestamps for X-axis labels
+  //   for (var sensor in sensorTypes) {
+  //     for (var entry in frequencyAnalysisData[sensor] ?? []) {
+  //       if (!timestamps.contains(entry["Time"])) {
+  //         timestamps.add(entry["Time"]);
+  //       }
+  //     }
+  //   }
 
-    // ✅ If "Daily", show a single combined graph
-    if (selectedFilter == "Daily") {
-      return Column(
-        children: [
-          // ✅ Add the Legend Row
-          Wrap(
-            spacing: 10,
-            children:
-                sensorTypes.map((sensor) {
-                  return Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 12,
-                        height: 12,
-                        decoration: BoxDecoration(
-                          color: _getSensorColor(sensor),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 5),
-                      Text(
-                        sensor,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  );
-                }).toList(),
-          ),
+  //   // ✅ If "Daily", show a single combined graph
+  //   if (selectedFilter == "Daily") {
+  //     return Column(
+  //       children: [
+  //         // ✅ Add the Legend Row
+  //         Wrap(
+  //           spacing: 10,
+  //           children:
+  //               sensorTypes.map((sensor) {
+  //                 return Row(
+  //                   mainAxisSize: MainAxisSize.min,
+  //                   children: [
+  //                     Container(
+  //                       width: 12,
+  //                       height: 12,
+  //                       decoration: BoxDecoration(
+  //                         color: _getSensorColor(sensor),
+  //                         shape: BoxShape.circle,
+  //                       ),
+  //                     ),
+  //                     const SizedBox(width: 5),
+  //                     Text(
+  //                       sensor,
+  //                       style: const TextStyle(
+  //                         fontSize: 12,
+  //                         fontWeight: FontWeight.bold,
+  //                       ),
+  //                     ),
+  //                   ],
+  //                 );
+  //               }).toList(),
+  //         ),
 
-          const SizedBox(height: 12), // ✅ Adds spacing before the graph
-          // ✅ The Combined Graph
-          SizedBox(
-            height: 300, // ✅ Fixed height for Daily
-            child: BarChart(
-              BarChartData(
-                barGroups: List.generate(timestamps.length, (index) {
-                  String timeLabel = timestamps[index];
+  //         const SizedBox(height: 12), // ✅ Adds spacing before the graph
+  //         // ✅ The Combined Graph
+  //         SizedBox(
+  //           height: 300, // ✅ Fixed height for Daily
+  //           child: BarChart(
+  //             BarChartData(
+  //               barGroups: List.generate(timestamps.length, (index) {
+  //                 String timeLabel = timestamps[index];
 
-                  List<BarChartRodData> bars = [];
+  //                 List<BarChartRodData> bars = [];
 
-                  for (var sensor in sensorTypes) {
-                    var sensorData =
-                        frequencyAnalysisData[sensor]
-                            ?.where((data) => data["Time"] == timeLabel)
-                            .toList() ??
-                        [];
-                    if (sensorData.isNotEmpty) {
-                      double sensorValue =
-                          double.tryParse(
-                            sensorData.first["Value"].toString(),
-                          ) ??
-                          0;
+  //                 for (var sensor in sensorTypes) {
+  //                   var sensorData =
+  //                       frequencyAnalysisData[sensor]
+  //                           ?.where((data) => data["Time"] == timeLabel)
+  //                           .toList() ??
+  //                       [];
+  //                   if (sensorData.isNotEmpty) {
+  //                     double sensorValue =
+  //                         double.tryParse(
+  //                           sensorData.first["Value"].toString(),
+  //                         ) ??
+  //                         0;
 
-                      bars.add(
-                        BarChartRodData(
-                          toY: sensorValue,
-                          color: _getSensorColor(sensor),
-                          width: 16,
-                        ),
-                      );
-                    }
-                  }
+  //                     bars.add(
+  //                       BarChartRodData(
+  //                         toY: sensorValue,
+  //                         color: _getSensorColor(sensor),
+  //                         width: 16,
+  //                       ),
+  //                     );
+  //                   }
+  //                 }
 
-                  return BarChartGroupData(x: index, barRods: bars);
-                }),
+  //                 return BarChartGroupData(x: index, barRods: bars);
+  //               }),
 
-                // ✅ Enable Touch Interaction
-                barTouchData: BarTouchData(
-                  touchTooltipData: BarTouchTooltipData(
-                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                      String formattedTime = "Unknown Time";
+  //               // ✅ Enable Touch Interaction
+  //               barTouchData: BarTouchData(
+  //                 touchTooltipData: BarTouchTooltipData(
 
-                      try {
-                        DateTime parsedTime;
-                        if (timestamps[groupIndex].contains("AM") ||
-                            timestamps[groupIndex].contains("PM")) {
-                          parsedTime = DateFormat(
-                            "yyyy-MM-dd hh:mm a",
-                          ).parse(timestamps[groupIndex]);
-                        } else {
-                          parsedTime = DateFormat(
-                            "yyyy-MM-dd HH:mm:ss",
-                          ).parse(timestamps[groupIndex]);
-                        }
+  //                   fitInsideHorizontally:true, // ✅ Prevents horizontal clipping
+  //                   fitInsideVertically: true, // ✅ Prevents vertical clipping
 
-                        // Show Day + Time for Weekly, Only Time for Daily
-                        formattedTime =
-                            (selectedFilter == "Weekly")
-                                ? DateFormat("EEE hh:mm a").format(
-                                  parsedTime,
-                                ) // Example: Mon 08:00 AM
-                                : DateFormat(
-                                  "hh:mm a",
-                                ).format(parsedTime); // Example: 08:00 AM
-                      } catch (e) {
-                        print(
-                          "Error parsing timestamp: ${timestamps[groupIndex]} - $e",
-                        );
-                      }
+  //                   getTooltipItem: (group, groupIndex, rod, rodIndex) {
+  //                     String formattedTime = "Unknown Time";
 
-                      return BarTooltipItem(
-                        "Sensor Value: ${rod.toY}\nTime: $formattedTime", // Tooltip Format
-                        const TextStyle(color: Colors.white, fontSize: 12),
-                      );
-                    },
-                    getTooltipColor:
-                        (group) => Colors.black87, // Tooltip background color
-                    tooltipRoundedRadius: 8, // Rounded corners
-                    tooltipPadding: const EdgeInsets.all(
-                      8,
-                    ), // Padding inside tooltip
-                    tooltipMargin: 10, // Space between bars & tooltip
-                  ),
-                ),
+  //                     try {
+  //                       DateTime parsedTime;
+  //                       if (timestamps[groupIndex].contains("AM") ||
+  //                           timestamps[groupIndex].contains("PM")) {
+  //                         parsedTime = DateFormat(
+  //                           "yyyy-MM-dd hh:mm a",
+  //                         ).parse(timestamps[groupIndex]);
+  //                       } else {
+  //                         parsedTime = DateFormat(
+  //                           "yyyy-MM-dd HH:mm:ss",
+  //                         ).parse(timestamps[groupIndex]);
+  //                       }
 
-                titlesData: _buildChartTitles(
-                  timestamps,
-                ), // ✅ Keep existing title formatting
-              ),
-            ),
-          ),
-        ],
-      );
-    }
+  //                       // Show Day + Time for Weekly, Only Time for Daily
+  //                       formattedTime =
+  //                           (selectedFilter == "Weekly")
+  //                               ? DateFormat("EEE hh:mm a").format(
+  //                                 parsedTime,
+  //                               ) // Example: Mon 08:00 AM
+  //                               : DateFormat(
+  //                                 "hh:mm a",
+  //                               ).format(parsedTime); // Example: 08:00 AM
+  //                     } catch (e) {
+  //                       print(
+  //                         "Error parsing timestamp: ${timestamps[groupIndex]} - $e",
+  //                       );
+  //                     }
 
-    // ✅ If "Weekly", show separate graphs per sensor type
-    return Column(
-      children:
-          sensorTypes.map((sensor) {
-            List<String> sensorTimestamps = [];
-            for (var entry in frequencyAnalysisData[sensor] ?? []) {
-              if (!sensorTimestamps.contains(entry["Time"])) {
-                sensorTimestamps.add(entry["Time"]);
-              }
-            }
+  //                     return BarTooltipItem(
+  //                       "Sensor Value: ${rod.toY}\nTime: $formattedTime", // Tooltip Format
+  //                       const TextStyle(color: Colors.white, fontSize: 12),
+  //                     );
+  //                   },
+  //                   getTooltipColor:
+  //                       (group) => Colors.black87, // Tooltip background color
+  //                   tooltipRoundedRadius: 8, // Rounded corners
+  //                   tooltipPadding: const EdgeInsets.all(
+  //                     8,
+  //                   ), // Padding inside tooltip
+  //                   tooltipMargin: 10, // Space between bars & tooltip
+  //                 ),
+  //               ),
 
-            return Column(
-              children: [
-                const SizedBox(height: 16), // ✅ Adds spacing between graphs
-                // ✅ Sensor Title (Legend for Each Graph)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: _getSensorColor(sensor),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 5),
-                    Text(
-                      sensor,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
+  //               titlesData: _buildChartTitles(
+  //                 timestamps,
+  //               ), // ✅ Keep existing title formatting
+  //             ),
+  //           ),
+  //         ),
+  //       ],
+  //     );
+  //   }
 
-                const SizedBox(height: 10),
+  //   // ✅ If "Weekly", show separate graphs per sensor type
+  //   return Column(
+  //     children:
+  //         sensorTypes.map((sensor) {
+  //           List<String> sensorTimestamps = [];
+  //           for (var entry in frequencyAnalysisData[sensor] ?? []) {
+  //             if (!sensorTimestamps.contains(entry["Time"])) {
+  //               sensorTimestamps.add(entry["Time"]);
+  //             }
+  //           }
 
-                // ✅ The Separate Graph for this Sensor
-                SizedBox(
-                  height: 300, // ✅ Consistent height per graph
-                  child: BarChart(
-                    BarChartData(
-                      barGroups: List.generate(timestamps.length, (index) {
-                        String timeLabel = timestamps[index];
+  //           return Column(
+  //             children: [
+  //               const SizedBox(height: 16), // ✅ Adds spacing between graphs
+  //               // ✅ Sensor Title (Legend for Each Graph)
+  //               Row(
+  //                 mainAxisAlignment: MainAxisAlignment.center,
+  //                 children: [
+  //                   Container(
+  //                     width: 12,
+  //                     height: 12,
+  //                     decoration: BoxDecoration(
+  //                       color: _getSensorColor(sensor),
+  //                       shape: BoxShape.circle,
+  //                     ),
+  //                   ),
+  //                   const SizedBox(width: 5),
+  //                   Text(
+  //                     sensor,
+  //                     style: const TextStyle(
+  //                       fontSize: 14,
+  //                       fontWeight: FontWeight.bold,
+  //                     ),
+  //                   ),
+  //                 ],
+  //               ),
 
-                        List<BarChartRodData> bars = [];
+  //               const SizedBox(height: 10),
+
+  //               // ✅ The Separate Graph for this Sensor
+
+  //               Padding(
+  // padding: const EdgeInsets.symmetric(vertical: 20),  // ✅ Adds space above & below
+  //               child: SizedBox(
+  //                 height: 300, // ✅ Consistent height per graph
+  //                 child: BarChart(
+  //                   BarChartData(
+  //                     barGroups: List.generate(timestamps.length, (index) {
+  //                       String timeLabel = timestamps[index];
+
+  //                       List<BarChartRodData> bars = [];
 
                         
-                          var sensorData =
-                              frequencyAnalysisData[sensor]
-                                  ?.where((data) => data["Time"] == timeLabel)
-                                  .toList() ??
-                              [];
-                          if (sensorData.isNotEmpty) {
-                            double sensorValue =
-                                double.tryParse(
-                                  sensorData.first["Value"].toString(),
-                                ) ??
-                                0;
+  //                         var sensorData =
+  //                             frequencyAnalysisData[sensor]
+  //                                 ?.where((data) => data["Time"] == timeLabel)
+  //                                 .toList() ??
+  //                             [];
+  //                         if (sensorData.isNotEmpty) {
+  //                           double sensorValue =
+  //                               double.tryParse(
+  //                                 sensorData.first["Value"].toString(),
+  //                               ) ??
+  //                               0;
 
-                            bars.add(
-                              BarChartRodData(
-                                toY: sensorValue,
-                                color: _getSensorColor(sensor),
-                                width: 16,
-                              ),
-                            );
-                          }
+  //                           bars.add(
+  //                             BarChartRodData(
+  //                               toY: sensorValue,
+  //                               color: _getSensorColor(sensor),
+  //                               width: 16,
+  //                             ),
+  //                           );
+  //                         }
                         
 
-                        return BarChartGroupData(x: index, barRods: bars);
-                      }),
+  //                       return BarChartGroupData(x: index, barRods: bars);
+  //                     }),
 
-                      // ✅ Enable Touch Interaction
-                      barTouchData: BarTouchData(
-                        touchTooltipData: BarTouchTooltipData(
-                          getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                            String formattedTime = "Unknown Time";
+  //                     // ✅ Enable Touch Interaction
+  //                     barTouchData: BarTouchData(
+  //                       touchTooltipData: BarTouchTooltipData(
 
-                            try {
-                              DateTime parsedTime;
-                              if (timestamps[groupIndex].contains("AM") ||
-                                  timestamps[groupIndex].contains("PM")) {
-                                parsedTime = DateFormat(
-                                  "yyyy-MM-dd hh:mm a",
-                                ).parse(timestamps[groupIndex]);
-                              } else {
-                                parsedTime = DateFormat(
-                                  "yyyy-MM-dd HH:mm:ss",
-                                ).parse(timestamps[groupIndex]);
-                              }
+  //                         fitInsideHorizontally:true, // ✅ Prevents horizontal clipping
+  //                          fitInsideVertically: true, // ✅ Prevents vertical clipping
 
-                              // Show Day + Time for Weekly, Only Time for Daily
-                              formattedTime =
-                                  (selectedFilter == "Weekly")
-                                      ? DateFormat("EEE hh:mm a").format(
-                                        parsedTime,
-                                      ) // Example: Mon 08:00 AM
-                                      : DateFormat(
-                                        "hh:mm a",
-                                      ).format(parsedTime); // Example: 08:00 AM
-                            } catch (e) {
-                              print(
-                                "Error parsing timestamp: ${timestamps[groupIndex]} - $e",
-                              );
-                            }
+  //                          tooltipMargin: 30,  // ✅ Pushes tooltip away from other widgets
 
-                            return BarTooltipItem(
-                              "Sensor Value: ${rod.toY}\nTime: $formattedTime", // Tooltip Format
-                              const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                              ),
-                            );
-                          },
-                          getTooltipColor:
-                              (group) =>
-                                  Colors.black87, // Tooltip background color
-                          tooltipRoundedRadius: 8, // Rounded corners
-                          tooltipPadding: const EdgeInsets.all(
-                            8,
-                          ), // Padding inside tooltip
-                          tooltipMargin: 10, // Space between bars & tooltip
-                        ),
-                      ),
+  //                         getTooltipItem: (group, groupIndex, rod, rodIndex) {
+  //                           String formattedTime = "Unknown Time";
 
-                      titlesData: _buildChartTitles(
-                        timestamps,
-                      ), // ✅ Keep existing title formatting
-                    ),
-                  ),
-                ),
-              ],
-            );
-          }).toList(),
-    );
-  }
+  //                           try {
+  //                             DateTime parsedTime;
+  //                             if (timestamps[groupIndex].contains("AM") ||
+  //                                 timestamps[groupIndex].contains("PM")) {
+  //                               parsedTime = DateFormat(
+  //                                 "yyyy-MM-dd hh:mm a",
+  //                               ).parse(timestamps[groupIndex]);
+  //                             } else {
+  //                               parsedTime = DateFormat(
+  //                                 "yyyy-MM-dd HH:mm:ss",
+  //                               ).parse(timestamps[groupIndex]);
+  //                             }
+
+  //                             // Show Day + Time for Weekly, Only Time for Daily
+  //                             formattedTime =
+  //                                 (selectedFilter == "Weekly")
+  //                                     ? DateFormat("EEE hh:mm a").format(
+  //                                       parsedTime,
+  //                                     ) // Example: Mon 08:00 AM
+  //                                     : DateFormat(
+  //                                       "hh:mm a",
+  //                                     ).format(parsedTime); // Example: 08:00 AM
+  //                           } catch (e) {
+  //                             print(
+  //                               "Error parsing timestamp: ${timestamps[groupIndex]} - $e",
+  //                             );
+  //                           }
+
+  //                           return BarTooltipItem(
+  //                             "Sensor Value: ${rod.toY}\nTime: $formattedTime", // Tooltip Format
+  //                             const TextStyle(
+  //                               color: Colors.white,
+  //                               fontSize: 12,
+  //                             ),
+  //                           );
+  //                         },
+  //                         getTooltipColor:
+  //                             (group) =>
+  //                                 Colors.black87, // Tooltip background color
+  //                         tooltipRoundedRadius: 8, // Rounded corners
+  //                         tooltipPadding: const EdgeInsets.all(
+  //                           8,
+  //                         ), // Padding inside tooltip
+  //                        // tooltipMargin: 10, // Space between bars & tooltip
+  //                       ),
+  //                     ),
+
+  //                     titlesData: _buildChartTitles(
+  //                       timestamps,
+  //                     ), // ✅ Keep existing title formatting
+  //                   ),
+  //                 ),
+  //                ),
+  //               )
+  //             ],
+  //           );
+  //         }).toList(),
+  //   );
+  // }
 
   String formatSensorValue(String sensor, double value) {
     if (sensor.toLowerCase().contains("moisture") ||
@@ -1867,84 +2032,101 @@ class _ComparisonGraphWidgetState extends State<ComparisonGraphWidget> with Auto
   }
 
   Widget _buildComparisonGraph() {
-    print("🔍 comparisonGraph Data Check: First - ${widget.firstDateData}, Second - ${widget.secondDateData}");
+  print("🔍 comparisonGraph Data Check: First - ${widget.firstDateData}, Second - ${widget.secondDateData}");
 
-    if (widget.firstDateData.isEmpty || widget.secondDateData.isEmpty) {
-      return const SizedBox(height: 300); // Maintain layout
-    }
+  if (widget.firstDateData.isEmpty || widget.secondDateData.isEmpty) {
+    return const SizedBox(height: 300); // Maintain layout
+  }
 
-    List<String> labels = [
-      "Temperature",
-      "Moisture Level",
-      "pH Level 1",
-      "pH Level 2",
-      "Humidity",
-    ];
+  List<String> labels = [
+    "Temperature",
+    "Moisture Level",
+    "pH Level 1",
+    "pH Level 2",
+    "Humidity",
+  ];
 
-    List<double> firstValues = labels.map((label) {
-      String rawValue = widget.firstDateData[label]?.toString() ?? "0";
-      return double.tryParse(rawValue) ?? 0;
-    }).toList();
+  /// ✅ Improved Data Parsing (Fixed Casting Issue)
+List<double> firstValues = labels.map((label) {
+  String? rawValue = widget.firstDateData[label];
 
-    List<double> secondValues = labels.map((label) {
-      String rawValue = widget.secondDateData[label]?.toString() ?? "0";
-      return double.tryParse(rawValue) ?? 0;
-    }).toList();
+  if (rawValue == null || rawValue.toLowerCase() == "n/a") return 0.0; // Ensure double type
 
-    return Column(
-      children: [
-        Wrap(
-          spacing: 12,
-          children: labels.map((sensor) {
-            return Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(_getSensorIcon(sensor), size: 18, color: Colors.black),
-                const SizedBox(width: 5),
-                Text(sensor, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-              ],
-            );
-          }).toList(),
-        ),
-        const SizedBox(height: 13),
-        SizedBox(
-          height: 300,
-          child: BarChart(
-            BarChartData(
-              barGroups: List.generate(labels.length, (index) {
-                return BarChartGroupData(
-                  x: index,
-                  barRods: [
-                    BarChartRodData(
-                      toY: firstValues[index],
-                      color: Colors.blue,
-                      width: 16,
-                    ),
-                    BarChartRodData(
-                      toY: secondValues[index],
-                      color: Colors.green,
-                      width: 16,
-                    ),
-                  ],
-                );
-              }),
-              titlesData: FlTitlesData(
-                leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 40)),
-                bottomTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    getTitlesWidget: (value, _) {
-                      return Icon(_getSensorIcon(labels[value.toInt()]), size: 24, color: Colors.black54);
-                    },
+  rawValue = rawValue.replaceAll("°C", "").replaceAll("%", ""); // Remove units
+
+  return double.tryParse(rawValue) ?? 0.0; // Explicitly return double
+}).toList().cast<double>(); // ✅ Ensure it is a List<double>
+
+List<double> secondValues = labels.map((label) {
+  String? rawValue = widget.secondDateData[label];
+
+  if (rawValue == null || rawValue.toLowerCase() == "n/a") return 0.0;
+
+  rawValue = rawValue.replaceAll("°C", "").replaceAll("%", "");
+
+  return double.tryParse(rawValue) ?? 0.0;
+}).toList().cast<double>(); // ✅ Ensure it is a List<double>
+
+
+  // ✅ Debugging: Print parsed values
+  print("📊 First Values: $firstValues");
+  print("📊 Second Values: $secondValues");
+
+  return Column(
+    children: [
+      Wrap(
+        spacing: 12,
+        children: labels.map((sensor) {
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(_getSensorIcon(sensor), size: 18, color: Colors.black),
+              const SizedBox(width: 5),
+              Text(sensor, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            ],
+          );
+        }).toList(),
+      ),
+      const SizedBox(height: 13),
+      SizedBox(
+        height: 300,
+        child: BarChart(
+          BarChartData(
+            barGroups: List.generate(labels.length, (index) {
+              return BarChartGroupData(
+                x: index,
+                barRods: [
+                  BarChartRodData(
+                    toY: firstValues[index],
+                    color: Colors.blue,
+                    width: 16,
                   ),
+                  BarChartRodData(
+                    toY: secondValues[index],
+                    color: Colors.green,
+                    width: 16,
+                  ),
+                ],
+              );
+            }),
+            titlesData: FlTitlesData(
+              leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 40)),
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  getTitlesWidget: (value, _) {
+                    return Icon(_getSensorIcon(labels[value.toInt()]), size: 24, color: Colors.black54);
+                  },
                 ),
               ),
             ),
           ),
         ),
-      ],
-    );
-  }
+      ),
+    ],
+  );
+}
+
 
   // Function to Map Sensor Type to Icons
   IconData _getSensorIcon(String sensorType) {
@@ -1965,6 +2147,7 @@ class _ComparisonGraphWidgetState extends State<ComparisonGraphWidget> with Auto
 }
 
 
+// Frequency Graph
 class FrequencyGraphWidget extends StatefulWidget {
   final GlobalKey repaintKey;
   final Map<String, dynamic> frequencyData;
@@ -2007,105 +2190,203 @@ class _FrequencyGraphWidgetState extends State<FrequencyGraphWidget> with Automa
     );
 }
 
-  Widget _buildTimeBasedFrequencyGraph() {
-    if (widget.frequencyData.isEmpty) {
-      return const Center(child: Text("No alerts recorded to display."));
-    }
+Widget _buildTimeBasedFrequencyGraph() {
+  if (widget.frequencyData.isEmpty) {
+    return const Center(child: Text("No alerts recorded to display."));
+  }
 
-    List<String> sensorTypes = widget.frequencyData.keys.toList();
-    List<String> timestamps = [];
+  List<String> sensorTypes = widget.frequencyData.keys.toList();
+  List<String> timestamps = [];
 
-    for (var sensor in sensorTypes) {
-      for (var entry in widget.frequencyData[sensor] ?? []) {
-        if (!timestamps.contains(entry["Time"])) {
-          timestamps.add(entry["Time"]);
-        }
+  for (var sensor in sensorTypes) {
+    for (var entry in widget.frequencyData[sensor] ?? []) {
+      if (!timestamps.contains(entry["Time"])) {
+        timestamps.add(entry["Time"]);
       }
     }
+  }
 
-    if (widget.selectedFilter == "Daily") {
-      return Column(
-        children: [
-          Wrap(
-            spacing: 10,
-            children: sensorTypes.map((sensor) {
-              return Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 12,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: _getSensorColor(sensor),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 5),
-                  Text(
-                    sensor,
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              );
-            }).toList(),
-          ),
-
-          const SizedBox(height: 12),
-
-          SizedBox(
-            height: 300,
-            child: BarChart(
-              BarChartData(
-                barGroups: List.generate(timestamps.length, (index) {
-                  String timeLabel = timestamps[index];
-                  List<BarChartRodData> bars = [];
-
-                  for (var sensor in sensorTypes) {
-                    var sensorData = widget.frequencyData[sensor]
-                            ?.where((data) => data["Time"] == timeLabel)
-                            .toList() ??
-                        [];
-                    if (sensorData.isNotEmpty) {
-                      double sensorValue = double.tryParse(sensorData.first["Value"].toString()) ?? 0;
-                      bars.add(
-                        BarChartRodData(
-                          toY: sensorValue,
-                          color: _getSensorColor(sensor),
-                          width: 16,
-                        ),
-                      );
-                    }
-                  }
-
-                  return BarChartGroupData(x: index, barRods: bars);
-                }),
-
-                barTouchData: BarTouchData(
-                  touchTooltipData: BarTouchTooltipData(
-                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                      String formattedTime = _formatTimestamp(timestamps[groupIndex]);
-                      return BarTooltipItem(
-                        "Sensor Value: ${rod.toY}\nTime: $formattedTime",
-                        const TextStyle(color: Colors.white, fontSize: 12),
-                      );
-                    },
-                    getTooltipColor: (group) => Colors.black87,
-                    tooltipRoundedRadius: 8,
-                    tooltipPadding: const EdgeInsets.all(8),
-                    tooltipMargin: 10,
+  if (widget.selectedFilter == "Daily") {
+    return Column(
+      children: [
+        Wrap(
+          spacing: 10,
+          children: sensorTypes.map((sensor) {
+            return Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: _getSensorColor(sensor),
+                    shape: BoxShape.circle,
                   ),
                 ),
+                const SizedBox(width: 5),
+                Text(
+                  sensor,
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+              ],
+            );
+          }).toList(),
+        ),
 
-                titlesData: _buildChartTitles(timestamps),
+        const SizedBox(height: 12),
+
+        SizedBox(
+          height: 300,
+          child: BarChart(
+            BarChartData(
+              barGroups: List.generate(timestamps.length, (index) {
+                String timeLabel = timestamps[index];
+                List<BarChartRodData> bars = [];
+
+                for (var sensor in sensorTypes) {
+                  var sensorData = widget.frequencyData[sensor]
+                          ?.where((data) => data["Time"] == timeLabel)
+                          .toList() ??
+                      [];
+                  if (sensorData.isNotEmpty) {
+                    double sensorValue = double.tryParse(sensorData.first["Value"].toString()) ?? 0;
+                    bars.add(
+                      BarChartRodData(
+                        toY: sensorValue,
+                        color: _getSensorColor(sensor),
+                        width: 16,
+                      ),
+                    );
+                  }
+                }
+
+                return BarChartGroupData(x: index, barRods: bars);
+              }),
+
+              barTouchData: BarTouchData(
+                touchTooltipData: BarTouchTooltipData(
+                  tooltipMargin: 30, // ✅ Move tooltips away
+                  getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                    String formattedTime = _formatTimestamp(timestamps[groupIndex]);
+                    return BarTooltipItem(
+                      "Sensor Value: ${rod.toY}\nTime: $formattedTime",
+                      const TextStyle(color: Colors.white, fontSize: 12),
+                    );
+                  },
+                  getTooltipColor: (group) => Colors.black87,
+                  tooltipRoundedRadius: 8,
+                  tooltipPadding: const EdgeInsets.all(8),
+                ),
               ),
+
+              titlesData: _buildChartTitles(timestamps),
             ),
           ),
-        ],
-      );
-    }
-
-    return const SizedBox();
+        ),
+      ],
+    );
   }
+
+  // ✅ If "Weekly", generate separate graphs per sensor type
+  if (widget.selectedFilter == "Weekly") {
+    return Container( // ✅ Removed Expanded to avoid constraint issues
+      padding: const EdgeInsets.symmetric(vertical: 10), // ✅ Adds spacing
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        child: Column(
+          children: sensorTypes.map((sensor) {
+            List<String> sensorTimestamps = [];
+            for (var entry in widget.frequencyData[sensor] ?? []) {
+              if (!sensorTimestamps.contains(entry["Time"])) {
+                sensorTimestamps.add(entry["Time"]);
+              }
+            }
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10), // ✅ Adds spacing between charts
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: _getSensorColor(sensor),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        sensor,
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  SizedBox(
+                    height: 300,
+                    child: BarChart(
+                      BarChartData(
+                        barGroups: List.generate(sensorTimestamps.length, (index) {
+                          String timeLabel = sensorTimestamps[index];
+                          List<BarChartRodData> bars = [];
+
+                          var sensorData = widget.frequencyData[sensor]
+                                  ?.where((data) => data["Time"] == timeLabel)
+                                  .toList() ??
+                              [];
+                          if (sensorData.isNotEmpty) {
+                            double sensorValue = double.tryParse(sensorData.first["Value"].toString()) ?? 0;
+                            bars.add(
+                              BarChartRodData(
+                                toY: sensorValue,
+                                color: _getSensorColor(sensor),
+                                width: 16,
+                              ),
+                            );
+                          }
+
+                          return BarChartGroupData(x: index, barRods: bars);
+                        }),
+
+                        barTouchData: BarTouchData(
+  touchTooltipData: BarTouchTooltipData(
+    fitInsideVertically: true,  // ✅ Prevents tooltip from clipping above
+    fitInsideHorizontally: true, // ✅ Ensures tooltip stays in view
+    tooltipPadding: const EdgeInsets.all(8), // ✅ Keeps tooltip properly sized
+    tooltipRoundedRadius: 8,
+    getTooltipItem: (group, groupIndex, rod, rodIndex) {
+      String formattedTime = _formatTimestamp(sensorTimestamps[groupIndex]);
+      return BarTooltipItem(
+        "Sensor Value: ${rod.toY}\nTime: $formattedTime",
+        const TextStyle(color: Colors.white, fontSize: 12),
+      );
+    },
+    getTooltipColor: (group) => Colors.black87,
+  ),
+),
+
+                        titlesData: _buildChartTitles(sensorTimestamps),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  return const SizedBox(); // Default fallback
+}
+
+
 
   /// ✅ **Move `_buildChartTitles` inside `FrequencyGraphWidget`**
   FlTitlesData _buildChartTitles(List<String> timestamps) {
@@ -2171,15 +2452,19 @@ class _FrequencyGraphWidgetState extends State<FrequencyGraphWidget> with Automa
 
   /// ✅ **Move `_getSensorColor` inside `FrequencyGraphWidget`**
   Color _getSensorColor(String sensor) {
-    switch (sensor.toLowerCase()) {
-      case "temperature":
-        return Colors.red;
-      case "moisture level":
-        return Colors.blue;
-      case "ph level":
-        return Colors.green;
-      default:
-        return Colors.grey;
+  switch (sensor.toLowerCase()) {
+    case "temperature":
+      return Colors.red;
+    case "moisture":
+      return Colors.blue;
+    case "ph_level":
+    return const Color.fromARGB(255, 83, 255, 88);
+    case "ph_level2":
+      return Colors.green;
+    case "humidity":
+      return Colors.orange; // 🌤️ Set a distinct color for humidity
+    default:
+      return Colors.grey; // Fallback for unknown sensors
     }
   }
 }

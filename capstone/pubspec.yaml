@@ -72,8 +72,21 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
+      
+
   assets:
     - assets/fonts/Roboto-Regular.ttf
+    - assets/fonts/Roboto-Thin.ttf
+    - assets/fonts/Roboto-ExtraLight.ttf
+    - assets/fonts/Roboto-Light.ttf
+    - assets/fonts/Roboto-Regular.ttf
+    - assets/fonts/Roboto-Medium.ttf
+    - assets/fonts/Roboto-SemiBold.ttf
+    - assets/fonts/Roboto-Bold.ttf
+    - assets/fonts/Roboto-ExtraBold.ttf
+    - assets/fonts/Roboto-Black.ttf
+    - assets/fonts/Roboto-Italic.ttf
+    - assets/fonts/Roboto-BoldItalic.ttf
     - assets/logo_login.png
     - assets/main_logo.png
     - assets/onboard_1.png
@@ -82,6 +95,8 @@ flutter:
     - assets/onboard_4.png
     - assets/bg.png
     # - assets/feature3.png
+
+
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
@@ -118,3 +133,31 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+fonts:
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/Roboto-Thin.ttf
+          weight: 100
+        - asset: assets/fonts/Roboto-ExtraLight.ttf
+          weight: 200
+        - asset: assets/fonts/Roboto-Light.ttf
+          weight: 300
+        - asset: assets/fonts/Roboto-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Roboto-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Roboto-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Roboto-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Roboto-ExtraBold.ttf
+          weight: 800
+        - asset: assets/fonts/Roboto-Black.ttf
+          weight: 900
+        - asset: assets/fonts/Roboto-Italic.ttf
+          style: italic
+        - asset: assets/fonts/Roboto-BoldItalic.ttf
+          weight: 700
+          style: italic
+
