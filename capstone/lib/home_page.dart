@@ -1683,6 +1683,7 @@ class _DashboardPageState extends State<DashboardPage> {
     try {
       final supabase = Supabase.instance.client;
 
+      // ✅ Fetch Start Date from `Hardware_Sensors_Test`
       final sensorData = await supabase
           .from('Hardware_Sensors_Test')
           .select('start_date')
@@ -1690,51 +1691,68 @@ class _DashboardPageState extends State<DashboardPage> {
           .maybeSingle();
 
       if (sensorData == null || sensorData['start_date'] == null) {
-        print(
-            "No start date found in Hardware_Sensors_Test for hardware ID: $hardwareId");
+        print("No start date found for hardware ID: $hardwareId");
         return;
       }
 
       final startDate = sensorData['start_date'];
       print("Fetched start date: $startDate");
 
-      // Step 3: Store the fetched start_date in Compost_Data
-      await supabase.from('Compost_Data').insert({
-        'hardware_id': hardwareId,
-        'start_date': startDate,
-        'end_date': DateTime.now().toIso8601String(),
-      });
+      // ✅ Fetch the logged-in user's ID
+      final prefs = await SharedPreferences.getInstance();
+      String? userIdString = prefs.getString("user_id_pref");
+      int? userId = userIdString != null ? int.tryParse(userIdString) : null;
+
+      if (userId == null) {
+        print("❌ Error: User ID not found.");
+        return;
+      }
+
+      // ✅ Fetch `fullname` of the logged-in user
+      final userResponse = await supabase
+          .from('Users')
+          .select('fullname')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+      String retrievedBy = userResponse?['fullname'] ?? "Unknown";
+
+      // ✅ Update existing row instead of inserting a new one
+      final updateResponse = await supabase
+          .from('Compost_Data')
+          .update({
+            'end_date': DateTime.now().toIso8601String(),
+            'retrieved_by': retrievedBy, // ✅ Store the user who retrieved it
+          })
+          .eq('hardware_id', hardwareId)
+          .select();
+
+      if (updateResponse.isEmpty) {
+        print("❌ Error: No rows updated in Compost_Data.");
+        return;
+      }
+
       print(
-          "Inserted compost data for hardware ID: $hardwareId with start date: $startDate");
+          "✅ Compost data updated for hardware ID: $hardwareId, retrieved by: $retrievedBy");
 
-// naka comment to kase risky mag null sa Hardware_Sensors_Test
-      // Step 4: Nullify all sensor data in Hardware_Sensors_Test (except hardware_id & qr_value)
+      // ✅ Nullify `start_date` in `Hardware_Sensors_Test`
+      await supabase
+          .from('Hardware_Sensors_Test')
+          .update({'start_date': null}).eq('hardware_id', hardwareId);
 
-      final updateResponse =
-          await supabase.from('Hardware_Sensors_Test').update({
-        'start_date': null,
-        // 'ph_level': null,  comment out muna kase risky i nullify to lahat
-        // 'ph_level2': null,
-        // 'humidity': null,
-        // 'temperature': null,
-        // 'moisture': null,
-        // 'refreshed_date': null,
-      }).eq('hardware_id', hardwareId);
+      print("✅ Start date set to NULL for hardware ID: $hardwareId");
 
-      if (updateResponse.error != null) {
-        print(
-            "Error updating Hardware_Sensors_Test: ${updateResponse.error!.message}");
-      } else {
-        print(
-            "Successfully cleared sensor data in Hardware_Sensors_Test for hardware ID: $hardwareId");
-      }
-
-      // ✅ Refresh the UI to reflect changes
+      // ✅ Refresh UI
       if (mounted) {
-        setState(() {});
+        setState(() {
+          _containerAddedDate = null;
+          _calculateContainerAge();
+        });
       }
+
+      _refreshData(); // ✅ Ensure UI updates properly
     } catch (e) {
-      print("Error retrieving compost: $e");
+      print("🚨 Error retrieving compost: $e");
     }
   }
 
@@ -1896,9 +1914,32 @@ class _DashboardPageState extends State<DashboardPage> {
 
       String formattedDate = selectedDate!.toIso8601String();
 
+      final prefs = await SharedPreferences.getInstance();
+      String? userIdString = prefs.getString("user_id_pref");
+      int? userId = userIdString != null ? int.tryParse(userIdString) : null;
+
+      if (userId == null) {
+        print("❌ Error: User ID not found.");
+        return;
+      }
+
+      // ✅ Fetch full name instead of username
+      final userResponse = await Supabase.instance.client
+          .from('Users')
+          .select('fullname') // ✅ Use fullname
+          .eq('user_id', userId)
+          .maybeSingle();
+
+      String startedBy =
+          userResponse != null ? userResponse['fullname'] : "Unknown";
+
+      // ✅ Update `start_date` & `started_by` in `Hardware_Sensors_Test`
       final updateResponse = await Supabase.instance.client
           .from('Hardware_Sensors_Test')
-          .update({'start_date': formattedDate})
+          .update({
+            'start_date': formattedDate,
+            'started_by': startedBy, // ✅ Store full name
+          })
           .eq('hardware_id', selectedHardwareId!)
           .select()
           .single();
@@ -1908,12 +1949,25 @@ class _DashboardPageState extends State<DashboardPage> {
         return;
       }
 
+      // ✅ Insert into `Compost_Data` with `started_by` (No `container_id`)
+      final compostInsertResponse =
+          await Supabase.instance.client.from('Compost_Data').insert({
+        'hardware_id': selectedHardwareId!, // ✅ Removed `container_id`
+        'start_date': formattedDate,
+        'started_by': startedBy, // ✅ Store who started the compost
+      }).select();
+
+      if (compostInsertResponse == null || compostInsertResponse.isEmpty) {
+        print("❌ Error: Compost_Data insert failed.");
+        return;
+      }
+
       setState(() {
         _containerAddedDate = selectedDate;
         _calculateContainerAge();
       });
 
-      print("✅ Compost start date updated successfully!");
+      print("✅ Compost start date updated successfully by: $startedBy");
 
       // ✅ Call `_refreshData()` to update UI
       _refreshData();

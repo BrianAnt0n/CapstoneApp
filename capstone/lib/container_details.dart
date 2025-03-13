@@ -39,7 +39,15 @@ class _ContainerDetailsState extends State<ContainerDetails> {
               return _buildEmptyState();
             }
 
-            final pastCompostList = snapshot.data!;
+            // ✅ Filter out compost entries where end_date is NULL (not retrieved)
+            final pastCompostList = snapshot.data!
+                .where((compost) => compost['end_date'] != null)
+                .toList();
+
+            if (pastCompostList.isEmpty) {
+              return _buildEmptyState();
+            }
+
             return ListView.builder(
               itemCount: pastCompostList.length,
               itemBuilder: (context, index) {
@@ -63,7 +71,6 @@ class _ContainerDetailsState extends State<ContainerDetails> {
     return response ?? [];
   }
 
-// 📌 Build a compost card with compost status and weeks before retrieval
   Widget _buildCompostCard(Map<String, dynamic> compost) {
     DateTime startDate = DateTime.parse(compost['start_date']);
     DateTime? endDate = compost['end_date'] != null
@@ -75,104 +82,132 @@ class _ContainerDetailsState extends State<ContainerDetails> {
     Color statusColor = _getStatusColor(weeksBeforeRetrieval);
 
     return Card(
-      elevation: 5,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      margin: const EdgeInsets.symmetric(vertical: 10),
+      elevation: 6,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 📌 Compost Icon
+            // 📌 Compost Cycle Title
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: statusColor.withOpacity(0.1),
+                  ),
+                  child: Icon(Icons.recycling, size: 28, color: statusColor),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  "Compost Cycle",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blueAccent.shade700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // 📌 Compost Dates
+            _buildInfoRow(Icons.calendar_today, "Start Date",
+                _formatDate(compost['start_date']), Colors.blueAccent),
+            _buildInfoRow(Icons.event, "End Date",
+                _formatDate(compost['end_date']), Colors.redAccent),
+
+            const Divider(height: 20, thickness: 1),
+
+            // 📌 Weeks Before Retrieval
+            Row(
+              children: [
+                Icon(Icons.schedule, size: 18, color: Colors.orangeAccent),
+                const SizedBox(width: 8),
+                Text(
+                  "Week Duration: $weeksBeforeRetrieval weeks",
+                  style: const TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+
+            // 📌 Compost Status
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
               decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: statusColor.withOpacity(0.1),
+                color: statusColor.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(Icons.recycling, size: 30, color: statusColor),
-            ),
-            const SizedBox(width: 16),
-
-            // 📌 Compost Date Details & Status
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Compost Cycle",
-                    style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blueAccent.shade700),
-                  ),
-                  const SizedBox(height: 5),
-                  Row(
-                    children: [
-                      const Icon(Icons.calendar_today,
-                          size: 16, color: Colors.blueAccent),
-                      const SizedBox(width: 8),
-                      Text("Start: ${_formatDate(compost['start_date'])}",
-                          style:
-                              TextStyle(fontSize: 14, color: Colors.grey[700])),
-                    ],
-                  ),
-                  Row(
-                    children: [
-                      const Icon(Icons.event,
-                          size: 16, color: Colors.redAccent),
-                      const SizedBox(width: 8),
-                      Text("End: ${_formatDate(compost['end_date'])}",
-                          style:
-                              TextStyle(fontSize: 14, color: Colors.grey[700])),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-
-                  // 📌 Display Weeks Before Retrieval
-                  Text(
-                    "Week Duration: $weeksBeforeRetrieval weeks",
-                    style: const TextStyle(
-                        fontSize: 14, fontWeight: FontWeight.w500),
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  // 📌 Compost Status
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(vertical: 4, horizontal: 10),
-                    decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      status,
-                      style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: statusColor),
-                    ),
-                  ),
-                ],
+              child: Text(
+                status,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: statusColor,
+                ),
               ),
             ),
+
+            const Divider(height: 20, thickness: 1),
+
+            // 📌 Started by & Retrieved by
+            _buildInfoRow(Icons.person, "Started by",
+                compost['started_by'] ?? "Unknown", Colors.green),
+            _buildInfoRow(Icons.person_outline, "Retrieved by",
+                compost['retrieved_by'] ?? "Unknown", Colors.brown),
           ],
         ),
       ),
     );
   }
 
-// 📌 Calculate Weeks Before Retrieval
+// 📌 Helper Function for Creating Info Rows
+  Widget _buildInfoRow(
+      IconData icon, String label, String value, Color iconColor) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: iconColor),
+          const SizedBox(width: 8),
+          Text(
+            "$label:",
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+// ✅ Fix: Ensure correct week calculation & prevent 0 weeks Overcomposted
   int _calculateWeeksBeforeRetrieval(DateTime startDate, DateTime? endDate) {
-    final today = DateTime.now();
-    return endDate == null
-        ? today.difference(startDate).inDays ~/ 7
-        : endDate.difference(startDate).inDays ~/ 7;
+    if (endDate == null) return 0; // Default to 0 if no end date
+
+    int daysDifference = endDate.difference(startDate).inDays;
+    int weeks = daysDifference ~/ 7;
+
+    return weeks; // Ensure correct week calculation
   }
 
 // 📌 Determine Compost Status Based on Weeks Before Retrieval
+// ✅ Fix: Prevent "0 Weeks Overcomposted"
   String _getCompostStatus(int weeks) {
-    if (weeks >= 1 && weeks <= 7) {
+    if (weeks == 0) {
+      return "Retrieved Early: Not Ready"; // ✅ Fix: 0 weeks should be "Not Ready"
+    } else if (weeks >= 1 && weeks <= 7) {
       return "Retrieved Early: Not Ready"; // 🔴 Too soon
     } else if (weeks >= 8 && weeks <= 11) {
       return "Premature Compost Retrieval"; // 🟠 Taken before optimal composting
@@ -182,6 +217,7 @@ class _ContainerDetailsState extends State<ContainerDetails> {
       return "Overcomposted"; // ⚫ Left too long
     }
   }
+
 
 // 📌 Assign Status Colors Based on Weeks Before Retrieval
   Color _getStatusColor(int weeks) {
@@ -195,7 +231,6 @@ class _ContainerDetailsState extends State<ContainerDetails> {
       return Colors.grey; // ⚫ Overcomposted
     }
   }
-
 
 // 📌 Calculate Compost Status Based on `_calculateContainerAge` logic
   String _calculateCompostStatus(DateTime startDate, DateTime? endDate) {
