@@ -77,9 +77,9 @@ Future<void> checkForNotifications() async {
   List<int> hardwareIds = hardwareIdToContainerName.keys.toList();
   int lastSeenId = prefs.getInt('last_seen_notification') ?? -1;
 
-// =======
-//   DateTime fiveMinutesAgo = DateTime.now().subtract(Duration(minutes: 5));
-// >>>>>>> master
+DateTime fiveMinutesAgo = DateTime.now().subtract(Duration(minutes: 5));
+DateTime now = DateTime.now();
+
   print("🔢 Last seen notification ID: $lastSeenId");
 
   try {
@@ -88,14 +88,13 @@ Future<void> checkForNotifications() async {
         .select()
         .order('notification_id', ascending: true);
 
-    final filteredNotifications = response.where((n) => 
-      hardwareIds.contains(n['hardware_id']) && 
-      n['notification_id'] > lastSeenId && 
-      hardwareIdToContainerName.containsKey(n['hardware_id'])
-//       hardwareIdToContainerName.containsKey(n['hardware_id']) &&
-//       DateTime.parse(n['timestamp']).isAfter(fiveMinutesAgo)
-// >>>>>>> master
-    ).toList();
+final filteredNotifications = response.where((n) => 
+  hardwareIds.contains(n['hardware_id']) && 
+  n['notification_id'] > lastSeenId &&
+  hardwareIdToContainerName.containsKey(n['hardware_id']) &&
+  DateTime.parse(n['timestamp']).isAfter(fiveMinutesAgo) &&
+  DateTime.parse(n['timestamp']).isBefore(now)
+).toList();
 
     if (filteredNotifications.isEmpty) {
       print("⚠ No new notifications found.");
