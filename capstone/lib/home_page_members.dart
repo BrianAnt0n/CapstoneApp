@@ -228,6 +228,7 @@ class DashboardPage extends StatefulWidget {
   _DashboardPageState createState() => _DashboardPageState();
 }
 
+List<DateTime> _noteDates = [];
 DateTime? _containerAddedDate; // Holds the compost start date
 
 class _DashboardPageState extends State<DashboardPage> {
@@ -276,8 +277,19 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   void initState() {
     super.initState();
+    _loadUserId(); //
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _refreshData(); // ✅ Automatically refresh data when opening the dashboard
+      _refreshData();
+    });
+  }
+
+  int? userId;
+
+  Future<void> _loadUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      userId = prefs.getInt('user_id'); // Ensure key name matches storage
     });
   }
 
@@ -301,6 +313,7 @@ class _DashboardPageState extends State<DashboardPage> {
         _historyFuture =
             fetchHistoryData(selectedContainerId!); // ✅ Fetch history
       });
+      _noteDates = await fetchNoteDates(hardwareId);
     }
 
     FocusScope.of(context).unfocus();
@@ -316,6 +329,28 @@ class _DashboardPageState extends State<DashboardPage> {
         .maybeSingle();
 
     return containerResponse?['hardware_id']; // ✅ Returns correct hardware_id
+  }
+
+  Future<int?> _fetchHardwareId(int containerId) async {
+    try {
+      final response = await Supabase.instance.client
+          .from('Containers_test') // ✅ Correct table
+          .select('hardware_id')
+          .eq('container_id', containerId)
+          .maybeSingle(); // ✅ Avoids errors if no data
+
+      if (response != null && response['hardware_id'] != null) {
+        print(
+            "Fetched hardware_id: ${response['hardware_id']} for container_id: $containerId");
+        return response['hardware_id'] as int;
+      } else {
+        print("No hardware_id found for container_id: $containerId");
+        return null;
+      }
+    } catch (error) {
+      print("Error fetching hardware_id: $error");
+      return null;
+    }
   }
 
   Future<void> _deleteNoteImage(int noteId, String imageUrl) async {
@@ -512,46 +547,6 @@ class _DashboardPageState extends State<DashboardPage> {
     } catch (error) {
       print("Error fetching hardware_id: $error");
       return null;
-    }
-  }
-
-  Future<int?> _fetchHardwareId(int containerId) async {
-    try {
-      final response = await Supabase.instance.client
-          .from('Containers_test') // ✅ Correct table
-          .select('hardware_id')
-          .eq('container_id', containerId)
-          .maybeSingle(); // ✅ Avoids errors if no data
-
-      if (response != null && response['hardware_id'] != null) {
-        print(
-            "Fetched hardware_id: ${response['hardware_id']} for container_id: $containerId");
-        return response['hardware_id'] as int;
-      } else {
-        print("No hardware_id found for container_id: $containerId");
-        return null;
-      }
-    } catch (error) {
-      print("Error fetching hardware_id: $error");
-      return null;
-    }
-  }
-
-  Future<List<DateTime>> fetchNoteDates(int hardwareId) async {
-    final supabase = Supabase.instance.client;
-    try {
-      final response = await supabase
-          .from('Notes_test_test')
-          .select('created_date')
-          .eq('hardware_id', hardwareId);
-
-      return response
-          .map<DateTime>(
-              (note) => DateTime.parse(note['created_date']).toLocal())
-          .toList();
-    } catch (error) {
-      print("Error fetching note dates: $error");
-      return [];
     }
   }
 
@@ -1118,6 +1113,25 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
+// Add this function to fetch dates with notes
+  Future<List<DateTime>> fetchNoteDates(int hardwareId) async {
+    final supabase = Supabase.instance.client;
+    try {
+      final response = await supabase
+          .from('Notes_test_test')
+          .select('created_date')
+          .eq('hardware_id', hardwareId);
+
+      return response
+          .map<DateTime>(
+              (note) => DateTime.parse(note['created_date']).toLocal())
+          .toList();
+    } catch (error) {
+      print("Error fetching note dates: $error");
+      return [];
+    }
+  }
+
   void _openFullCalendar() {
     //Ensure keyboard is fully dismissed before opening the calendar
     FocusScope.of(context).requestFocus(FocusNode());
@@ -1483,7 +1497,6 @@ class _DashboardPageState extends State<DashboardPage> {
     return weeks;
   }
 
-
 //notes image section
   final SupabaseClient supabase = Supabase.instance.client;
 
@@ -1671,6 +1684,7 @@ class _DashboardPageState extends State<DashboardPage> {
     try {
       final supabase = Supabase.instance.client;
 
+      // ✅ Fetch Start Date from `Hardware_Sensors_Test`
       final sensorData = await supabase
           .from('Hardware_Sensors_Test')
           .select('start_date')
@@ -1678,35 +1692,68 @@ class _DashboardPageState extends State<DashboardPage> {
           .maybeSingle();
 
       if (sensorData == null || sensorData['start_date'] == null) {
-        print(
-            "No start date found in Hardware_Sensors_Test for hardware ID: $hardwareId");
+        print("No start date found for hardware ID: $hardwareId");
         return;
       }
 
       final startDate = sensorData['start_date'];
       print("Fetched start date: $startDate");
 
-      // ✅ Step 3: Store the fetched start_date in Compost_Data
-      await supabase.from('Compost_Data').insert({
-        'hardware_id': hardwareId,
-        'start_date': startDate,
-        'end_date': DateTime.now().toIso8601String(),
-      });
+      // ✅ Fetch the logged-in user's ID
+      final prefs = await SharedPreferences.getInstance();
+      String? userIdString = prefs.getString("user_id_pref");
+      int? userId = userIdString != null ? int.tryParse(userIdString) : null;
+
+      if (userId == null) {
+        print("❌ Error: User ID not found.");
+        return;
+      }
+
+      // ✅ Fetch `fullname` of the logged-in user
+      final userResponse = await supabase
+          .from('Users')
+          .select('fullname')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+      String retrievedBy = userResponse?['fullname'] ?? "Unknown";
+
+      // ✅ Update existing row instead of inserting a new one
+      final updateResponse = await supabase
+          .from('Compost_Data')
+          .update({
+            'end_date': DateTime.now().toIso8601String(),
+            'retrieved_by': retrievedBy, // ✅ Store the user who retrieved it
+          })
+          .eq('hardware_id', hardwareId)
+          .select();
+
+      if (updateResponse.isEmpty) {
+        print("❌ Error: No rows updated in Compost_Data.");
+        return;
+      }
+
       print(
-          "Inserted compost data for hardware ID: $hardwareId with start date: $startDate");
+          "✅ Compost data updated for hardware ID: $hardwareId, retrieved by: $retrievedBy");
 
-      // ✅ Step 4: Nullify start_date in Hardware_Sensors_Test
-      await supabase.from('Hardware_Sensors_Test').update({
-        'start_date': null,
-      }).eq('hardware_id', hardwareId);
+      // ✅ Nullify `start_date` in `Hardware_Sensors_Test`
+      await supabase
+          .from('Hardware_Sensors_Test')
+          .update({'start_date': null}).eq('hardware_id', hardwareId);
 
-      print(
-          "Successfully cleared start_date in Hardware_Sensors_Test for hardware ID: $hardwareId");
+      print("✅ Start date set to NULL for hardware ID: $hardwareId");
 
-      // ✅ Refresh UI after retrieval
-      _refreshData();
+      // ✅ Refresh UI
+      if (mounted) {
+        setState(() {
+          _containerAddedDate = null;
+          _calculateContainerAge();
+        });
+      }
+
+      _refreshData(); // ✅ Ensure UI updates properly
     } catch (e) {
-      print("Error retrieving compost: $e");
+      print("🚨 Error retrieving compost: $e");
     }
   }
 
@@ -1868,9 +1915,32 @@ class _DashboardPageState extends State<DashboardPage> {
 
       String formattedDate = selectedDate!.toIso8601String();
 
+      final prefs = await SharedPreferences.getInstance();
+      String? userIdString = prefs.getString("user_id_pref");
+      int? userId = userIdString != null ? int.tryParse(userIdString) : null;
+
+      if (userId == null) {
+        print("❌ Error: User ID not found.");
+        return;
+      }
+
+      // ✅ Fetch full name instead of username
+      final userResponse = await Supabase.instance.client
+          .from('Users')
+          .select('fullname') // ✅ Use fullname
+          .eq('user_id', userId)
+          .maybeSingle();
+
+      String startedBy =
+          userResponse != null ? userResponse['fullname'] : "Unknown";
+
+      // ✅ Update `start_date` & `started_by` in `Hardware_Sensors_Test`
       final updateResponse = await Supabase.instance.client
           .from('Hardware_Sensors_Test')
-          .update({'start_date': formattedDate})
+          .update({
+            'start_date': formattedDate,
+            'started_by': startedBy, // ✅ Store full name
+          })
           .eq('hardware_id', selectedHardwareId!)
           .select()
           .single();
@@ -1880,12 +1950,25 @@ class _DashboardPageState extends State<DashboardPage> {
         return;
       }
 
+      // ✅ Insert into `Compost_Data` with `started_by` (No `container_id`)
+      final compostInsertResponse =
+          await Supabase.instance.client.from('Compost_Data').insert({
+        'hardware_id': selectedHardwareId!, // ✅ Removed `container_id`
+        'start_date': formattedDate,
+        'started_by': startedBy, // ✅ Store who started the compost
+      }).select();
+
+      if (compostInsertResponse == null || compostInsertResponse.isEmpty) {
+        print("❌ Error: Compost_Data insert failed.");
+        return;
+      }
+
       setState(() {
         _containerAddedDate = selectedDate;
         _calculateContainerAge();
       });
 
-      print("✅ Compost start date updated successfully!");
+      print("✅ Compost start date updated successfully by: $startedBy");
 
       // ✅ Call `_refreshData()` to update UI
       _refreshData();
@@ -1955,6 +2038,7 @@ class _DashboardPageState extends State<DashboardPage> {
       ],
     );
   }
+
 // // Function to show the full-screen data report
 //   void _showDataReportDialog(
 //       BuildContext context, int selectedContainerId) async {
@@ -2462,7 +2546,6 @@ class _DashboardPageState extends State<DashboardPage> {
 
                     const SizedBox(height: 10),
 
-// Styled TextField for Notes with Inline Buttons
                     Container(
                       decoration: BoxDecoration(
                         color: Colors.grey[200],
@@ -2473,37 +2556,55 @@ class _DashboardPageState extends State<DashboardPage> {
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          // Expanded TextField
+                          // ✅ Enable TextField when `start_date` is NOT null
                           Expanded(
                             child: TextField(
                               controller: _notesController,
                               maxLines: 3,
                               style: const TextStyle(fontSize: 16),
-                              decoration: const InputDecoration(
-                                hintText: 'Write your note here...',
+                              readOnly: _containerAddedDate ==
+                                  null, // ✅ Disable if start_date is null
+                              decoration: InputDecoration(
+                                hintText: _containerAddedDate == null
+                                    ? "Notes are disabled until compost starts."
+                                    : "Write your note here...",
                                 border: InputBorder.none,
+                                hintStyle: TextStyle(
+                                  color: _containerAddedDate == null
+                                      ? Colors.grey
+                                      : Colors.black,
+                                ),
                               ),
                             ),
                           ),
 
                           const SizedBox(width: 8),
 
-                          // Column for Buttons (Stacked Vertically)
+                          // ✅ Enable Buttons when `start_date` is NOT null
                           Column(
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
                               IconButton(
-                                onPressed: _isLoading ? null : _addNote,
+                                onPressed:
+                                    (_containerAddedDate == null || _isLoading)
+                                        ? null
+                                        : _addNote,
                                 icon: _isLoading
                                     ? const CircularProgressIndicator()
                                     : const Icon(Icons.add_comment_outlined),
-                                color: Colors.green,
+                                color: _containerAddedDate == null
+                                    ? Colors.grey
+                                    : Colors.green,
                                 tooltip: "Add Note",
                               ),
                               IconButton(
-                                onPressed: _uploadPicture,
+                                onPressed: _containerAddedDate == null
+                                    ? null
+                                    : _uploadPicture,
                                 icon: const Icon(Icons.image),
-                                color: Colors.brown,
+                                color: _containerAddedDate == null
+                                    ? Colors.grey
+                                    : Colors.brown,
                                 tooltip: "Upload Picture",
                               ),
                             ],
@@ -2520,7 +2621,16 @@ class _DashboardPageState extends State<DashboardPage> {
                       builder: (context, snapshot) {
                         print(
                             "Notes FutureBuilder State: ${snapshot.connectionState}");
-                        print("Notes Data: ${snapshot.data}");
+
+                        if (_containerAddedDate == null) {
+                          return const Center(
+                            child: Text(
+                              "Notes are disabled. Compost not started.",
+                              style:
+                                  TextStyle(fontSize: 16, color: Colors.grey),
+                            ),
+                          );
+                        }
 
                         if (snapshot.connectionState ==
                             ConnectionState.waiting) {
@@ -2528,10 +2638,15 @@ class _DashboardPageState extends State<DashboardPage> {
                               child: CircularProgressIndicator());
                         } else if (snapshot.hasError || snapshot.data == null) {
                           print("Error fetching notes: ${snapshot.error}");
-                          return const Text('No notes found.');
+                          return const Center(child: Text('No notes found.'));
                         } else {
                           final notes =
                               snapshot.data as List<Map<String, dynamic>>;
+
+                          if (notes.isEmpty) {
+                            return const Center(
+                                child: Text('No notes available.'));
+                          }
 
                           print("Fetched ${notes.length} notes.");
                           return Column(
