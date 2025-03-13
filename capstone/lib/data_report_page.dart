@@ -11,6 +11,9 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart'; // ✅ Fixes rootBundle issue
+import 'package:flutter/foundation.dart';
+
 
 class DataReportPage extends StatefulWidget {
   final int selectedHardwareId; // ✅ Using hardware_id
@@ -29,18 +32,27 @@ class _DataReportPageState extends State<DataReportPage> {
   Map<String, String> firstDateData = {};
   Map<String, String> secondDateData = {};
   Map<String, List<dynamic>> frequencyAnalysisData = {};
+  bool isExportingPDF = false;
 
   String comparisonSummary = "";
   String frequencySummary = "";
 
   final GlobalKey comparisonGraphKey = GlobalKey();
-  final GlobalKey frequencyGraphKey = GlobalKey();
+final GlobalKey frequencyGraphKey = GlobalKey();
+
+
+  final GlobalKey<_ComparisonGraphWidgetState> comparisonGraphWidgetKey = GlobalKey<_ComparisonGraphWidgetState>();
+ final GlobalKey<_FrequencyGraphWidgetState> frequencyGraphWidgetKey = GlobalKey<_FrequencyGraphWidgetState>();
+
 
   @override
   void initState() {
     super.initState();
-    firstSelectedDate = DateTime.now();
-    secondSelectedDate = DateTime.now();
+
+    firstSelectedDate = DateTime.now().subtract(const Duration(days: 1)); // ✅ Default to Yesterday
+  secondSelectedDate = DateTime.now().subtract(const Duration(days: 2)); // ✅ Default to 2 days ago
+
+
     _initializeData();
   }
 
@@ -64,14 +76,16 @@ class _DataReportPageState extends State<DataReportPage> {
     });
 
     firstDateData = await _fetchHistoricalData(firstSelectedDate, hardwareId!);
-    frequencyAnalysisData =
-        await _fetchFrequencyAnalysis(hardwareId!) ??
+    secondDateData = await _fetchHistoricalData(secondSelectedDate, hardwareId!); // ✅ Fetch second date data
+    frequencyAnalysisData = await _fetchFrequencyAnalysis(hardwareId!) ??
         {}; // ✅ Fetch data for the graph
 
     setState(() {
       print("🔄 UI Updated with fetched data for User: $storedEmail");
     });
   }
+
+  
 
   // Date Picker Tile Widget
   Widget _buildDatePickerTile(
@@ -102,64 +116,87 @@ class _DataReportPageState extends State<DataReportPage> {
   }
 
   // Data Card Widget
-  Widget _buildDataCard(
-    String title,
-    Map<String, String> data,
-    bool isFirstDate,
-  ) {
-    return Card(
-      color: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      elevation: 3,
-      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
-              ),
+Widget _buildDataCard(String title, Map<String, String> data, bool isFirstDate) {
+  return Card(
+    color: Colors.white,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    elevation: 3,
+    margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+    child: Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
             ),
-            const Divider(color: Colors.black45),
-            ...data.entries.map((entry) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      entry.key,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        color: Colors.black54,
-                      ),
+          ),
+          const Divider(color: Colors.black45),
+          ...data.entries.map((entry) {
+            String formattedValue = _formatSensorValue(entry.key, entry.value); // ✅ Format the value
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    entry.key,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Colors.black54,
                     ),
-                    Text(
-                      entry.value,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color:
-                            isFirstDate
-                                ? Colors.blue
-                                : Colors
-                                    .green, // ✅ Dynamic Color Matching Graph
-                      ),
+                  ),
+                  Text(
+                    formattedValue, // ✅ Use formatted value
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: isFirstDate ? Colors.blue : Colors.green, 
                     ),
-                  ],
-                ),
-              );
-            }),
-          ],
-        ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
       ),
-    );
+    ),
+  );
+}
+
+// Helper function to format sensor values in Data Card
+String _formatSensorValue(String sensor, dynamic value) {
+  double? parsedValue;
+
+  // ✅ If value is already a double, use it directly
+  if (value is double) {
+    parsedValue = value;
+  } else if (value is String) {
+    parsedValue = double.tryParse(value.replaceAll("°C", "").replaceAll("%", ""));
   }
+
+  if (parsedValue == null) return value.toString(); // Return original value if parsing fails
+
+  switch (sensor.toLowerCase()) {
+    case "temperature":
+      return "${parsedValue.toStringAsFixed(1)}°C"; // 1 decimal place
+    case "moisture level":
+      return "${parsedValue.toInt()}%"; // Whole number
+    case "ph level 1":
+    case "ph level 2":
+      return parsedValue.toStringAsFixed(2); // 2 decimal places
+    case "humidity":
+      return "${parsedValue.toInt()}%"; // Whole number
+    default:
+      return value.toString(); // Fallback case
+  }
+}
+
+
 
   String selectedFilter = "Daily"; // Default filter
 
@@ -167,42 +204,47 @@ class _DataReportPageState extends State<DataReportPage> {
     DateTime date,
     int hardwareId,
   ) async {
-    String startOfDay = "${DateFormat('yyyy-MM-dd').format(date)} 00:00:00";
-    String endOfDay = "${DateFormat('yyyy-MM-dd').format(date)} 23:59:59";
+    
+  String startOfDay = "${DateFormat('yyyy-MM-dd').format(date)} 00:00:00";
+  String endOfDay = "${DateFormat('yyyy-MM-dd').format(date)} 23:59:59";
 
-    print(
-      "🔍 Fetching historical data for hardware_id: $hardwareId between $startOfDay and $endOfDay",
-    );
+  print("🔍 Fetching historical data for hardware_id: $hardwareId between $startOfDay and $endOfDay");
+  
 
-    try {
-      final response =
-          await Supabase.instance.client
-              .from('History_Test')
-              .select()
-              .eq('hardware_id', hardwareId)
-              .gte('timestamp', startOfDay)
-              .lte('timestamp', endOfDay)
-              .order('timestamp', ascending: false)
-              .limit(1)
-              .maybeSingle();
+  try {
+    final response = await Supabase.instance.client
+        .from('History_Test')
+        .select()
+        .eq('hardware_id', hardwareId)
+        .gte('timestamp', startOfDay)
+        .lte('timestamp', endOfDay)
+        .order('timestamp', ascending: false)
+        .limit(1)
+        .maybeSingle();
 
-      if (response == null) {
-        print("🚨 No data found for hardware_id: $hardwareId on $startOfDay");
-        return _defaultData("N/A");
-      }
+    if (response == null) {
+      print("🚨 No data found for hardware_id: $hardwareId on $startOfDay");
+      print("🟢 API Response: $response");
 
-      return {
-        "Temperature": "${response['temperature'] ?? 'N/A'}°C",
-        "Moisture Level": "${response['moisture'] ?? 'N/A'}%",
-        "pH Level 1": "${response['ph_level1'] ?? 'N/A'}",
-        "pH Level 2": "${response['ph_level2'] ?? 'N/A'}",
-        "Humidity": "${response['humidity'] ?? 'N/A'}%",
-      };
-    } catch (e) {
-      print("❌ Error fetching historical data: $e");
-      return _defaultData("Error");
+      return _defaultData("N/A");
     }
+
+    Map<String, String> parsedData = {
+      "Temperature": "${response['temperature'] ?? 'N/A'}°C",
+      "Moisture Level": "${response['moisture'] ?? 'N/A'}%",
+      "pH Level 1": "${response['ph_level1'] ?? 'N/A'}",
+      "pH Level 2": "${response['ph_level2'] ?? 'N/A'}",
+      "Humidity": "${response['humidity'] ?? 'N/A'}%",
+    };
+
+    print("✅ Parsed Data for $date: $parsedData");
+    return parsedData;
+  } catch (e) {
+    print("❌ Error fetching historical data: $e");
+    return _defaultData("Error");
   }
+}
+
 
   Future<Map<String, List<Map<String, dynamic>>>> _fetchFrequencyAnalysis(
     int hardwareId,
@@ -238,9 +280,18 @@ class _DataReportPageState extends State<DataReportPage> {
           .order('timestamp', ascending: true);
 
       if (response.isEmpty) {
-        print(
+        if (kDebugMode) {
+          print("🟢 Frequency Data Response: $response");
+        }
+        if (kDebugMode) {
+          print("🟢 API Response from Supabase: $response");
+        }
+
+        if (kDebugMode) {
+          print(
           "🚨 No notifications found for hardware_id: $hardwareId in the selected range",
         );
+        }
         return {};
       }
 
@@ -267,7 +318,9 @@ class _DataReportPageState extends State<DataReportPage> {
               "yyyy-MM-dd hh:mm a",
             ).format(DateTime.parse(entry['timestamp'].toString()));
           } catch (e) {
-            print("⚠️ Error parsing timestamp: ${entry['timestamp']} - $e");
+            if (kDebugMode) {
+              print("⚠️ Error parsing timestamp: ${entry['timestamp']} - $e");
+            }
           }
         }
 
@@ -280,7 +333,9 @@ class _DataReportPageState extends State<DataReportPage> {
 
       return groupedData;
     } catch (e) {
-      print("❌ Error fetching notification data: $e");
+      if (kDebugMode) {
+        print("❌ Error fetching notification data: $e");
+      }
       return {};
     }
   }
@@ -313,108 +368,90 @@ class _DataReportPageState extends State<DataReportPage> {
   }
 
   Widget _buildComparisonGraph() {
-    if (firstDateData.isEmpty || secondDateData.isEmpty) {
-      return const Center(child: Text("Select two dates to compare data."));
-    }
+    print("🟢 _buildComparisonGraph() is rebuilding. comparisonGraphKey exists: ${comparisonGraphKey.currentContext != null}");
 
-    List<String> labels = [
-      "Temperature",
-      "Moisture Level",
-      "pH Level 1",
-      "pH Level 2",
-      "Humidity",
-    ];
-    List<double> firstValues =
-        labels.map((label) {
-          return double.tryParse(
-                firstDateData[label]?.replaceAll(RegExp('[^0-9.]'), '') ?? "0",
-              ) ??
-              0;
-        }).toList();
+if (firstDateData.isEmpty || secondDateData.isEmpty) {
+   return const SizedBox(height: 300); // ✅ Maintain layout
+}
 
-    List<double> secondValues =
-        labels.map((label) {
-          return double.tryParse(
-                secondDateData[label]?.replaceAll(RegExp('[^0-9.]'), '') ?? "0",
-              ) ??
-              0;
-        }).toList();
+  List<String> labels = [
 
-    return Column(
-      children: [
-        // ✅ Legend Row
-        Wrap(
-          spacing: 12,
-          children:
-              labels.map((sensor) {
-                return Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(_getSensorIcon(sensor), size: 18, color: Colors.black),
-                    const SizedBox(width: 5),
-                    Text(
-                      sensor,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                );
-              }).toList(),
-        ),
+    "Temperature",
+    "Moisture Level",
+    "pH Level 1",
+    "pH Level 2",
+    "Humidity",
+  ];
 
-        const SizedBox(height: 13), // ✅ Adds spacing before the graph
-        // ✅ The Graph
-        SizedBox(
-          height: 300,
-          child: BarChart(
-            BarChartData(
-              barGroups: List.generate(labels.length, (index) {
-                return BarChartGroupData(
-                  x: index, // ✅ Use index directly for positioning
-                  barRods: [
-                    BarChartRodData(
-                      toY: firstValues[index],
-                      color: Colors.blue,
-                      width: 16,
-                    ),
-                    BarChartRodData(
-                      toY: secondValues[index],
-                      color: Colors.green,
-                      width: 16,
-                    ),
-                  ],
-                );
-              }),
-              titlesData: FlTitlesData(
-                topTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: false,
-                  ), // ✅ Hide numbers on top
-                ),
-                leftTitles: AxisTitles(
-                  sideTitles: SideTitles(showTitles: true, reservedSize: 40),
-                ),
-                bottomTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    getTitlesWidget: (value, _) {
-                      return Icon(
-                        _getSensorIcon(labels[value.toInt()]),
-                        size: 24,
-                        color: Colors.black54,
-                      );
-                    },
+  List<double> firstValues = labels.map((label) {
+  String rawValue = firstDateData[label]?.toString() ?? "0"; // ✅ Ensure it's a String
+  return double.tryParse(rawValue) ?? 0; // ✅ Convert String to double safely
+}).toList();
+
+List<double> secondValues = labels.map((label) {
+  String rawValue = secondDateData[label]?.toString() ?? "0"; // ✅ Ensure it's a String
+  return double.tryParse(rawValue) ?? 0; // ✅ Convert String to double safely
+}).toList();
+
+
+
+  return Column(
+    children: [
+      Wrap(
+        spacing: 12,
+        children: labels.map((sensor) {
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(_getSensorIcon(sensor), size: 18, color: Colors.black),
+              const SizedBox(width: 5),
+              Text(sensor, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            ],
+          );
+        }).toList(),
+      ),
+      const SizedBox(height: 13),
+      
+      SizedBox(
+        height: 300,
+        child: BarChart(
+          BarChartData(
+            barGroups: List.generate(labels.length, (index) {
+              return BarChartGroupData(
+                x: index,
+                barRods: [
+                  BarChartRodData(
+                    toY: firstValues[index],
+                    color: firstDateData.isNotEmpty ? Colors.blue : Colors.grey.withOpacity(0.3),
+                    width: 16,
                   ),
+                  BarChartRodData(
+                    toY: secondValues[index],
+                    color: secondDateData.isNotEmpty ? Colors.green : Colors.grey.withOpacity(0.3),
+                    width: 16,
+                  ),
+                ],
+              );
+            }),
+            titlesData: FlTitlesData(
+              topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 40)),
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  getTitlesWidget: (value, _) {
+                    return Icon(_getSensorIcon(labels[value.toInt()]), size: 24, color: Colors.black54);
+                  },
                 ),
               ),
             ),
           ),
         ),
-      ],
-    );
-  }
+      ),
+    ],
+  );
+}
+
 
   // Function to Map Sensor Type to Icons
   IconData _getSensorIcon(String sensorType) {
@@ -433,19 +470,19 @@ class _DataReportPageState extends State<DataReportPage> {
     }
   }
 
-  String _formatSensorValue(String sensorType, dynamic value) {
-    double parsedValue =
-        double.tryParse(value.toString()) ?? 0; // ✅ Ensure it's a number
+  // String _formatSensorValue(String sensorType, dynamic value) {
+  //   double parsedValue =
+  //       double.tryParse(value.toString()) ?? 0; // ✅ Ensure it's a number
 
-    if (sensorType.toLowerCase() == "moisture" ||
-        sensorType.toLowerCase() == "humidity") {
-      return "${parsedValue.round()}%"; // ✅ Round to whole number
-    } else if (sensorType.toLowerCase() == "temperature") {
-      return "${parsedValue.toStringAsFixed(1)}°C"; // ✅ Keep 1 decimal place
-    }
+  //   if (sensorType.toLowerCase() == "moisture" ||
+  //       sensorType.toLowerCase() == "humidity") {
+  //     return "${parsedValue.round()}%"; // ✅ Round to whole number
+  //   } else if (sensorType.toLowerCase() == "temperature") {
+  //     return "${parsedValue.toStringAsFixed(1)}°C"; // ✅ Keep 1 decimal place
+  //   }
 
-    return value.toString(); // ✅ Keep pH values as-is
-  }
+  //   return value.toString(); // ✅ Keep pH values as-is
+  // }
 
   FlTitlesData _buildChartTitles(List<String> timestamps) {
     return FlTitlesData(
@@ -485,7 +522,9 @@ class _DataReportPageState extends State<DataReportPage> {
                         ) // Mon 08:00 AM
                         : DateFormat("hh:mm a").format(parsedTime); // 08:00 AM
               } catch (e) {
-                print("⚠️ Error parsing timestamp: ${timestamps[index]} - $e");
+                if (kDebugMode) {
+                  print("⚠️ Error parsing timestamp: ${timestamps[index]} - $e");
+                }
               }
 
               // ✅ Adaptive Label Spacing
@@ -511,117 +550,340 @@ class _DataReportPageState extends State<DataReportPage> {
     );
   }
 
-  Future<void> _exportToPDF() async {
-    print("📄 Exporting PDF...");
 
-    final pdf = pw.Document();
 
-    // ✅ Title Page
-    pdf.addPage(
-      pw.Page(
-        build:
-            (pw.Context context) => pw.Center(
-              child: pw.Column(
-                mainAxisAlignment: pw.MainAxisAlignment.center,
-                children: [
-                  pw.Text(
-                    "Data Report Summary",
-                    style: pw.TextStyle(
-                      fontSize: 24,
-                      fontWeight: pw.FontWeight.bold,
-                    ),
-                  ),
-                  pw.SizedBox(height: 8),
-                  pw.Text("Generated on ${DateTime.now()}"),
-                ],
-              ),
-            ),
-      ),
-    );
+ Future<void> _exportToPDF() async {
+  setState(() {
+    isExportingPDF = true; // 🔄 Show Loading Indicator
+  });
 
-    // ✅ Add Data Comparison Summary (if available)
-    if (comparisonSummary.isNotEmpty) {
-      pdf.addPage(
-        pw.Page(
-          build:
-              (pw.Context context) => pw.Padding(
-                padding: const pw.EdgeInsets.all(16),
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Text(
-                      "📊 Data Comparison Summary",
-                      style: pw.TextStyle(
-                        fontSize: 18,
-                        fontWeight: pw.FontWeight.bold,
-                      ),
-                    ),
-                    pw.Text(comparisonSummary),
-                  ],
-                ),
-              ),
-        ),
-      );
-    }
-
-    // ✅ Add Time-Based Frequency Summary (if available)
-    if (frequencySummary.isNotEmpty) {
-      pdf.addPage(
-        pw.Page(
-          build:
-              (pw.Context context) => pw.Padding(
-                padding: const pw.EdgeInsets.all(16),
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Text(
-                      "📈 Time-Based Frequency Summary",
-                      style: pw.TextStyle(
-                        fontSize: 18,
-                        fontWeight: pw.FontWeight.bold,
-                      ),
-                    ),
-                    pw.Text(frequencySummary),
-                  ],
-                ),
-              ),
-        ),
-      );
-    }
-
-    List<Uint8List> images = await _captureGraphsAsImages();
-
-    if (images.isEmpty) {
-      print("❌ No images captured, aborting PDF export.");
-      return;
-    }
-
-    // ✅ Add Graphs in 2x2 Grid Layout
-    List<pw.Widget> graphWidgets = [];
-    for (var i = 0; i < images.length; i++) {
-      graphWidgets.add(
-        pw.Column(
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) {
+      return AlertDialog(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            pw.Image(pw.MemoryImage(images[i]), width: 200, height: 200),
-            pw.Text("Graph ${i + 1}"),
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text("Generating PDF, please wait..."),
           ],
         ),
       );
+    },
+  );
+
+  try {
+    if (kDebugMode) {
+      print("📄 Exporting PDF...");
     }
 
-    for (var i = 0; i < graphWidgets.length; i += 4) {
-      pdf.addPage(
-        pw.Page(
-          build:
-              (pw.Context context) => pw.GridView(
-                crossAxisCount: 2,
-                crossAxisSpacing: 10,
-                mainAxisSpacing: 10,
-                children: graphWidgets.sublist(
-                  i,
-                  i + 4 > graphWidgets.length ? graphWidgets.length : i + 4,
+    await Future.delayed(const Duration(milliseconds: 1000)); // Ensure UI updates
+
+    // 📂 Load Fonts
+    final regularFont = pw.Font.ttf(await rootBundle.load("assets/fonts/Roboto-Regular.ttf"));
+    final blackFont = pw.Font.ttf(await rootBundle.load("assets/fonts/Roboto-Black.ttf"));
+    final boldFont = pw.Font.ttf(await rootBundle.load("assets/fonts/Roboto-Bold.ttf"));
+    final lightFont = pw.Font.ttf(await rootBundle.load("assets/fonts/Roboto-Light.ttf"));
+    final italicFont = pw.Font.ttf(await rootBundle.load("assets/fonts/Roboto-Italic.ttf"));
+
+    final generatedDate = DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now());
+
+    // ✅ Ensure summaries are generated
+    if (comparisonSummary.trim().isEmpty) {
+      if (kDebugMode) {
+        print("❌ No data for comparisonSummary! Regenerating...");
+      }
+      _generateComparisonSummary();
+    }
+
+    if (frequencySummary.trim().isEmpty) {
+      if (kDebugMode) {
+        print("❌ No data for frequencySummary! Regenerating...");
+      }
+      _generateFrequencySummary();
+    }
+
+    // ✅ Format dates correctly
+    String firstDateFormatted = DateFormat('yyyy-MM-dd').format(firstSelectedDate);
+    String secondDateFormatted = DateFormat('yyyy-MM-dd').format(secondSelectedDate);
+
+    comparisonSummary = comparisonSummary
+        .replaceAll(firstSelectedDate.toString(), firstDateFormatted)
+        .replaceAll(secondSelectedDate.toString(), secondDateFormatted);
+
+    final pdf = pw.Document();
+
+    /// ✅ Page 1: Title Page
+    pdf.addPage(
+      pw.Page(
+        build: (pw.Context context) => pw.Center(
+          child: pw.Column(
+            mainAxisAlignment: pw.MainAxisAlignment.center,
+            crossAxisAlignment: pw.CrossAxisAlignment.center,
+            children: [
+              pw.Text("DATA REPORT SUMMARY", style: pw.TextStyle(fontSize: 32, font: blackFont, letterSpacing: 1.5)),
+              pw.SizedBox(height: 16),
+              pw.Text("Generated on $generatedDate", style: pw.TextStyle(font: italicFont, fontSize: 12, color: PdfColors.grey)),
+              pw.SizedBox(height: 24),
+              pw.Text("Confidential Document", style: pw.TextStyle(font: lightFont, fontSize: 10, color: PdfColors.grey500)),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    /// ✅ Helper for Bullet Points with Bold Formatting for Frequency Summary
+   pw.Widget _buildBulletPoints(String summary) {
+  List<String> lines = summary.split("\n").where((line) => line.isNotEmpty).toList();
+
+  return pw.Column(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    children: lines.map((line) {
+      pw.Widget bulletPoint;
+
+      // ✅ Remove ** formatting completely before parsing
+      String cleanLine = line.replaceAll("**", "");
+
+      // ✅ Detect "Daily" format
+      final dailyMatch = RegExp(r"The highest recorded value today for (.+?) was at (.+?) with a value of (.+?)\.").firstMatch(cleanLine);
+
+      // ✅ Detect "Weekly" format
+      final weeklyMatch = RegExp(r"The highest recorded (.+?) this week was (.+?) at (.+?)\.").firstMatch(cleanLine);
+
+      if (dailyMatch != null) {
+        final sensorType = dailyMatch.group(1)!;
+        final timestamp = dailyMatch.group(2)!;
+        final value = dailyMatch.group(3)!;
+
+        bulletPoint = pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text("• ", style: pw.TextStyle(font: boldFont, fontSize: 17)),
+            pw.Expanded(
+              child: pw.RichText(
+                text: pw.TextSpan(
+                  style: pw.TextStyle(font: regularFont, fontSize: 16),
+                  children: [
+                    const pw.TextSpan(text: "The highest recorded value today for "),
+                    pw.TextSpan(text: sensorType, style: pw.TextStyle(font: boldFont)), 
+                    const pw.TextSpan(text: " was at "),
+                    pw.TextSpan(text: timestamp, style: pw.TextStyle(font: boldFont)),
+                    const pw.TextSpan(text: " with a value of "),
+                    pw.TextSpan(text: value, style: pw.TextStyle(font: boldFont)),
+                    const pw.TextSpan(text: "."),
+                  ],
                 ),
               ),
+            ),
+          ],
+        );
+      } 
+      else if (weeklyMatch != null) {
+        final sensorType = weeklyMatch.group(1)!;
+        final value = weeklyMatch.group(2)!;
+        final timestamp = weeklyMatch.group(3)!;
+
+        bulletPoint = pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text("• ", style: pw.TextStyle(font: boldFont, fontSize: 17)),
+            pw.Expanded(
+              child: pw.RichText(
+                text: pw.TextSpan(
+                  style: pw.TextStyle(font: regularFont, fontSize: 16),
+                  children: [
+                    const pw.TextSpan(text: "The highest recorded "),
+                    pw.TextSpan(text: sensorType, style: pw.TextStyle(font: boldFont)), 
+                    const pw.TextSpan(text: " this week was "),
+                    pw.TextSpan(text: value, style: pw.TextStyle(font: boldFont)),
+                    const pw.TextSpan(text: " at "),
+                    pw.TextSpan(text: timestamp, style: pw.TextStyle(font: boldFont)),
+                    const pw.TextSpan(text: "."),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      } 
+      else {
+        bulletPoint = pw.Text(cleanLine, style: pw.TextStyle(font: regularFont, fontSize: 16));
+      }
+
+      // ✅ Add spacing after each bullet point
+      return pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          bulletPoint,
+          pw.SizedBox(height: 10), // Adjust for more or less spacing
+        ],
+      );
+    }).toList(),
+  );
+}
+
+
+
+    /// ✅ Helper for Comparison Summary with Rich Formatting
+    pw.Widget _buildComparisonBulletPoints(String summary) {
+  List<String> lines = summary.split("\n").where((line) => line.isNotEmpty).toList();
+
+  return pw.Column(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    children: lines.map((line) {
+      final match = RegExp(r"• (.+?) on (.+?) \((.+?)\) was higher than (.+?) \((.+?)\) by (.+?)\.").firstMatch(line) ??
+          RegExp(r"• (.+?) was the same on both dates \((.+?): (.+?), (.+?): (.+?)\)\.").firstMatch(line);
+
+      pw.Widget bulletPoint;
+
+      if (match != null && match.groupCount == 6) {
+        bulletPoint = pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text("• ", style: pw.TextStyle(font: boldFont, fontSize: 17)),
+            pw.Expanded(
+              child: pw.RichText(
+                text: pw.TextSpan(
+                  style: pw.TextStyle(font: regularFont, fontSize: 16),
+                  children: [
+                    pw.TextSpan(text: match.group(1)!, style: pw.TextStyle(font: boldFont)),
+                    const pw.TextSpan(text: " on "),
+                    pw.TextSpan(text: match.group(2)!, style: pw.TextStyle(font: italicFont)),
+                    const pw.TextSpan(text: " ("),
+                    pw.TextSpan(text: match.group(3)!, style: pw.TextStyle(font: boldFont)),
+                    const pw.TextSpan(text: ") was higher than "),
+                    pw.TextSpan(text: match.group(4)!, style: pw.TextStyle(font: italicFont)),
+                    const pw.TextSpan(text: " ("),
+                    pw.TextSpan(text: match.group(5)!, style: pw.TextStyle(font: boldFont)),
+                    const pw.TextSpan(text: ") by "),
+                    pw.TextSpan(text: match.group(6)!, style: pw.TextStyle(font: boldFont)),
+                    const pw.TextSpan(text: "."),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      } else if (match != null && match.groupCount == 5) {
+        bulletPoint = pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text("• ", style: pw.TextStyle(font: boldFont, fontSize: 17)),
+            pw.Expanded(
+              child: pw.RichText(
+                text: pw.TextSpan(
+                  style: pw.TextStyle(font: regularFont, fontSize: 16),
+                  children: [
+                    pw.TextSpan(text: match.group(1)!, style: pw.TextStyle(font: boldFont)),
+                    const pw.TextSpan(text: " was the same on both dates ("),
+                    pw.TextSpan(text: match.group(2)!, style: pw.TextStyle(font: italicFont)),
+                    const pw.TextSpan(text: ": "),
+                    pw.TextSpan(text: match.group(3)!, style: pw.TextStyle(font: boldFont)),
+                    const pw.TextSpan(text: ", "),
+                    pw.TextSpan(text: match.group(4)!, style: pw.TextStyle(font: italicFont)),
+                    const pw.TextSpan(text: ": "),
+                    pw.TextSpan(text: match.group(5)!, style: pw.TextStyle(font: boldFont)),
+                    const pw.TextSpan(text: ")."),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      } else {
+        bulletPoint = pw.Text(line, style: pw.TextStyle(font: regularFont, fontSize: 16));
+      }
+
+      // Add spacing after each bullet
+      return pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          bulletPoint,
+          pw.SizedBox(height: 10), // Adjust this for more or less spacing
+        ],
+      );
+    }).toList(),
+  );
+}
+
+
+     /// ✅ Page 2: Data Comparison Summary
+    if (comparisonSummary.trim().isNotEmpty) {
+      pdf.addPage(
+        pw.Page(
+          build: (pw.Context context) => pw.Padding(
+            padding: const pw.EdgeInsets.all(24),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text("Data Comparison Summary", style: pw.TextStyle(fontSize: 24, font: boldFont, color: PdfColors.blue900)),
+                pw.SizedBox(height: 12),
+                pw.Divider(),
+                pw.SizedBox(height: 12),
+                _buildComparisonBulletPoints(comparisonSummary),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    /// ✅ Page 3: Time-Based Frequency Summary
+    if (frequencySummary.trim().isNotEmpty) {
+      pdf.addPage(
+        pw.Page(
+          build: (pw.Context context) => pw.Padding(
+            padding: const pw.EdgeInsets.all(24),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text("Time-Based Frequency Summary", style: pw.TextStyle(fontSize: 24, font: boldFont, color: PdfColors.blue900)),
+                pw.SizedBox(height: 12),
+                pw.Divider(),
+                pw.SizedBox(height: 12),
+                _buildBulletPoints(frequencySummary),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // ✅ Capture Graphs
+    List<Uint8List> images = await _captureGraphsAsImages();
+
+    // ✅ Page 4: Comparison Graph
+    if (images.isNotEmpty) {
+      pdf.addPage(
+        pw.Page(
+          build: (pw.Context context) => pw.Center(
+            child: pw.Column(
+              children: [
+                pw.Text("Comparison Graph", style: pw.TextStyle(fontSize: 20, font: boldFont)),
+                pw.SizedBox(height: 10),
+                pw.Image(pw.MemoryImage(images[0]), width: 400, height: 300),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // ✅ Page 5: Frequency Graph
+    if (images.length > 1) {
+      pdf.addPage(
+        pw.Page(
+          build: (pw.Context context) => pw.Center(
+            child: pw.Column(
+              children: [
+                pw.Text("Frequency Graph", style: pw.TextStyle(fontSize: 20, font: boldFont)),
+                pw.SizedBox(height: 10),
+                pw.Image(pw.MemoryImage(images[1]), width: 400, height: 300),
+              ],
+            ),
+          ),
         ),
       );
     }
@@ -632,51 +894,348 @@ class _DataReportPageState extends State<DataReportPage> {
     await file.writeAsBytes(await pdf.save());
 
     print("✅ PDF Saved at: ${file.path}");
-    await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => pdf.save(),
-    );
+    await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdf.save());
+
+  } finally {
+    setState(() {
+      isExportingPDF = false;
+    });
+    Navigator.of(context).pop();
   }
+}
+
+
+
+
+//////////////////////////////////////////////////////////////////////////////////////////
+
+// ✅ Helper Functions to Recalculate Summaries
+void _generateComparisonSummary() {
+  comparisonSummary = ""; // Clear old data
+  if (firstDateData.isNotEmpty && secondDateData.isNotEmpty) {
+    List<String> labels = ["Temperature", "Moisture Level", "pH Level 1", "pH Level 2", "Humidity"];
+    
+    for (String label in labels) {
+      double firstValue = double.tryParse(firstDateData[label]?.replaceAll(RegExp('[^0-9.]'), '') ?? "0") ?? 0;
+      double secondValue = double.tryParse(secondDateData[label]?.replaceAll(RegExp('[^0-9.]'), '') ?? "0") ?? 0;
+
+      //   // ✅ Format Dates Correctly (Removes Time)
+      // String firstDateFormatted = DateFormat('yyyy-MM-dd').format(firstSelectedDate);
+      // String secondDateFormatted = DateFormat('yyyy-MM-dd').format(secondSelectedDate);
+
+      if (firstValue > secondValue) {
+        double diff = (firstValue - secondValue);
+        comparisonSummary += "• $label on $firstSelectedDate (${firstValue.toStringAsFixed(2)}) was higher than $secondSelectedDate (${secondValue.toStringAsFixed(2)}) by ${diff.toStringAsFixed(2)}.\n\n";
+      } else if (firstValue < secondValue) {
+        double diff = (secondValue - firstValue);
+        comparisonSummary += "• $label on $secondSelectedDate (${secondValue.toStringAsFixed(2)}) was higher than $firstSelectedDate (${firstValue.toStringAsFixed(2)}) by ${diff.toStringAsFixed(2)}.\n\n";
+      } else {
+        comparisonSummary += "• $label was the same on both dates ($firstSelectedDate: ${firstValue.toStringAsFixed(2)}, $secondSelectedDate: ${secondValue.toStringAsFixed(2)}).\n\n";
+      }
+    }
+  }
+}
+
+void _generateFrequencySummary() {
+  if (kDebugMode) {
+    print("🔄 Regenerating Frequency Summary...");
+  }
+  frequencySummary = ""; // ✅ Clear old data
+
+  if (kDebugMode) {
+    print("🔍 selectedFilter: $selectedFilter");
+  } // ✅ Debugging line
+
+  if (frequencyAnalysisData.isNotEmpty) {
+    List<String> summaries = [];
+
+    frequencyAnalysisData.forEach((sensorType, sensorData) {
+      if (sensorData.isNotEmpty) {
+        if (selectedFilter == "Weekly") {
+          double highestWeeklyValue = 0;
+          String highestWeeklyTimestamp = "";
+
+          for (var entry in sensorData) {
+            double sensorValue = double.tryParse(entry["Value"].toString()) ?? 0;
+            if (sensorValue > highestWeeklyValue) {
+              highestWeeklyValue = sensorValue;
+              highestWeeklyTimestamp = entry["Time"];
+            }
+          }
+
+          // ✅ Format timestamp correctly for Weekly mode
+          String formattedTimestamp = "Unknown Time";
+          try {
+            DateTime parsedTime = DateFormat("yyyy-MM-dd hh:mm a").parse(highestWeeklyTimestamp);
+            formattedTimestamp = DateFormat("EEE, yyyy-MM-dd hh:mm a").format(parsedTime);
+          } catch (e) {
+            if (kDebugMode) {
+              print("⚠️ Error parsing timestamp: $highestWeeklyTimestamp - $e");
+            }
+          }
+
+          // ✅ Apply proper units
+          String formattedValue = _formatSensorValue(sensorType, highestWeeklyValue);
+
+          // ✅ Better formatting
+          summaries.add("• The highest recorded **$sensorType** this week was **$formattedValue** at **$formattedTimestamp**.");
+        } else { // ✅ Daily Mode
+          var highestRecord = (sensorData as List<Map<String, dynamic>>).reduce(
+            (a, b) => (double.tryParse(a["Value"].toString()) ?? 0) >
+                       (double.tryParse(b["Value"].toString()) ?? 0) ? a : b,
+          );
+
+          double highestValue = double.tryParse(highestRecord["Value"].toString()) ?? 0;
+          String rawTimestamp = highestRecord["Time"];
+          String formattedTimestamp = "Unknown Time";
+
+          try {
+            DateTime parsedTime = DateFormat("yyyy-MM-dd hh:mm a").parse(rawTimestamp);
+            formattedTimestamp = DateFormat("hh:mm a").format(parsedTime);
+          } catch (e) {
+            if (kDebugMode) {
+              print("⚠️ Error parsing timestamp: $rawTimestamp - $e");
+            }
+          }
+
+          // ✅ Apply proper units
+          String formattedValue = _formatSensorValue(sensorType, highestValue);
+
+          // ✅ Improved formatting
+          summaries.add("• The highest recorded **$sensorType** today was **$formattedValue** at **$formattedTimestamp**.");
+        }
+      }
+    });
+
+    // ✅ Combine summaries for all sensor types
+    frequencySummary = summaries.join("\n\n");
+  }
+
+  if (kDebugMode) {
+    print("📌 Final frequencySummary: $frequencySummary");
+  }
+}
+
+
+
+// ✅ Helper Function: Formats Bullet Points for PDF
+pw.Widget _buildPDFBulletPoints(String summary, pw.Font customFont) {
+  List<String> lines = summary.split("\n").where((line) => line.isNotEmpty).toList();
+
+  return pw.Column(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    children: lines.map((line) {
+      List<String> parts = line.split("by");
+      String firstPart = parts.isNotEmpty ? parts[0].trim() : "";
+      String secondPart = parts.length > 1 ? "by ${parts[1].trim()}" : "";
+
+      return pw.Padding(
+        padding: const pw.EdgeInsets.only(bottom: 4),
+        child: pw.RichText(
+          text: pw.TextSpan(
+            children: [
+              pw.TextSpan(
+                text: "• ", // ✅ Bullet point (now works with custom font!)
+                style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, font: customFont),
+              ),
+              pw.TextSpan(
+                text: firstPart, // ✅ First part of the sentence
+                style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold, font: customFont),
+              ),
+              if (secondPart.isNotEmpty)
+                pw.TextSpan(
+                  text: " $secondPart", // ✅ Bold the difference value
+                  style: pw.TextStyle(
+                    font: customFont,
+                    fontSize: 14,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColors.blue,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    }).toList(),
+  );
+}
+
+
+
 
   Future<List<Uint8List>> _captureGraphsAsImages() async {
-    List<Uint8List> images = [];
+  List<Uint8List> images = [];
 
-    // ✅ Wait for rendering to complete
-    await Future.delayed(const Duration(milliseconds: 500));
+  // ❌ No need to manually wait anymore; _captureGraph() handles it!
+  // await _waitForGraphRender(comparisonGraphKey, "comparisonGraphKey");
+  // await _waitForGraphRender(frequencyGraphKey, "frequencyGraphKey");
 
-    // ✅ Capture _buildComparisonGraph()
-    if (comparisonGraphKey.currentContext != null) {
-      RenderRepaintBoundary boundary =
-          comparisonGraphKey.currentContext!.findRenderObject()
-              as RenderRepaintBoundary;
-      ui.Image image = await boundary.toImage(pixelRatio: 3.0);
-      ByteData? byteData = await image.toByteData(
-        format: ui.ImageByteFormat.png,
-      );
-      if (byteData != null) images.add(byteData.buffer.asUint8List());
-    } else {
-      print("❌ comparisonGraphKey is NULL!");
-    }
+   // ✅ Capture _buildComparisonGraph() and force rebuild if needed
+  Uint8List? comparisonGraphImage = await _captureGraph(
+    comparisonGraphKey, 
+    "comparisonGraphKey", 
+    () => setState(() {})  // 🔄 Forces a rebuild!
+  );
+  if (comparisonGraphImage != null) images.add(comparisonGraphImage);
 
-    // ✅ Capture _buildTimeBasedFrequencyGraph()
-    if (frequencyGraphKey.currentContext != null) {
-      RenderRepaintBoundary boundary =
-          frequencyGraphKey.currentContext!.findRenderObject()
-              as RenderRepaintBoundary;
-      ui.Image image = await boundary.toImage(pixelRatio: 3.0);
-      ByteData? byteData = await image.toByteData(
-        format: ui.ImageByteFormat.png,
-      );
-      if (byteData != null) images.add(byteData.buffer.asUint8List());
-    } else {
-      print("❌ frequencyGraphKey is NULL!");
-    }
+  // ✅ Capture _buildTimeBasedFrequencyGraph() and force rebuild if needed
+  Uint8List? frequencyGraphImage = await _captureGraph(
+    frequencyGraphKey, 
+    "frequencyGraphKey", 
+    () => setState(() {})  // 🔄 Forces a rebuild!
+  );
+  if (frequencyGraphImage != null) images.add(frequencyGraphImage);
 
+  if (kDebugMode) {
     print("📸 Total images captured: ${images.length}");
-    return images;
   }
+  return images;
+}
+
+
+// ✅ Helper Function: Captures a widget as an image
+Future<Uint8List?> _captureGraph(GlobalKey key, String graphName, VoidCallback forceRebuild) async {
+
+  if (kDebugMode) {
+    print("🔍 Attempting to capture $graphName...");
+  }
+
+  if (kDebugMode) {
+    print("🔍 Checking $graphName BEFORE capturing images: ${key.currentContext != null}");
+  }
+
+  // ✅ Force rebuild if widget is null
+  if (key.currentContext == null) {
+    if (kDebugMode) {
+      print("⚠ $graphName context is NULL! Forcing rebuild...");
+    }
+    forceRebuild();  // 🔄 Calls setState() to trigger a rebuild
+    await Future.delayed(Duration(milliseconds: 500)); // Allow rebuild time
+  }
+
+  // ✅ Double-check after rebuild attempt
+  if (key.currentContext == null) {
+    if (kDebugMode) {
+      print("⚠ $graphName context is STILL NULL after rebuild attempt. Skipping capture.");
+    }
+    return null;
+  }
+
+  // ✅ Ensure widget is fully rendered before proceeding
+  await _waitForGraphRender(key, graphName);
+
+  if (key.currentContext == null || key.currentContext!.findRenderObject() == null) {
+    if (kDebugMode) {
+      print("⚠ $graphName is still NULL, skipping capture.");
+    }
+    return null;
+  }
+
+  RenderRepaintBoundary? boundary = key.currentContext!.findRenderObject() as RenderRepaintBoundary?;
+
+  if (boundary == null || boundary.debugNeedsPaint) {
+  if (kDebugMode) {
+    print("⚠ $graphName is not fully painted! Retrying...");
+  }
+
+  // ✅ Force UI rebuild and delay again
+  forceRebuild();
+  await Future.delayed(Duration(milliseconds: 700));
+
+  boundary = key.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+  if (boundary == null || boundary.debugNeedsPaint) {
+    if (kDebugMode) {
+      print("❌ $graphName is STILL NOT READY after waiting! Skipping...");
+    }
+    return null;
+  }
+}
+
+  if (kDebugMode) {
+    print("✅ $graphName is fully rendered and painted.");
+  }
+  ui.Image image = await boundary.toImage(pixelRatio: 3.0);
+  ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+  return byteData?.buffer.asUint8List();
+}
+
+
+// ✅ Moved `_waitForGraphRender()` inside `_captureGraph()`
+Future<void> _waitForGraphRender(GlobalKey key, String graphName) async {
+  int retries = 6; // ✅ Increased retries
+  while (retries > 0) {
+    await Future.delayed(const Duration(milliseconds: 700)); // ✅ Increased delay
+
+    if (key.currentContext != null) {
+      RenderRepaintBoundary? boundary = key.currentContext!.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary != null && !boundary.debugNeedsPaint) {
+        print("✅ $graphName is fully rendered and painted.");
+        return;
+      }
+    }
+retries--;
+    if (kDebugMode) {
+      print("⏳ Waiting for $graphName to finish rendering... ($retries retries left)");
+    }
+    
+  }
+
+  if (kDebugMode) {
+    print("❌ $graphName is STILL NULL or not painted after waiting!");
+  }
+}
+
+
+
+
+// // ✅ Helper Function: Waits for a widget to render
+// Future<void> _waitForGraphRender(GlobalKey key, String graphName) async {
+//   int retries = 15; // ✅ Increased retries
+//   while (retries > 0) {
+//     await Future.delayed(const Duration(milliseconds: 700)); // ✅ Increased delay
+
+//     if (key.currentContext != null) {
+//       RenderRepaintBoundary? boundary = key.currentContext!.findRenderObject() as RenderRepaintBoundary?;
+//       if (boundary != null && !boundary.debugNeedsPaint) {
+//         print("✅ $graphName is fully rendered and painted.");
+//         return; // ✅ Exit once rendering is complete
+//       }
+//     }
+
+//     print("⏳ Waiting for $graphName to finish rendering... ($retries retries left)");
+//     retries--;
+//   }
+
+//   print("❌ $graphName is STILL NULL or not painted after waiting!");
+// }
+
+
+
+
+//////////////////////////////////////////////////////////////////////////////////////////
 
   @override
   Widget build(BuildContext context) {
+
+      if (kDebugMode) {
+        print("🔍 BUILDING PAGE - comparisonGraphKey exists: ${comparisonGraphKey.currentContext != null}");
+      }
+
+    // 🔍 Debugging Log
+      if (kDebugMode) {
+        print("🔍 comparisonGraphKey exists in UI: ${comparisonGraphKey.currentContext != null}");
+      }
+
+       // 🔍 Check if first and second date data are updating
+    if (kDebugMode) {
+      print("🔍 First Date Data: $firstDateData");
+    }
+    if (kDebugMode) {
+      print("🔍 Second Date Data: $secondDateData");
+    }
+
+
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -712,35 +1271,45 @@ class _DataReportPageState extends State<DataReportPage> {
                   secondSelectedDate = pickedDate;
                   hasSecondDate = true;
                 });
-                secondDateData = await _fetchHistoricalData(
-                  secondSelectedDate,
-                  hardwareId!,
-                );
-                setState(() {});
-              }
-            }),
+
+    if (kDebugMode) {
+      print("🔍 Fetching data for second date: $pickedDate");
+    }
+    
+    secondDateData = await _fetchHistoricalData(secondSelectedDate, hardwareId!);
+    
+    if (kDebugMode) {
+      print("🔍 Updated secondDateData: $secondDateData");
+    }
+    
+    setState(() {}); // 🔄 Ensure UI updates
+  }
+}),
 
             Expanded(
               child: ListView(
                 children: [
                   _buildDataCard("First Date Data", firstDateData, true),
-                  if (hasSecondDate)
-                    _buildDataCard("Second Date Data", secondDateData, false),
-                  const SizedBox(
-                    height: 16,
-                  ), // ✅ Adds spacing between _buildDataCard and _buildComparisonGraph
-                  if (hasSecondDate)
-                    RepaintBoundary(
-                      key: comparisonGraphKey,
-                      child: _buildComparisonGraph(),
-                    ),
+                  _buildDataCard("Second Date Data", secondDateData, false),
+                  const SizedBox(height: 16),
 
-                  const SizedBox(height: 12), // ✅ Adds spacing before the graph
+                 ComparisonGraphWidget(
+                    key: comparisonGraphWidgetKey, // ✅ Add this line
+                    repaintKey: comparisonGraphKey,
+                    firstDateData: firstDateData,
+                    secondDateData: secondDateData,
+                    widgetKey: comparisonGraphWidgetKey, // ✅ Add this line
+                  ),
 
-                  const Divider(
-                    thickness: 2,
-                    color: Colors.black26,
-                  ), // ✅ Adds a Visual Separator
+
+
+                  const SizedBox(height: 12),
+
+
+
+
+                  const Divider(thickness: 2,color: Colors.black26,), // ✅ Adds a Visual Separator
+
                   // ✅ Filter Dropdown for Daily/Weekly (AFTER Divider)
                   Padding(
                     padding: const EdgeInsets.symmetric(
@@ -789,15 +1358,30 @@ class _DataReportPageState extends State<DataReportPage> {
                   // Build Frequency Analysis Card
                   _buildFrequencyAnalysisCard(),
 
-                  const SizedBox(height: 16), // ✅ Adds spacing before the graph
-                  if (frequencyAnalysisData.isNotEmpty)
-                    RepaintBoundary(
-                      key: frequencyGraphKey,
-                      child: _buildTimeBasedFrequencyGraph(),
+                  const SizedBox(height: 32), // ✅ Adds spacing before the graph
+
+                  // Build Time Based Frequency Graph
+
+                  // if (frequencyAnalysisData.isNotEmpty)
+                  //   RepaintBoundary(
+                  //     key: frequencyGraphKey,
+                  //     child: _buildTimeBasedFrequencyGraph(),
+                  //   ),
+
+
+                // if (frequencyAnalysisData.isNotEmpty)
+                    FrequencyGraphWidget(
+                      key: frequencyGraphWidgetKey,
+                      repaintKey: frequencyGraphKey,
+                      frequencyData: frequencyAnalysisData,
+                      selectedFilter: selectedFilter,
                     ),
-                  const SizedBox(
-                    height: 16,
-                  ), // Adds spacing before the conclusion
+
+
+                  const SizedBox(height: 16,), // Adds spacing before the conclusion
+                   const Divider(thickness: 2, color: Colors.black26,), // ✅ Adds a Visual Separator
+
+                  // ✅ Conclusion
                   _buildConclusionWidget(),
 
                   // ✅ Export PDF Button
@@ -806,12 +1390,16 @@ class _DataReportPageState extends State<DataReportPage> {
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: ElevatedButton.icon(
                       icon: const Icon(Icons.picture_as_pdf),
-                      label: const Text("Export as PDF"),
-                      onPressed: () async {
-                        await _exportToPDF(); // ✅ Calls the function to generate PDF
-                      },
+                      label: Text(isExportingPDF
+                          ? "Exporting..."
+                          : "Export as PDF"), // 🔄 Update text while exporting
+                      onPressed: isExportingPDF
+                          ? null // ⛔ Disable button while exporting
+                          : () async {
+                              await _exportToPDF();
+                            },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green[700], // ✅ Green theme
+                        backgroundColor: Colors.green[700],
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(
                           vertical: 12,
@@ -820,6 +1408,7 @@ class _DataReportPageState extends State<DataReportPage> {
                       ),
                     ),
                   ),
+
                   const SizedBox(height: 16), // ✅ Adds spacing after button
                 ],
               ),
@@ -894,7 +1483,9 @@ class _DataReportPageState extends State<DataReportPage> {
                       ).format(parsedTime); // ✅ Keep time-only for "Daily"
                     }
                   } catch (e) {
-                    print("⚠️ Error parsing timestamp: ${data["Time"]} - $e");
+                    if (kDebugMode) {
+                      print("⚠️ Error parsing timestamp: ${data["Time"]} - $e");
+                    }
                   }
 
                   return Padding(
@@ -933,291 +1524,305 @@ class _DataReportPageState extends State<DataReportPage> {
     );
   }
 
-  Widget _buildTimeBasedFrequencyGraph() {
-    if (frequencyAnalysisData.isEmpty) {
-      return const Center(child: Text("No alerts recorded to display."));
-    }
+  // Widget _buildTimeBasedFrequencyGraph() {
+  //   if (frequencyAnalysisData.isEmpty) {
+  //     return const Center(child: Text("No alerts recorded to display."));
+  //   }
 
-    List<String> sensorTypes = frequencyAnalysisData.keys.toList();
-    List<String> timestamps = [];
+  //   List<String> sensorTypes = frequencyAnalysisData.keys.toList();
+  //   List<String> timestamps = [];
 
-    // ✅ Collect unique timestamps for X-axis labels
-    for (var sensor in sensorTypes) {
-      for (var entry in frequencyAnalysisData[sensor] ?? []) {
-        if (!timestamps.contains(entry["Time"])) {
-          timestamps.add(entry["Time"]);
-        }
-      }
-    }
+  //   // ✅ Collect unique timestamps for X-axis labels
+  //   for (var sensor in sensorTypes) {
+  //     for (var entry in frequencyAnalysisData[sensor] ?? []) {
+  //       if (!timestamps.contains(entry["Time"])) {
+  //         timestamps.add(entry["Time"]);
+  //       }
+  //     }
+  //   }
 
-    // ✅ If "Daily", show a single combined graph
-    if (selectedFilter == "Daily") {
-      return Column(
-        children: [
-          // ✅ Add the Legend Row
-          Wrap(
-            spacing: 10,
-            children:
-                sensorTypes.map((sensor) {
-                  return Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 12,
-                        height: 12,
-                        decoration: BoxDecoration(
-                          color: _getSensorColor(sensor),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 5),
-                      Text(
-                        sensor,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  );
-                }).toList(),
-          ),
+  //   // ✅ If "Daily", show a single combined graph
+  //   if (selectedFilter == "Daily") {
+  //     return Column(
+  //       children: [
+  //         // ✅ Add the Legend Row
+  //         Wrap(
+  //           spacing: 10,
+  //           children:
+  //               sensorTypes.map((sensor) {
+  //                 return Row(
+  //                   mainAxisSize: MainAxisSize.min,
+  //                   children: [
+  //                     Container(
+  //                       width: 12,
+  //                       height: 12,
+  //                       decoration: BoxDecoration(
+  //                         color: _getSensorColor(sensor),
+  //                         shape: BoxShape.circle,
+  //                       ),
+  //                     ),
+  //                     const SizedBox(width: 5),
+  //                     Text(
+  //                       sensor,
+  //                       style: const TextStyle(
+  //                         fontSize: 12,
+  //                         fontWeight: FontWeight.bold,
+  //                       ),
+  //                     ),
+  //                   ],
+  //                 );
+  //               }).toList(),
+  //         ),
 
-          const SizedBox(height: 12), // ✅ Adds spacing before the graph
-          // ✅ The Combined Graph
-          SizedBox(
-            height: 300, // ✅ Fixed height for Daily
-            child: BarChart(
-              BarChartData(
-                barGroups: List.generate(timestamps.length, (index) {
-                  String timeLabel = timestamps[index];
+  //         const SizedBox(height: 12), // ✅ Adds spacing before the graph
+  //         // ✅ The Combined Graph
+  //         SizedBox(
+  //           height: 300, // ✅ Fixed height for Daily
+  //           child: BarChart(
+  //             BarChartData(
+  //               barGroups: List.generate(timestamps.length, (index) {
+  //                 String timeLabel = timestamps[index];
 
-                  List<BarChartRodData> bars = [];
+  //                 List<BarChartRodData> bars = [];
 
-                  for (var sensor in sensorTypes) {
-                    var sensorData =
-                        frequencyAnalysisData[sensor]
-                            ?.where((data) => data["Time"] == timeLabel)
-                            .toList() ??
-                        [];
-                    if (sensorData.isNotEmpty) {
-                      double sensorValue =
-                          double.tryParse(
-                            sensorData.first["Value"].toString(),
-                          ) ??
-                          0;
+  //                 for (var sensor in sensorTypes) {
+  //                   var sensorData =
+  //                       frequencyAnalysisData[sensor]
+  //                           ?.where((data) => data["Time"] == timeLabel)
+  //                           .toList() ??
+  //                       [];
+  //                   if (sensorData.isNotEmpty) {
+  //                     double sensorValue =
+  //                         double.tryParse(
+  //                           sensorData.first["Value"].toString(),
+  //                         ) ??
+  //                         0;
 
-                      bars.add(
-                        BarChartRodData(
-                          toY: sensorValue,
-                          color: _getSensorColor(sensor),
-                          width: 16,
-                        ),
-                      );
-                    }
-                  }
+  //                     bars.add(
+  //                       BarChartRodData(
+  //                         toY: sensorValue,
+  //                         color: _getSensorColor(sensor),
+  //                         width: 16,
+  //                       ),
+  //                     );
+  //                   }
+  //                 }
 
-                  return BarChartGroupData(x: index, barRods: bars);
-                }),
+  //                 return BarChartGroupData(x: index, barRods: bars);
+  //               }),
 
-                // ✅ Enable Touch Interaction
-                barTouchData: BarTouchData(
-                  touchTooltipData: BarTouchTooltipData(
-                    getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                      String formattedTime = "Unknown Time";
+  //               // ✅ Enable Touch Interaction
+  //               barTouchData: BarTouchData(
+  //                 touchTooltipData: BarTouchTooltipData(
 
-                      try {
-                        DateTime parsedTime;
-                        if (timestamps[groupIndex].contains("AM") ||
-                            timestamps[groupIndex].contains("PM")) {
-                          parsedTime = DateFormat(
-                            "yyyy-MM-dd hh:mm a",
-                          ).parse(timestamps[groupIndex]);
-                        } else {
-                          parsedTime = DateFormat(
-                            "yyyy-MM-dd HH:mm:ss",
-                          ).parse(timestamps[groupIndex]);
-                        }
+  //                   fitInsideHorizontally:true, // ✅ Prevents horizontal clipping
+  //                   fitInsideVertically: true, // ✅ Prevents vertical clipping
 
-                        // Show Day + Time for Weekly, Only Time for Daily
-                        formattedTime =
-                            (selectedFilter == "Weekly")
-                                ? DateFormat("EEE hh:mm a").format(
-                                  parsedTime,
-                                ) // Example: Mon 08:00 AM
-                                : DateFormat(
-                                  "hh:mm a",
-                                ).format(parsedTime); // Example: 08:00 AM
-                      } catch (e) {
-                        print(
-                          "Error parsing timestamp: ${timestamps[groupIndex]} - $e",
-                        );
-                      }
+  //                   getTooltipItem: (group, groupIndex, rod, rodIndex) {
+  //                     String formattedTime = "Unknown Time";
 
-                      return BarTooltipItem(
-                        "Sensor Value: ${rod.toY}\nTime: $formattedTime", // Tooltip Format
-                        const TextStyle(color: Colors.white, fontSize: 12),
-                      );
-                    },
-                    getTooltipColor:
-                        (group) => Colors.black87, // Tooltip background color
-                    tooltipRoundedRadius: 8, // Rounded corners
-                    tooltipPadding: const EdgeInsets.all(
-                      8,
-                    ), // Padding inside tooltip
-                    tooltipMargin: 10, // Space between bars & tooltip
-                  ),
-                ),
+  //                     try {
+  //                       DateTime parsedTime;
+  //                       if (timestamps[groupIndex].contains("AM") ||
+  //                           timestamps[groupIndex].contains("PM")) {
+  //                         parsedTime = DateFormat(
+  //                           "yyyy-MM-dd hh:mm a",
+  //                         ).parse(timestamps[groupIndex]);
+  //                       } else {
+  //                         parsedTime = DateFormat(
+  //                           "yyyy-MM-dd HH:mm:ss",
+  //                         ).parse(timestamps[groupIndex]);
+  //                       }
 
-                titlesData: _buildChartTitles(
-                  timestamps,
-                ), // ✅ Keep existing title formatting
-              ),
-            ),
-          ),
-        ],
-      );
-    }
+  //                       // Show Day + Time for Weekly, Only Time for Daily
+  //                       formattedTime =
+  //                           (selectedFilter == "Weekly")
+  //                               ? DateFormat("EEE hh:mm a").format(
+  //                                 parsedTime,
+  //                               ) // Example: Mon 08:00 AM
+  //                               : DateFormat(
+  //                                 "hh:mm a",
+  //                               ).format(parsedTime); // Example: 08:00 AM
+  //                     } catch (e) {
+  //                       print(
+  //                         "Error parsing timestamp: ${timestamps[groupIndex]} - $e",
+  //                       );
+  //                     }
 
-    // ✅ If "Weekly", show separate graphs per sensor type
-    return Column(
-      children:
-          sensorTypes.map((sensor) {
-            List<String> sensorTimestamps = [];
-            for (var entry in frequencyAnalysisData[sensor] ?? []) {
-              if (!sensorTimestamps.contains(entry["Time"])) {
-                sensorTimestamps.add(entry["Time"]);
-              }
-            }
+  //                     return BarTooltipItem(
+  //                       "Sensor Value: ${rod.toY}\nTime: $formattedTime", // Tooltip Format
+  //                       const TextStyle(color: Colors.white, fontSize: 12),
+  //                     );
+  //                   },
+  //                   getTooltipColor:
+  //                       (group) => Colors.black87, // Tooltip background color
+  //                   tooltipRoundedRadius: 8, // Rounded corners
+  //                   tooltipPadding: const EdgeInsets.all(
+  //                     8,
+  //                   ), // Padding inside tooltip
+  //                   tooltipMargin: 10, // Space between bars & tooltip
+  //                 ),
+  //               ),
 
-            return Column(
-              children: [
-                const SizedBox(height: 16), // ✅ Adds spacing between graphs
-                // ✅ Sensor Title (Legend for Each Graph)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: _getSensorColor(sensor),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 5),
-                    Text(
-                      sensor,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
+  //               titlesData: _buildChartTitles(
+  //                 timestamps,
+  //               ), // ✅ Keep existing title formatting
+  //             ),
+  //           ),
+  //         ),
+  //       ],
+  //     );
+  //   }
 
-                const SizedBox(height: 10),
+  //   // ✅ If "Weekly", show separate graphs per sensor type
+  //   return Column(
+  //     children:
+  //         sensorTypes.map((sensor) {
+  //           List<String> sensorTimestamps = [];
+  //           for (var entry in frequencyAnalysisData[sensor] ?? []) {
+  //             if (!sensorTimestamps.contains(entry["Time"])) {
+  //               sensorTimestamps.add(entry["Time"]);
+  //             }
+  //           }
 
-                // ✅ The Separate Graph for this Sensor
-                SizedBox(
-                  height: 300, // ✅ Consistent height per graph
-                  child: BarChart(
-                    BarChartData(
-                      barGroups: List.generate(timestamps.length, (index) {
-                        String timeLabel = timestamps[index];
+  //           return Column(
+  //             children: [
+  //               const SizedBox(height: 16), // ✅ Adds spacing between graphs
+  //               // ✅ Sensor Title (Legend for Each Graph)
+  //               Row(
+  //                 mainAxisAlignment: MainAxisAlignment.center,
+  //                 children: [
+  //                   Container(
+  //                     width: 12,
+  //                     height: 12,
+  //                     decoration: BoxDecoration(
+  //                       color: _getSensorColor(sensor),
+  //                       shape: BoxShape.circle,
+  //                     ),
+  //                   ),
+  //                   const SizedBox(width: 5),
+  //                   Text(
+  //                     sensor,
+  //                     style: const TextStyle(
+  //                       fontSize: 14,
+  //                       fontWeight: FontWeight.bold,
+  //                     ),
+  //                   ),
+  //                 ],
+  //               ),
 
-                        List<BarChartRodData> bars = [];
+  //               const SizedBox(height: 10),
 
-                        for (var sensor in sensorTypes) {
-                          var sensorData =
-                              frequencyAnalysisData[sensor]
-                                  ?.where((data) => data["Time"] == timeLabel)
-                                  .toList() ??
-                              [];
-                          if (sensorData.isNotEmpty) {
-                            double sensorValue =
-                                double.tryParse(
-                                  sensorData.first["Value"].toString(),
-                                ) ??
-                                0;
+  //               // ✅ The Separate Graph for this Sensor
 
-                            bars.add(
-                              BarChartRodData(
-                                toY: sensorValue,
-                                color: _getSensorColor(sensor),
-                                width: 16,
-                              ),
-                            );
-                          }
-                        }
+  //               Padding(
+  // padding: const EdgeInsets.symmetric(vertical: 20),  // ✅ Adds space above & below
+  //               child: SizedBox(
+  //                 height: 300, // ✅ Consistent height per graph
+  //                 child: BarChart(
+  //                   BarChartData(
+  //                     barGroups: List.generate(timestamps.length, (index) {
+  //                       String timeLabel = timestamps[index];
 
-                        return BarChartGroupData(x: index, barRods: bars);
-                      }),
+  //                       List<BarChartRodData> bars = [];
 
-                      // ✅ Enable Touch Interaction
-                      barTouchData: BarTouchData(
-                        touchTooltipData: BarTouchTooltipData(
-                          getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                            String formattedTime = "Unknown Time";
+                        
+  //                         var sensorData =
+  //                             frequencyAnalysisData[sensor]
+  //                                 ?.where((data) => data["Time"] == timeLabel)
+  //                                 .toList() ??
+  //                             [];
+  //                         if (sensorData.isNotEmpty) {
+  //                           double sensorValue =
+  //                               double.tryParse(
+  //                                 sensorData.first["Value"].toString(),
+  //                               ) ??
+  //                               0;
 
-                            try {
-                              DateTime parsedTime;
-                              if (timestamps[groupIndex].contains("AM") ||
-                                  timestamps[groupIndex].contains("PM")) {
-                                parsedTime = DateFormat(
-                                  "yyyy-MM-dd hh:mm a",
-                                ).parse(timestamps[groupIndex]);
-                              } else {
-                                parsedTime = DateFormat(
-                                  "yyyy-MM-dd HH:mm:ss",
-                                ).parse(timestamps[groupIndex]);
-                              }
+  //                           bars.add(
+  //                             BarChartRodData(
+  //                               toY: sensorValue,
+  //                               color: _getSensorColor(sensor),
+  //                               width: 16,
+  //                             ),
+  //                           );
+  //                         }
+                        
 
-                              // Show Day + Time for Weekly, Only Time for Daily
-                              formattedTime =
-                                  (selectedFilter == "Weekly")
-                                      ? DateFormat("EEE hh:mm a").format(
-                                        parsedTime,
-                                      ) // Example: Mon 08:00 AM
-                                      : DateFormat(
-                                        "hh:mm a",
-                                      ).format(parsedTime); // Example: 08:00 AM
-                            } catch (e) {
-                              print(
-                                "Error parsing timestamp: ${timestamps[groupIndex]} - $e",
-                              );
-                            }
+  //                       return BarChartGroupData(x: index, barRods: bars);
+  //                     }),
 
-                            return BarTooltipItem(
-                              "Sensor Value: ${rod.toY}\nTime: $formattedTime", // Tooltip Format
-                              const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                              ),
-                            );
-                          },
-                          getTooltipColor:
-                              (group) =>
-                                  Colors.black87, // Tooltip background color
-                          tooltipRoundedRadius: 8, // Rounded corners
-                          tooltipPadding: const EdgeInsets.all(
-                            8,
-                          ), // Padding inside tooltip
-                          tooltipMargin: 10, // Space between bars & tooltip
-                        ),
-                      ),
+  //                     // ✅ Enable Touch Interaction
+  //                     barTouchData: BarTouchData(
+  //                       touchTooltipData: BarTouchTooltipData(
 
-                      titlesData: _buildChartTitles(
-                        timestamps,
-                      ), // ✅ Keep existing title formatting
-                    ),
-                  ),
-                ),
-              ],
-            );
-          }).toList(),
-    );
-  }
+  //                         fitInsideHorizontally:true, // ✅ Prevents horizontal clipping
+  //                          fitInsideVertically: true, // ✅ Prevents vertical clipping
+
+  //                          tooltipMargin: 30,  // ✅ Pushes tooltip away from other widgets
+
+  //                         getTooltipItem: (group, groupIndex, rod, rodIndex) {
+  //                           String formattedTime = "Unknown Time";
+
+  //                           try {
+  //                             DateTime parsedTime;
+  //                             if (timestamps[groupIndex].contains("AM") ||
+  //                                 timestamps[groupIndex].contains("PM")) {
+  //                               parsedTime = DateFormat(
+  //                                 "yyyy-MM-dd hh:mm a",
+  //                               ).parse(timestamps[groupIndex]);
+  //                             } else {
+  //                               parsedTime = DateFormat(
+  //                                 "yyyy-MM-dd HH:mm:ss",
+  //                               ).parse(timestamps[groupIndex]);
+  //                             }
+
+  //                             // Show Day + Time for Weekly, Only Time for Daily
+  //                             formattedTime =
+  //                                 (selectedFilter == "Weekly")
+  //                                     ? DateFormat("EEE hh:mm a").format(
+  //                                       parsedTime,
+  //                                     ) // Example: Mon 08:00 AM
+  //                                     : DateFormat(
+  //                                       "hh:mm a",
+  //                                     ).format(parsedTime); // Example: 08:00 AM
+  //                           } catch (e) {
+  //                             print(
+  //                               "Error parsing timestamp: ${timestamps[groupIndex]} - $e",
+  //                             );
+  //                           }
+
+  //                           return BarTooltipItem(
+  //                             "Sensor Value: ${rod.toY}\nTime: $formattedTime", // Tooltip Format
+  //                             const TextStyle(
+  //                               color: Colors.white,
+  //                               fontSize: 12,
+  //                             ),
+  //                           );
+  //                         },
+  //                         getTooltipColor:
+  //                             (group) =>
+  //                                 Colors.black87, // Tooltip background color
+  //                         tooltipRoundedRadius: 8, // Rounded corners
+  //                         tooltipPadding: const EdgeInsets.all(
+  //                           8,
+  //                         ), // Padding inside tooltip
+  //                        // tooltipMargin: 10, // Space between bars & tooltip
+  //                       ),
+  //                     ),
+
+  //                     titlesData: _buildChartTitles(
+  //                       timestamps,
+  //                     ), // ✅ Keep existing title formatting
+  //                   ),
+  //                 ),
+  //                ),
+  //               )
+  //             ],
+  //           );
+  //         }).toList(),
+  //   );
+  // }
 
   String formatSensorValue(String sensor, double value) {
     if (sensor.toLowerCase().contains("moisture") ||
@@ -1232,154 +1837,723 @@ class _DataReportPageState extends State<DataReportPage> {
   }
 
   Widget _buildConclusionWidget() {
-    if (firstDateData.isEmpty &&
-        secondDateData.isEmpty &&
-        frequencyAnalysisData.isEmpty) {
-      return const Center(child: Text("No data available for conclusion."));
-    }
+  if (firstDateData.isEmpty &&
+      secondDateData.isEmpty &&
+      frequencyAnalysisData.isEmpty) {
+    return const Center(child: Text("No data available for conclusion."));
+  }
 
-    String firstDateStr = DateFormat("yyyy-MM-dd").format(firstSelectedDate);
-    String secondDateStr = DateFormat("yyyy-MM-dd").format(secondSelectedDate);
+  String firstDateStr = DateFormat("yyyy-MM-dd").format(firstSelectedDate);
+  String secondDateStr = DateFormat("yyyy-MM-dd").format(secondSelectedDate);
 
-    // 📌 1️⃣ Comparison Summary
-    print("📝 Comparison Summary: $comparisonSummary");
-    comparisonSummary = "";
-    if (firstDateData.isNotEmpty && secondDateData.isNotEmpty) {
-      List<String> labels = [
-        "Temperature",
-        "Moisture Level",
-        "pH Level 1",
-        "pH Level 2",
-        "Humidity",
-      ];
+  // 📌 1️⃣ Comparison Summary
+  print("📝 Comparison Summary: $comparisonSummary");
+  List<InlineSpan> comparisonSpans = [];
 
-      for (String label in labels) {
-        double firstValue =
-            double.tryParse(
-              firstDateData[label]?.replaceAll(RegExp('[^0-9.]'), '') ?? "0",
-            ) ??
-            0;
-        double secondValue =
-            double.tryParse(
-              secondDateData[label]?.replaceAll(RegExp('[^0-9.]'), '') ?? "0",
-            ) ??
-            0;
+  if (firstDateData.isNotEmpty && secondDateData.isNotEmpty) {
+    List<String> labels = [
+      "Temperature",
+      "Moisture Level",
+      "pH Level 1",
+      "pH Level 2",
+      "Humidity",
+    ];
 
-        if (firstValue > secondValue) {
+    String formatSensorValue(String sensor, double value) {
+  if (sensor.contains("Temperature")) {
+    return "${value.toStringAsFixed(1)}°C"; // ✅ 1 decimal + °C
+  } else if (sensor.contains("Moisture") || sensor.contains("Humidity")) {
+    return "${value.toStringAsFixed(0)}%"; // ✅ Whole number + %
+  } else if (sensor.contains("pH")) {
+    return value.toStringAsFixed(2); // ✅ 2 decimal places for pH
+  }
+  return value.toString(); // Default case (not expected)
+}
+
+
+    for (String label in labels) {
+      double firstValue =
+          double.tryParse(firstDateData[label]?.replaceAll(RegExp('[^0-9.]'), '') ?? "0") ?? 0;
+      double secondValue =
+          double.tryParse(secondDateData[label]?.replaceAll(RegExp('[^0-9.]'), '') ?? "0") ?? 0;
+
+      if (firstValue > secondValue) {
           double diff = (firstValue - secondValue);
-          comparisonSummary +=
-              "$label on **$firstDateStr** was higher than on **$secondDateStr** by ${diff.toStringAsFixed(2)}.\n";
+          comparisonSpans.add(_buildBulletSpan(
+            label,
+            "on $firstDateStr (${formatSensorValue(label, firstValue)}) was higher than $secondDateStr (${formatSensorValue(label, secondValue)}) by ",
+            formatSensorValue(label, diff),
+          ));
         } else if (firstValue < secondValue) {
           double diff = (secondValue - firstValue);
-          comparisonSummary +=
-              "$label on **$secondDateStr** was higher than on **$firstDateStr** by ${diff.toStringAsFixed(2)}.\n";
+          comparisonSpans.add(_buildBulletSpan(
+            label,
+            "on $secondDateStr (${formatSensorValue(label, secondValue)}) was higher than $firstDateStr (${formatSensorValue(label, firstValue)}) by ",
+            formatSensorValue(label, diff),
+          ));
         } else {
-          comparisonSummary +=
-              "$label was the same on **both dates** ($firstDateStr & $secondDateStr).\n";
+          comparisonSpans.add(_buildBulletSpan(
+            label,
+            "was the same on both dates ($firstDateStr: ${formatSensorValue(label, firstValue)}, $secondDateStr: ${formatSensorValue(label, secondValue)}).",
+            "",
+          ));
         }
+
+
+    }
+  }
+
+  // 📌 2️⃣ Time-Based Frequency Summary
+  print("📝 Frequency Summary: $frequencySummary");
+  List<InlineSpan> frequencySpans = [];
+
+  if (frequencyAnalysisData.isNotEmpty) {
+    frequencyAnalysisData.forEach((sensorType, sensorData) {
+      if (sensorData.isNotEmpty) {
+        var highestRecord = (sensorData as List<Map<String, dynamic>>).reduce(
+          (a, b) =>
+              (double.tryParse(a["Value"].toString()) ?? 0) >
+                      (double.tryParse(b["Value"].toString()) ?? 0)
+                  ? a
+                  : b,
+        );
+
+        double highestValue =
+            double.tryParse(highestRecord["Value"].toString()) ?? 0;
+        String highestValueStr = formatSensorValue(sensorType, highestValue);
+        String rawTimestamp = highestRecord["Time"];
+        String formattedTimestamp = "Unknown Time";
+
+        try {
+          DateTime parsedTime = DateFormat("yyyy-MM-dd hh:mm a").parse(rawTimestamp);
+          formattedTimestamp = (selectedFilter == "Weekly")
+              ? DateFormat("EEE hh:mm a").format(parsedTime) // Example: Mon 08:00 AM
+              : DateFormat("hh:mm a").format(parsedTime); // Example: 08:00 AM
+        } catch (e) {
+          print("⚠️ Error parsing timestamp: $rawTimestamp - $e");
+        }
+
+        frequencySpans.add(_buildBulletSpan(
+          sensorType,
+          "was highest at $formattedTimestamp with a value of ",
+          highestValueStr,
+        ));
       }
-    }
+    });
+  }
 
-    // 📌 2️⃣ Time-Based Frequency Summary (Updated)
-    print("📝 Frequency Summary: $frequencySummary");
-    frequencySummary = "";
-    if (frequencyAnalysisData.isNotEmpty) {
-      List<String> summaries = [];
+  // 📌 UI Layout
+  return Card(
+    color: Colors.white,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    elevation: 3,
+    margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+    child: Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ✅ Title
+          const Text(
+            "📌 Conclusion & Findings",
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.green,
+            ),
+          ),
+          const Divider(color: Colors.black45),
+          const SizedBox(height: 10),
 
-      frequencyAnalysisData.forEach((sensorType, sensorData) {
-        if (sensorData.isNotEmpty) {
-          // ✅ Find the highest value for this sensor type
-          var highestRecord = (sensorData as List<Map<String, dynamic>>).reduce(
-            (a, b) =>
-                (double.tryParse(a["Value"].toString()) ?? 0) >
-                        (double.tryParse(b["Value"].toString()) ?? 0)
-                    ? a
-                    : b,
-          );
-
-          double highestValue =
-              double.tryParse(highestRecord["Value"].toString()) ?? 0;
-          String highestValueStr = formatSensorValue(sensorType, highestValue);
-          String rawTimestamp = highestRecord["Time"];
-          String formattedTimestamp = "Unknown Time";
-
-          try {
-            DateTime parsedTime = DateFormat(
-              "yyyy-MM-dd hh:mm a",
-            ).parse(rawTimestamp);
-            if (selectedFilter == "Weekly") {
-              formattedTimestamp = DateFormat(
-                "yyyy-MM-dd hh:mm a",
-              ).format(parsedTime);
-            } else {
-              formattedTimestamp = DateFormat("hh:mm a").format(parsedTime);
-            }
-          } catch (e) {
-            print("⚠️ Error parsing timestamp: $rawTimestamp - $e");
-          }
-
-          // ✅ Add summary for this sensor type
-          summaries.add(
-            selectedFilter == "Weekly"
-                ? "The highest recorded value this week for **$sensorType** was at **$formattedTimestamp** with a value of **$highestValueStr**."
-                : "The highest recorded value today for **$sensorType** was at **$formattedTimestamp** with a value of **$highestValueStr**.",
-          );
-        }
-      });
-
-      // ✅ Combine summaries for all sensor types
-      frequencySummary = summaries.join("\n");
-    }
-
-    // 📌 UI Layout
-    return Card(
-      color: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      elevation: 3,
-      margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              "Conclusion & Findings",
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
+          // ✅ Comparison Summary
+          if (comparisonSpans.isNotEmpty) ...[
+            Text(
+              "📊 Date Comparison Summary ($firstDateStr vs. $secondDateStr)",
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            RichText(
+              text: TextSpan(
+                style: const TextStyle(fontSize: 16, color: Colors.black87),
+                children: comparisonSpans,
               ),
             ),
-            const Divider(color: Colors.black45),
+            const SizedBox(height: 20),
+          ],
 
-            if (comparisonSummary.isNotEmpty) ...[
-              Text(
-                "📊 Date Comparison Summary ($firstDateStr vs. $secondDateStr)",
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+          // ✅ Time-Based Frequency Summary
+          if (frequencySpans.isNotEmpty) ...[
+            const Text(
+              "📈 Time-Based Frequency Summary",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            RichText(
+              text: TextSpan(
+                style: const TextStyle(fontSize: 16, color: Colors.black87),
+                children: frequencySpans,
+              ),
+            ),
+          ],
+        ],
+      ),
+    ),
+  );
+}
+
+// ✅ Helper Function: Formats text into bullet points with bold values
+InlineSpan _buildBulletSpan(String label, String text, String boldValue) {
+  return WidgetSpan(
+    child: Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "• ", // Bullet point
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          Expanded(
+            child: RichText(
+              text: TextSpan(
+                children: [
+                  TextSpan(
+                    text: "$label ", // Sensor name
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  ),
+                  TextSpan(
+                    text: text, // Regular text
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  TextSpan(
+                    text: boldValue, // Highlighted Value
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+
+}
+
+class ComparisonGraphWidget extends StatefulWidget {
+  final GlobalKey<_ComparisonGraphWidgetState> widgetKey; // ✅ Added GlobalKey
+  final GlobalKey repaintKey;
+  final Map<String, String> firstDateData;
+  final Map<String, String> secondDateData;
+  
+
+  const ComparisonGraphWidget({
+    Key? key,
+    required this.widgetKey,  // ✅ Assign the key
+    required this.repaintKey,
+    required this.firstDateData,
+    required this.secondDateData,
+  }) : super(key: widgetKey); // ✅ Pass key to parent
+
+  @override
+  _ComparisonGraphWidgetState createState() => _ComparisonGraphWidgetState();
+}
+
+class _ComparisonGraphWidgetState extends State<ComparisonGraphWidget> with AutomaticKeepAliveClientMixin {
+  
+  // ✅ Ensures the widget stays in memory and doesn’t get disposed
+  @override
+  bool get wantKeepAlive => true;
+
+  // ✅ Add this method to trigger a rebuild
+  void forceRebuild() {
+    setState(() {}); // 🔄 Triggers a rebuild when called
+  }
+  
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context); // ✅ Required for AutomaticKeepAliveClientMixin
+
+    print("🟢 _buildComparisonGraph() is rebuilding. comparisonGraphKey exists: ${widget.repaintKey.currentContext != null}");
+    print("🔄 _buildComparisonGraph() is rebuilding. comparisonGraphKey is attached: ${widget.repaintKey.currentContext != null}");
+
+
+    return Visibility( // ✅ Ensures widget is always built
+      visible: true,
+      maintainState: true,
+      child: RepaintBoundary(
+        key: widget.repaintKey,
+        child: _buildComparisonGraph(),
+      ),
+    );
+  }
+
+  Widget _buildComparisonGraph() {
+  print("🔍 comparisonGraph Data Check: First - ${widget.firstDateData}, Second - ${widget.secondDateData}");
+
+  if (widget.firstDateData.isEmpty || widget.secondDateData.isEmpty) {
+    return const SizedBox(height: 300); // Maintain layout
+  }
+
+  List<String> labels = [
+    "Temperature",
+    "Moisture Level",
+    "pH Level 1",
+    "pH Level 2",
+    "Humidity",
+  ];
+
+  /// ✅ Improved Data Parsing (Fixed Casting Issue)
+List<double> firstValues = labels.map((label) {
+  String? rawValue = widget.firstDateData[label];
+
+  if (rawValue == null || rawValue.toLowerCase() == "n/a") return 0.0; // Ensure double type
+
+  rawValue = rawValue.replaceAll("°C", "").replaceAll("%", ""); // Remove units
+
+  return double.tryParse(rawValue) ?? 0.0; // Explicitly return double
+}).toList().cast<double>(); // ✅ Ensure it is a List<double>
+
+List<double> secondValues = labels.map((label) {
+  String? rawValue = widget.secondDateData[label];
+
+  if (rawValue == null || rawValue.toLowerCase() == "n/a") return 0.0;
+
+  rawValue = rawValue.replaceAll("°C", "").replaceAll("%", "");
+
+  return double.tryParse(rawValue) ?? 0.0;
+}).toList().cast<double>(); // ✅ Ensure it is a List<double>
+
+
+  // ✅ Debugging: Print parsed values
+  print("📊 First Values: $firstValues");
+  print("📊 Second Values: $secondValues");
+
+  return Column(
+    children: [
+      Wrap(
+        spacing: 12,
+        children: labels.map((sensor) {
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(_getSensorIcon(sensor), size: 18, color: Colors.black),
+              const SizedBox(width: 5),
+              Text(sensor, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            ],
+          );
+        }).toList(),
+      ),
+      const SizedBox(height: 13),
+      SizedBox(
+        height: 300,
+        child: BarChart(
+          BarChartData(
+            barGroups: List.generate(labels.length, (index) {
+              return BarChartGroupData(
+                x: index,
+                barRods: [
+                  BarChartRodData(
+                    toY: firstValues[index],
+                    color: Colors.blue,
+                    width: 16,
+                  ),
+                  BarChartRodData(
+                    toY: secondValues[index],
+                    color: Colors.green,
+                    width: 16,
+                  ),
+                ],
+              );
+            }),
+            titlesData: FlTitlesData(
+              leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 40)),
+              bottomTitles: AxisTitles(
+                sideTitles: SideTitles(
+                  showTitles: true,
+                  getTitlesWidget: (value, _) {
+                    return Icon(_getSensorIcon(labels[value.toInt()]), size: 24, color: Colors.black54);
+                  },
                 ),
               ),
-              Text(
-                comparisonSummary,
-                style: const TextStyle(fontSize: 16, color: Colors.black54),
-              ),
-              const SizedBox(height: 10),
-            ],
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
+}
 
-            if (frequencySummary.isNotEmpty) ...[
-              const Text(
-                "📈 Time-Based Frequency Summary",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              Text(
-                frequencySummary,
-                style: const TextStyle(fontSize: 16, color: Colors.black54),
-              ),
-            ],
-          ],
+
+  // Function to Map Sensor Type to Icons
+  IconData _getSensorIcon(String sensorType) {
+    switch (sensorType.toLowerCase()) {
+      case "temperature":
+        return Icons.thermostat; // 🌡️ Temperature
+      case "moisture level":
+        return Icons.water_drop; // 💧 Moisture Level
+      case "ph level 1":
+      case "ph level 2":
+        return Icons.science; // 🧪 pH Levels
+      case "humidity":
+        return Icons.cloud; // ☁️ Humidity
+      default:
+        return Icons.device_unknown; // ❓ Default Icon
+    }
+  }
+}
+
+
+// Frequency Graph
+class FrequencyGraphWidget extends StatefulWidget {
+  final GlobalKey repaintKey;
+  final Map<String, dynamic> frequencyData;
+  final String selectedFilter;
+
+  const FrequencyGraphWidget({
+    Key? key,
+    required this.repaintKey,
+    required this.frequencyData,
+    required this.selectedFilter,
+  }) : super(key: key);
+
+  @override
+  _FrequencyGraphWidgetState createState() => _FrequencyGraphWidgetState();
+}
+
+class _FrequencyGraphWidgetState extends State<FrequencyGraphWidget> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true; // ✅ Keeps widget in memory
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context); // ✅ Required for AutomaticKeepAliveClientMixin
+
+    print("🟢 _buildTimeBasedFrequencyGraph() is rebuilding. frequencyGraphKey exists: ${widget.repaintKey.currentContext != null}");
+    print("🟢 FrequencyGraphWidget is building. Attached to UI? ${widget.repaintKey.currentContext != null}");
+    print("🔍 Frequency Data Check: ${widget.frequencyData}");
+
+
+
+    return KeepAlive(
+      keepAlive: true,
+      child: SizedBox(
+        height: 400,
+        child: RepaintBoundary(
+          key: widget.repaintKey,
+          child: _buildTimeBasedFrequencyGraph(),
         ),
       ),
     );
+}
+
+Widget _buildTimeBasedFrequencyGraph() {
+  if (widget.frequencyData.isEmpty) {
+    return const Center(child: Text("No alerts recorded to display."));
+  }
+
+  List<String> sensorTypes = widget.frequencyData.keys.toList();
+  List<String> timestamps = [];
+
+  for (var sensor in sensorTypes) {
+    for (var entry in widget.frequencyData[sensor] ?? []) {
+      if (!timestamps.contains(entry["Time"])) {
+        timestamps.add(entry["Time"]);
+      }
+    }
+  }
+
+// Daily Filter
+ if (widget.selectedFilter == "Daily") {
+  bool isScrollable = timestamps.length > 6; // ✅ Enable scrolling dynamically
+  double graphWidth = isScrollable ? timestamps.length * 50.0 : 400.0; // ✅ Dynamic width
+
+  return Column(
+    children: [
+      Wrap(
+        spacing: 10,
+        children: sensorTypes.map((sensor) {
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: _getSensorColor(sensor),
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 5),
+              Text(
+                sensor,
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+            ],
+          );
+        }).toList(),
+      ),
+      const SizedBox(height: 12),
+
+      SingleChildScrollView( // ✅ Enables horizontal scrolling dynamically
+        scrollDirection: Axis.horizontal,
+        child: SizedBox(
+          width: graphWidth, // ✅ Prevents infinite constraints issue
+          height: 300,
+          child: BarChart(
+            BarChartData(
+              barGroups: List.generate(timestamps.length, (index) {
+                String timeLabel = timestamps[index];
+                List<BarChartRodData> bars = [];
+
+                for (var sensor in sensorTypes) {
+                  var sensorData = widget.frequencyData[sensor]
+                          ?.where((data) => data["Time"] == timeLabel)
+                          .toList() ??
+                      [];
+                  if (sensorData.isNotEmpty) {
+                    double sensorValue = double.tryParse(sensorData.first["Value"].toString()) ?? 0;
+                    bars.add(
+                      BarChartRodData(
+                        toY: sensorValue,
+                        color: _getSensorColor(sensor),
+                        width: 16,
+                      ),
+                    );
+                  }
+                }
+
+                return BarChartGroupData(x: index, barRods: bars);
+              }),
+
+              barTouchData: BarTouchData(
+                touchTooltipData: BarTouchTooltipData(
+                  fitInsideVertically: true,
+                            fitInsideHorizontally: true,
+                  
+                  getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                    String formattedTime = _formatTimestamp(timestamps[groupIndex]);
+                    return BarTooltipItem(
+                      "Sensor Value: ${rod.toY}\nTime: $formattedTime",
+                      const TextStyle(color: Colors.white, fontSize: 12),
+                    );
+                  },
+                  getTooltipColor: (group) => Colors.black87,
+                  tooltipRoundedRadius: 8,
+                  tooltipPadding: const EdgeInsets.all(8),
+                ),
+              ),
+
+              titlesData: _buildChartTitles(timestamps),
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+
+
+  // ✅ **Weekly Logic (Retains Vertical Scrolling for Multiple Sensors)**
+  if (widget.selectedFilter == "Weekly") {
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(), // ✅ Retains vertical scrolling
+      child: Column(
+        children: sensorTypes.map((sensor) {
+          List<String> sensorTimestamps = [];
+          for (var entry in widget.frequencyData[sensor] ?? []) {
+            if (!sensorTimestamps.contains(entry["Time"])) {
+              sensorTimestamps.add(entry["Time"]);
+            }
+          }
+
+          bool isScrollable = sensorTimestamps.length > 6; // ✅ Enable scrolling dynamically
+
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: _getSensorColor(sensor),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      sensor,
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 10),
+
+                SingleChildScrollView(
+                  scrollDirection: isScrollable ? Axis.horizontal : Axis.vertical, // ✅ Scroll dynamically
+                  child: SizedBox(
+                    width: isScrollable ? sensorTimestamps.length * 50.0 : null, // ✅ Expand width dynamically
+                    height: 300,
+                    child: BarChart(
+                      BarChartData(
+                        barGroups: List.generate(sensorTimestamps.length, (index) {
+                          String timeLabel = sensorTimestamps[index];
+                          List<BarChartRodData> bars = [];
+
+                          var sensorData = widget.frequencyData[sensor]
+                                  ?.where((data) => data["Time"] == timeLabel)
+                                  .toList() ??
+                              [];
+                          if (sensorData.isNotEmpty) {
+                            double sensorValue = double.tryParse(sensorData.first["Value"].toString()) ?? 0;
+                            bars.add(
+                              BarChartRodData(
+                                toY: sensorValue,
+                                color: _getSensorColor(sensor),
+                                width: 16,
+                              ),
+                            );
+                          }
+
+                          return BarChartGroupData(x: index, barRods: bars);
+                        }),
+
+                        barTouchData: BarTouchData(
+                          touchTooltipData: BarTouchTooltipData(
+                            fitInsideVertically: true,
+                            fitInsideHorizontally: true,
+                            tooltipPadding: const EdgeInsets.all(8),
+                            tooltipRoundedRadius: 8,
+                            getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                              String formattedTime = _formatTimestamp(sensorTimestamps[groupIndex]);
+                              return BarTooltipItem(
+                                "Sensor Value: ${rod.toY}\nTime: $formattedTime",
+                                const TextStyle(color: Colors.white, fontSize: 12),
+                              );
+                            },
+                            getTooltipColor: (group) => Colors.black87,
+                          ),
+                        ),
+
+                        titlesData: _buildChartTitles(sensorTimestamps),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  return const SizedBox(); // Default fallback
+}
+
+
+
+
+
+  /// ✅ **Move `_buildChartTitles` inside `FrequencyGraphWidget`**
+  FlTitlesData _buildChartTitles(List<String> timestamps) {
+    return FlTitlesData(
+      topTitles: AxisTitles(
+        sideTitles: SideTitles(showTitles: false), // ✅ Hide top numbers
+      ),
+      leftTitles: AxisTitles(
+        sideTitles: SideTitles(showTitles: true, reservedSize: 40),
+      ),
+      bottomTitles: AxisTitles(
+        sideTitles: SideTitles(
+          showTitles: true,
+          reservedSize: 60,
+          getTitlesWidget: (value, meta) {
+            int index = value.toInt();
+            if (index >= 0 && index < timestamps.length) {
+              return _buildFormattedTimestampLabel(index, timestamps);
+            }
+            return const Text("");
+          },
+        ),
+      ),
+    );
+  }
+
+  /// ✅ **Move `_formatTimestamp` inside `FrequencyGraphWidget`**
+  String _formatTimestamp(String timestamp) {
+    try {
+      DateTime parsedTime;
+      if (timestamp.contains("AM") || timestamp.contains("PM")) {
+        parsedTime = DateFormat("yyyy-MM-dd hh:mm a").parse(timestamp);
+      } else {
+        parsedTime = DateFormat("yyyy-MM-dd HH:mm:ss").parse(timestamp);
+      }
+
+      return (widget.selectedFilter == "Weekly")
+          ? DateFormat("EEE hh:mm a").format(parsedTime)
+          : DateFormat("hh:mm a").format(parsedTime);
+    } catch (e) {
+      if (kDebugMode) {
+        print("⚠️ Error parsing timestamp: $timestamp - $e");
+      }
+      return "Invalid Time";
+    }
+  }
+
+  /// ✅ **Helper to show labels at correct intervals**
+  Widget _buildFormattedTimestampLabel(int index, List<String> timestamps) {
+    String formattedTime = _formatTimestamp(timestamps[index]);
+
+    bool showLabel = timestamps.length <= 4 || index % 2 == 0;
+
+    return showLabel
+        ? Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              formattedTime,
+              style: const TextStyle(fontSize: 10),
+              textAlign: TextAlign.center,
+            ),
+          )
+        : const SizedBox.shrink();
+  }
+
+  /// ✅ **Move `_getSensorColor` inside `FrequencyGraphWidget`**
+  Color _getSensorColor(String sensor) {
+  switch (sensor.toLowerCase()) {
+    case "temperature":
+      return Colors.red;
+    case "moisture":
+      return Colors.blue;
+    case "ph_level":
+    return const Color.fromARGB(255, 83, 255, 88);
+    case "ph_level2":
+      return Colors.green;
+    case "humidity":
+      return Colors.orange; // 🌤️ Set a distinct color for humidity
+    default:
+      return Colors.grey; // Fallback for unknown sensors
+    }
   }
 }
