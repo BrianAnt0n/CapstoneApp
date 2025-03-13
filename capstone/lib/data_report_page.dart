@@ -204,10 +204,12 @@ String _formatSensorValue(String sensor, dynamic value) {
     DateTime date,
     int hardwareId,
   ) async {
+    
   String startOfDay = "${DateFormat('yyyy-MM-dd').format(date)} 00:00:00";
   String endOfDay = "${DateFormat('yyyy-MM-dd').format(date)} 23:59:59";
 
   print("🔍 Fetching historical data for hardware_id: $hardwareId between $startOfDay and $endOfDay");
+  
 
   try {
     final response = await Supabase.instance.client
@@ -222,6 +224,8 @@ String _formatSensorValue(String sensor, dynamic value) {
 
     if (response == null) {
       print("🚨 No data found for hardware_id: $hardwareId on $startOfDay");
+      print("🟢 API Response: $response");
+
       return _defaultData("N/A");
     }
 
@@ -276,9 +280,18 @@ String _formatSensorValue(String sensor, dynamic value) {
           .order('timestamp', ascending: true);
 
       if (response.isEmpty) {
-        print(
+        if (kDebugMode) {
+          print("🟢 Frequency Data Response: $response");
+        }
+        if (kDebugMode) {
+          print("🟢 API Response from Supabase: $response");
+        }
+
+        if (kDebugMode) {
+          print(
           "🚨 No notifications found for hardware_id: $hardwareId in the selected range",
         );
+        }
         return {};
       }
 
@@ -305,7 +318,9 @@ String _formatSensorValue(String sensor, dynamic value) {
               "yyyy-MM-dd hh:mm a",
             ).format(DateTime.parse(entry['timestamp'].toString()));
           } catch (e) {
-            print("⚠️ Error parsing timestamp: ${entry['timestamp']} - $e");
+            if (kDebugMode) {
+              print("⚠️ Error parsing timestamp: ${entry['timestamp']} - $e");
+            }
           }
         }
 
@@ -318,7 +333,9 @@ String _formatSensorValue(String sensor, dynamic value) {
 
       return groupedData;
     } catch (e) {
-      print("❌ Error fetching notification data: $e");
+      if (kDebugMode) {
+        print("❌ Error fetching notification data: $e");
+      }
       return {};
     }
   }
@@ -505,7 +522,9 @@ List<double> secondValues = labels.map((label) {
                         ) // Mon 08:00 AM
                         : DateFormat("hh:mm a").format(parsedTime); // 08:00 AM
               } catch (e) {
-                print("⚠️ Error parsing timestamp: ${timestamps[index]} - $e");
+                if (kDebugMode) {
+                  print("⚠️ Error parsing timestamp: ${timestamps[index]} - $e");
+                }
               }
 
               // ✅ Adaptive Label Spacing
@@ -556,7 +575,9 @@ List<double> secondValues = labels.map((label) {
   );
 
   try {
-    print("📄 Exporting PDF...");
+    if (kDebugMode) {
+      print("📄 Exporting PDF...");
+    }
 
     await Future.delayed(const Duration(milliseconds: 1000)); // Ensure UI updates
 
@@ -571,12 +592,16 @@ List<double> secondValues = labels.map((label) {
 
     // ✅ Ensure summaries are generated
     if (comparisonSummary.trim().isEmpty) {
-      print("❌ No data for comparisonSummary! Regenerating...");
+      if (kDebugMode) {
+        print("❌ No data for comparisonSummary! Regenerating...");
+      }
       _generateComparisonSummary();
     }
 
     if (frequencySummary.trim().isEmpty) {
-      print("❌ No data for frequencySummary! Regenerating...");
+      if (kDebugMode) {
+        print("❌ No data for frequencySummary! Regenerating...");
+      }
       _generateFrequencySummary();
     }
 
@@ -912,10 +937,14 @@ void _generateComparisonSummary() {
 }
 
 void _generateFrequencySummary() {
-  print("🔄 Regenerating Frequency Summary...");
+  if (kDebugMode) {
+    print("🔄 Regenerating Frequency Summary...");
+  }
   frequencySummary = ""; // ✅ Clear old data
 
-  print("🔍 selectedFilter: $selectedFilter"); // ✅ Debugging line
+  if (kDebugMode) {
+    print("🔍 selectedFilter: $selectedFilter");
+  } // ✅ Debugging line
 
   if (frequencyAnalysisData.isNotEmpty) {
     List<String> summaries = [];
@@ -940,7 +969,9 @@ void _generateFrequencySummary() {
             DateTime parsedTime = DateFormat("yyyy-MM-dd hh:mm a").parse(highestWeeklyTimestamp);
             formattedTimestamp = DateFormat("EEE, yyyy-MM-dd hh:mm a").format(parsedTime);
           } catch (e) {
-            print("⚠️ Error parsing timestamp: $highestWeeklyTimestamp - $e");
+            if (kDebugMode) {
+              print("⚠️ Error parsing timestamp: $highestWeeklyTimestamp - $e");
+            }
           }
 
           // ✅ Apply proper units
@@ -962,7 +993,9 @@ void _generateFrequencySummary() {
             DateTime parsedTime = DateFormat("yyyy-MM-dd hh:mm a").parse(rawTimestamp);
             formattedTimestamp = DateFormat("hh:mm a").format(parsedTime);
           } catch (e) {
-            print("⚠️ Error parsing timestamp: $rawTimestamp - $e");
+            if (kDebugMode) {
+              print("⚠️ Error parsing timestamp: $rawTimestamp - $e");
+            }
           }
 
           // ✅ Apply proper units
@@ -978,7 +1011,9 @@ void _generateFrequencySummary() {
     frequencySummary = summaries.join("\n\n");
   }
 
-  print("📌 Final frequencySummary: $frequencySummary");
+  if (kDebugMode) {
+    print("📌 Final frequencySummary: $frequencySummary");
+  }
 }
 
 
@@ -1051,7 +1086,9 @@ pw.Widget _buildPDFBulletPoints(String summary, pw.Font customFont) {
   );
   if (frequencyGraphImage != null) images.add(frequencyGraphImage);
 
-  print("📸 Total images captured: ${images.length}");
+  if (kDebugMode) {
+    print("📸 Total images captured: ${images.length}");
+  }
   return images;
 }
 
@@ -1059,20 +1096,28 @@ pw.Widget _buildPDFBulletPoints(String summary, pw.Font customFont) {
 // ✅ Helper Function: Captures a widget as an image
 Future<Uint8List?> _captureGraph(GlobalKey key, String graphName, VoidCallback forceRebuild) async {
 
-  print("🔍 Attempting to capture $graphName...");
+  if (kDebugMode) {
+    print("🔍 Attempting to capture $graphName...");
+  }
 
-  print("🔍 Checking $graphName BEFORE capturing images: ${key.currentContext != null}");
+  if (kDebugMode) {
+    print("🔍 Checking $graphName BEFORE capturing images: ${key.currentContext != null}");
+  }
 
   // ✅ Force rebuild if widget is null
   if (key.currentContext == null) {
-    print("⚠ $graphName context is NULL! Forcing rebuild...");
+    if (kDebugMode) {
+      print("⚠ $graphName context is NULL! Forcing rebuild...");
+    }
     forceRebuild();  // 🔄 Calls setState() to trigger a rebuild
     await Future.delayed(Duration(milliseconds: 500)); // Allow rebuild time
   }
 
   // ✅ Double-check after rebuild attempt
   if (key.currentContext == null) {
-    print("⚠ $graphName context is STILL NULL after rebuild attempt. Skipping capture.");
+    if (kDebugMode) {
+      print("⚠ $graphName context is STILL NULL after rebuild attempt. Skipping capture.");
+    }
     return null;
   }
 
@@ -1080,14 +1125,18 @@ Future<Uint8List?> _captureGraph(GlobalKey key, String graphName, VoidCallback f
   await _waitForGraphRender(key, graphName);
 
   if (key.currentContext == null || key.currentContext!.findRenderObject() == null) {
-    print("⚠ $graphName is still NULL, skipping capture.");
+    if (kDebugMode) {
+      print("⚠ $graphName is still NULL, skipping capture.");
+    }
     return null;
   }
 
   RenderRepaintBoundary? boundary = key.currentContext!.findRenderObject() as RenderRepaintBoundary?;
 
   if (boundary == null || boundary.debugNeedsPaint) {
-  print("⚠ $graphName is not fully painted! Retrying...");
+  if (kDebugMode) {
+    print("⚠ $graphName is not fully painted! Retrying...");
+  }
 
   // ✅ Force UI rebuild and delay again
   forceRebuild();
@@ -1095,12 +1144,16 @@ Future<Uint8List?> _captureGraph(GlobalKey key, String graphName, VoidCallback f
 
   boundary = key.currentContext?.findRenderObject() as RenderRepaintBoundary?;
   if (boundary == null || boundary.debugNeedsPaint) {
-    print("❌ $graphName is STILL NOT READY after waiting! Skipping...");
+    if (kDebugMode) {
+      print("❌ $graphName is STILL NOT READY after waiting! Skipping...");
+    }
     return null;
   }
 }
 
-  print("✅ $graphName is fully rendered and painted.");
+  if (kDebugMode) {
+    print("✅ $graphName is fully rendered and painted.");
+  }
   ui.Image image = await boundary.toImage(pixelRatio: 3.0);
   ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
   return byteData?.buffer.asUint8List();
@@ -1121,11 +1174,15 @@ Future<void> _waitForGraphRender(GlobalKey key, String graphName) async {
       }
     }
 retries--;
-    print("⏳ Waiting for $graphName to finish rendering... ($retries retries left)");
+    if (kDebugMode) {
+      print("⏳ Waiting for $graphName to finish rendering... ($retries retries left)");
+    }
     
   }
 
-  print("❌ $graphName is STILL NULL or not painted after waiting!");
+  if (kDebugMode) {
+    print("❌ $graphName is STILL NULL or not painted after waiting!");
+  }
 }
 
 
@@ -1160,14 +1217,22 @@ retries--;
   @override
   Widget build(BuildContext context) {
 
-      print("🔍 BUILDING PAGE - comparisonGraphKey exists: ${comparisonGraphKey.currentContext != null}");
+      if (kDebugMode) {
+        print("🔍 BUILDING PAGE - comparisonGraphKey exists: ${comparisonGraphKey.currentContext != null}");
+      }
 
     // 🔍 Debugging Log
-      print("🔍 comparisonGraphKey exists in UI: ${comparisonGraphKey.currentContext != null}");
+      if (kDebugMode) {
+        print("🔍 comparisonGraphKey exists in UI: ${comparisonGraphKey.currentContext != null}");
+      }
 
        // 🔍 Check if first and second date data are updating
-    print("🔍 First Date Data: $firstDateData");
-    print("🔍 Second Date Data: $secondDateData");
+    if (kDebugMode) {
+      print("🔍 First Date Data: $firstDateData");
+    }
+    if (kDebugMode) {
+      print("🔍 Second Date Data: $secondDateData");
+    }
 
 
 
@@ -1207,11 +1272,15 @@ retries--;
                   hasSecondDate = true;
                 });
 
-    print("🔍 Fetching data for second date: $pickedDate");
+    if (kDebugMode) {
+      print("🔍 Fetching data for second date: $pickedDate");
+    }
     
     secondDateData = await _fetchHistoricalData(secondSelectedDate, hardwareId!);
     
-    print("🔍 Updated secondDateData: $secondDateData");
+    if (kDebugMode) {
+      print("🔍 Updated secondDateData: $secondDateData");
+    }
     
     setState(() {}); // 🔄 Ensure UI updates
   }
@@ -1414,7 +1483,9 @@ retries--;
                       ).format(parsedTime); // ✅ Keep time-only for "Daily"
                     }
                   } catch (e) {
-                    print("⚠️ Error parsing timestamp: ${data["Time"]} - $e");
+                    if (kDebugMode) {
+                      print("⚠️ Error parsing timestamp: ${data["Time"]} - $e");
+                    }
                   }
 
                   return Padding(
@@ -2206,36 +2277,42 @@ Widget _buildTimeBasedFrequencyGraph() {
     }
   }
 
-  if (widget.selectedFilter == "Daily") {
-    return Column(
-      children: [
-        Wrap(
-          spacing: 10,
-          children: sensorTypes.map((sensor) {
-            return Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 12,
-                  height: 12,
-                  decoration: BoxDecoration(
-                    color: _getSensorColor(sensor),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 5),
-                Text(
-                  sensor,
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                ),
-              ],
-            );
-          }).toList(),
-        ),
+// Daily Filter
+ if (widget.selectedFilter == "Daily") {
+  bool isScrollable = timestamps.length > 6; // ✅ Enable scrolling dynamically
+  double graphWidth = isScrollable ? timestamps.length * 50.0 : 400.0; // ✅ Dynamic width
 
-        const SizedBox(height: 12),
+  return Column(
+    children: [
+      Wrap(
+        spacing: 10,
+        children: sensorTypes.map((sensor) {
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: _getSensorColor(sensor),
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 5),
+              Text(
+                sensor,
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+            ],
+          );
+        }).toList(),
+      ),
+      const SizedBox(height: 12),
 
-        SizedBox(
+      SingleChildScrollView( // ✅ Enables horizontal scrolling dynamically
+        scrollDirection: Axis.horizontal,
+        child: SizedBox(
+          width: graphWidth, // ✅ Prevents infinite constraints issue
           height: 300,
           child: BarChart(
             BarChartData(
@@ -2265,7 +2342,9 @@ Widget _buildTimeBasedFrequencyGraph() {
 
               barTouchData: BarTouchData(
                 touchTooltipData: BarTouchTooltipData(
-                  tooltipMargin: 30, // ✅ Move tooltips away
+                  fitInsideVertically: true,
+                            fitInsideHorizontally: true,
+                  
                   getTooltipItem: (group, groupIndex, rod, rodIndex) {
                     String formattedTime = _formatTimestamp(timestamps[groupIndex]);
                     return BarTooltipItem(
@@ -2283,51 +2362,57 @@ Widget _buildTimeBasedFrequencyGraph() {
             ),
           ),
         ),
-      ],
-    );
-  }
+      ),
+    ],
+  );
+}
 
-  // ✅ If "Weekly", generate separate graphs per sensor type
+
+
+  // ✅ **Weekly Logic (Retains Vertical Scrolling for Multiple Sensors)**
   if (widget.selectedFilter == "Weekly") {
-    return Container( // ✅ Removed Expanded to avoid constraint issues
-      padding: const EdgeInsets.symmetric(vertical: 10), // ✅ Adds spacing
-      child: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        child: Column(
-          children: sensorTypes.map((sensor) {
-            List<String> sensorTimestamps = [];
-            for (var entry in widget.frequencyData[sensor] ?? []) {
-              if (!sensorTimestamps.contains(entry["Time"])) {
-                sensorTimestamps.add(entry["Time"]);
-              }
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(), // ✅ Retains vertical scrolling
+      child: Column(
+        children: sensorTypes.map((sensor) {
+          List<String> sensorTimestamps = [];
+          for (var entry in widget.frequencyData[sensor] ?? []) {
+            if (!sensorTimestamps.contains(entry["Time"])) {
+              sensorTimestamps.add(entry["Time"]);
             }
+          }
 
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10), // ✅ Adds spacing between charts
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 12,
-                        height: 12,
-                        decoration: BoxDecoration(
-                          color: _getSensorColor(sensor),
-                          shape: BoxShape.circle,
-                        ),
+          bool isScrollable = sensorTimestamps.length > 6; // ✅ Enable scrolling dynamically
+
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: _getSensorColor(sensor),
+                        shape: BoxShape.circle,
                       ),
-                      const SizedBox(width: 5),
-                      Text(
-                        sensor,
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      sensor,
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
 
-                  const SizedBox(height: 10),
+                const SizedBox(height: 10),
 
-                  SizedBox(
+                SingleChildScrollView(
+                  scrollDirection: isScrollable ? Axis.horizontal : Axis.vertical, // ✅ Scroll dynamically
+                  child: SizedBox(
+                    width: isScrollable ? sensorTimestamps.length * 50.0 : null, // ✅ Expand width dynamically
                     height: 300,
                     child: BarChart(
                       BarChartData(
@@ -2354,37 +2439,39 @@ Widget _buildTimeBasedFrequencyGraph() {
                         }),
 
                         barTouchData: BarTouchData(
-  touchTooltipData: BarTouchTooltipData(
-    fitInsideVertically: true,  // ✅ Prevents tooltip from clipping above
-    fitInsideHorizontally: true, // ✅ Ensures tooltip stays in view
-    tooltipPadding: const EdgeInsets.all(8), // ✅ Keeps tooltip properly sized
-    tooltipRoundedRadius: 8,
-    getTooltipItem: (group, groupIndex, rod, rodIndex) {
-      String formattedTime = _formatTimestamp(sensorTimestamps[groupIndex]);
-      return BarTooltipItem(
-        "Sensor Value: ${rod.toY}\nTime: $formattedTime",
-        const TextStyle(color: Colors.white, fontSize: 12),
-      );
-    },
-    getTooltipColor: (group) => Colors.black87,
-  ),
-),
+                          touchTooltipData: BarTouchTooltipData(
+                            fitInsideVertically: true,
+                            fitInsideHorizontally: true,
+                            tooltipPadding: const EdgeInsets.all(8),
+                            tooltipRoundedRadius: 8,
+                            getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                              String formattedTime = _formatTimestamp(sensorTimestamps[groupIndex]);
+                              return BarTooltipItem(
+                                "Sensor Value: ${rod.toY}\nTime: $formattedTime",
+                                const TextStyle(color: Colors.white, fontSize: 12),
+                              );
+                            },
+                            getTooltipColor: (group) => Colors.black87,
+                          ),
+                        ),
 
                         titlesData: _buildChartTitles(sensorTimestamps),
                       ),
                     ),
                   ),
-                ],
-              ),
-            );
-          }).toList(),
-        ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
       ),
     );
   }
 
   return const SizedBox(); // Default fallback
 }
+
+
 
 
 
@@ -2427,7 +2514,9 @@ Widget _buildTimeBasedFrequencyGraph() {
           ? DateFormat("EEE hh:mm a").format(parsedTime)
           : DateFormat("hh:mm a").format(parsedTime);
     } catch (e) {
-      print("⚠️ Error parsing timestamp: $timestamp - $e");
+      if (kDebugMode) {
+        print("⚠️ Error parsing timestamp: $timestamp - $e");
+      }
       return "Invalid Time";
     }
   }
