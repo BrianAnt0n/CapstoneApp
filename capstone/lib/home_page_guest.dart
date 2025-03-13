@@ -154,12 +154,34 @@ class _DashboardPageState extends State<DashboardPage> {
   Future<List<Map<String, dynamic>>> fetchHistoryData(int containerId) async {
     final supabase = Supabase.instance.client;
     try {
-      return await supabase
-          .from('History_Test')
-          .select('*')
+
+      final hardwareResponse = await supabase
+          .from('Hardware_Sensors_Test')
+          .select('start_date'
+              )
           .eq('hardware_id', containerId)
+          .maybeSingle();
+
+      DateTime startDate = DateTime.parse(hardwareResponse?['start_date']);
+
+      // Step 2: Fetch historical data using the correct hardware_id
+      final response = await supabase
+          .from('History_Average')
+          .select(
+              )
+          .eq('hardware_id', containerId)
+          .gte('timestamp', startDate)
           .order('timestamp', ascending: true);
+
+      if (response.isEmpty) {
+        print("No historical data found for hardware_id: $containerId");
+      } else {
+        print("Fetched Historical Data: $response");
+      }
+
+      return response;
     } catch (error) {
+      print("Error fetching historical data: $error");
       return [];
     }
   }
@@ -643,36 +665,51 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  void _calculateContainerAge() {
+ int _calculateContainerAge() {
     if (_containerAddedDate == null) {
-      _containerAge = "Unknown";
-      return;
+      _containerAge = "NOT YET STARTED";
+      _ageColor = Colors.black;
+      return 0;
     }
 
     final difference = _selectedDate.difference(_containerAddedDate!);
-    int days = difference.inDays;
-    int weeks = (days / 7).floor(); // Always display as weeks
 
-    // Mark as "Over-composted" if 16 or more weeks
-    if (weeks > 16) {
-      _containerAge = "Over-composted";
-      _ageColor = Colors.grey; // Set a distinct color for over-composted
+    if (difference.isNegative) {
+      _containerAge = "NOT STARTED YET";
+      _ageColor = Colors.black;
+      return 0;
+    }
+
+    int weeks = difference.inDays ~/ 7;
+    int days = difference.inDays % 7;
+
+    // Handle singular/plural properly
+    String weekText = weeks == 1 ? "1 WEEK" : "$weeks WEEKS";
+    String dayText = days == 1 ? "1 DAY" : "$days DAYS";
+
+    if (weeks == 0) {
+      _containerAge = dayText; // Only display days if weeks is 0
+    } else if (days == 0) {
+      _containerAge = weekText; // Only display weeks if days is 0
     } else {
-      _containerAge = "$weeks ${weeks == 1 ? 'WEEK' : 'WEEKS'}";
+      _containerAge = "$weekText AND $dayText"; // Display both
+    }
 
-      // Set color based on compost age
-      if (weeks >= 12) {
-        _ageColor = Colors.green;
-      } else if (weeks >= 7) {
-        _ageColor = Colors.orange;
-      } else {
-        _ageColor = Colors.red;
-      }
+    if (weeks >= 16) {
+      _ageColor = Colors.grey;
+    } else if (weeks >= 12) {
+      _ageColor = Colors.green;
+    } else if (weeks >= 7) {
+      _ageColor = Colors.orange;
+    } else {
+      _ageColor = Colors.red;
     }
 
     if (mounted) {
-      setState(() {}); // Update UI
+      setState(() {});
     }
+
+    return weeks;
   }
 
   @override
@@ -739,7 +776,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                   Colors.green),
                               buildSensorCard(
                                   Icons.water_drop,
-                                  'Moisture Level',
+                                  'Dryness Level',
                                   '${sensorData['moisture']}%',
                                   Colors.blue),
                               buildSensorCard(Icons.science, 'pH Level 1',
@@ -911,7 +948,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           fontSize: 14, fontWeight: FontWeight.normal),
                     ),
 
-                    FutureBuilder(
+                   FutureBuilder(
                       future: _historyFuture,
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
@@ -934,14 +971,49 @@ class _DashboardPageState extends State<DashboardPage> {
                                 scrollController.position.maxScrollExtent);
                           });
 
+                          Widget buildChartOrMessage(
+                              String title, String key, Color color) {
+                            if (historyData.length <= 1) {
+                              return Container(
+                                height: 250, // Adjust height as needed
+                                alignment: Alignment.center,
+                                child: const Text(
+                                  'Insufficient Data',
+                                  style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.red),
+                                ),
+                              );
+                            } else if (_containerAddedDate == null) {
+                              return Container(
+                                height: 250, // Adjust height as needed
+                                alignment: Alignment.center,
+                                child: const Text(
+                                  'No Compost',
+                                  style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.red),
+                                ),
+                              );
+                              } else {
+                              return SingleChildScrollView(
+                                controller: scrollController,
+                                scrollDirection: Axis.horizontal,
+                                reverse: true,
+                                child: buildBarChart(
+                                    historyData, title, key, color),
+                              );
+                            }
+                          }
+
                           return SingleChildScrollView(
                             scrollDirection: Axis.vertical,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const SizedBox(height: 20),
-
-                                // Temperature Graph Section
                                 const Text(
                                   'Temperature Monitoring',
                                   style: TextStyle(
@@ -953,48 +1025,29 @@ class _DashboardPageState extends State<DashboardPage> {
                                   style: TextStyle(
                                       fontSize: 14, color: Colors.grey),
                                 ),
-                                SingleChildScrollView(
-                                  controller: scrollController,
-                                  scrollDirection: Axis.horizontal,
-                                  reverse: true,
-                                  child: buildBarChart(
-                                      historyData,
-                                      'Temperature',
-                                      'temperature',
-                                      Colors.green),
-                                ),
+                                buildChartOrMessage(
+                                    'Temperature', 'temperature', Colors.green),
                                 const SizedBox(height: 20),
                                 Divider(
                                     thickness: 2, color: Colors.grey.shade400),
-
                                 const SizedBox(height: 20),
-
-                                // Moisture Graph Section
                                 const Text(
-                                  'Moisture Level',
+                                  'Dryness Level',
                                   style: TextStyle(
                                       fontSize: 20,
                                       fontWeight: FontWeight.bold),
                                 ),
                                 const Text(
-                                  '• Optimal: 50-60%  |  Dry: Below 50%  |  Too Wet: Above 60%',
+                                  '• Optimal: 50-60%  |  Wet: Below 50%  |  Too Dry: Above 60%',
                                   style: TextStyle(
                                       fontSize: 14, color: Colors.grey),
                                 ),
-                                SingleChildScrollView(
-                                  controller: scrollController,
-                                  scrollDirection: Axis.horizontal,
-                                  reverse: true,
-                                  child: buildBarChart(historyData, 'Moisture',
-                                      'moisture', Colors.blue),
-                                ),
+                                buildChartOrMessage(
+                                    'Dryness', 'moisture', Colors.blue),
                                 const SizedBox(height: 20),
                                 Divider(
                                     thickness: 2, color: Colors.grey.shade400),
-
                                 const SizedBox(height: 20),
-
-                                // pH Level 1 Graph Section
                                 const Text(
                                   'pH Level 1',
                                   style: TextStyle(
@@ -1006,20 +1059,12 @@ class _DashboardPageState extends State<DashboardPage> {
                                   style: TextStyle(
                                       fontSize: 14, color: Colors.grey),
                                 ),
-                                SingleChildScrollView(
-                                  controller: scrollController,
-                                  scrollDirection: Axis.horizontal,
-                                  reverse: true,
-                                  child: buildBarChart(historyData,
-                                      'pH Level 1', 'ph_level1', Colors.purple),
-                                ),
+                                buildChartOrMessage(
+                                    'pH Level 1', 'ph_level1', Colors.purple),
                                 const SizedBox(height: 20),
                                 Divider(
                                     thickness: 2, color: Colors.grey.shade400),
-
                                 const SizedBox(height: 20),
-
-                                // pH Level 2 Graph Section
                                 const Text(
                                   'pH Level 2',
                                   style: TextStyle(
@@ -1031,23 +1076,12 @@ class _DashboardPageState extends State<DashboardPage> {
                                   style: TextStyle(
                                       fontSize: 14, color: Colors.grey),
                                 ),
-                                SingleChildScrollView(
-                                  controller: scrollController,
-                                  scrollDirection: Axis.horizontal,
-                                  reverse: true,
-                                  child: buildBarChart(
-                                      historyData,
-                                      'pH Level 2',
-                                      'ph_level2',
-                                      Colors.deepPurple),
-                                ),
+                                buildChartOrMessage('pH Level 2', 'ph_level2',
+                                    Colors.deepPurple),
                                 const SizedBox(height: 20),
                                 Divider(
                                     thickness: 2, color: Colors.grey.shade400),
-
                                 const SizedBox(height: 20),
-
-                                // Humidity Graph Section
                                 const Text(
                                   'Humidity Level',
                                   style: TextStyle(
@@ -1059,13 +1093,8 @@ class _DashboardPageState extends State<DashboardPage> {
                                   style: TextStyle(
                                       fontSize: 14, color: Colors.grey),
                                 ),
-                                SingleChildScrollView(
-                                  controller: scrollController,
-                                  scrollDirection: Axis.horizontal,
-                                  reverse: true,
-                                  child: buildBarChart(historyData, 'Humidity',
-                                      'humidity', Colors.orange),
-                                ),
+                                buildChartOrMessage(
+                                    'Humidity', 'humidity', Colors.orange),
                               ],
                             ),
                           );
