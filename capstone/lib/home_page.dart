@@ -554,18 +554,28 @@ class _DashboardPageState extends State<DashboardPage> {
     try {
       // Step 1: Fetch the correct hardware_id using container_id
       final hardwareId = await fetchHardwareIdFromContainer(containerId);
-
+      
       if (hardwareId == null) {
         print("Cannot fetch historical data because hardware_id is null.");
         return [];
       }
 
+      final hardwareResponse = await supabase
+          .from('Hardware_Sensors_Test')
+          .select('start_date'
+              )
+          .eq('hardware_id', hardwareId)
+          .maybeSingle();
+
+      DateTime startDate = DateTime.parse(hardwareResponse?['start_date']);
+
       // Step 2: Fetch historical data using the correct hardware_id
       final response = await supabase
-          .from('History_Test')
+          .from('History_Average')
           .select(
-              'historical_id, ph_level1, ph_level2, humidity, temperature, moisture, timestamp, container_id, hardware_id')
+              )
           .eq('hardware_id', hardwareId)
+          .gte('timestamp', startDate)
           .order('timestamp', ascending: true);
 
       if (response.isEmpty) {
@@ -1683,6 +1693,7 @@ class _DashboardPageState extends State<DashboardPage> {
     try {
       final supabase = Supabase.instance.client;
 
+      // ✅ Fetch Start Date from `Hardware_Sensors_Test`
       final sensorData = await supabase
           .from('Hardware_Sensors_Test')
           .select('start_date')
@@ -1690,51 +1701,70 @@ class _DashboardPageState extends State<DashboardPage> {
           .maybeSingle();
 
       if (sensorData == null || sensorData['start_date'] == null) {
-        print(
-            "No start date found in Hardware_Sensors_Test for hardware ID: $hardwareId");
+        print("No start date found for hardware ID: $hardwareId");
         return;
       }
 
       final startDate = sensorData['start_date'];
       print("Fetched start date: $startDate");
 
-      // Step 3: Store the fetched start_date in Compost_Data
-      await supabase.from('Compost_Data').insert({
-        'hardware_id': hardwareId,
-        'start_date': startDate,
-        'end_date': DateTime.now().toIso8601String(),
-      });
+      // ✅ Fetch the logged-in user's ID
+      final prefs = await SharedPreferences.getInstance();
+      // String? userIdString = prefs.getString("user_id_pref");
+      // int? userId = userIdString != null ? int.tryParse(userIdString) : null;
+
+      // if (userId == null) {
+      //   print("❌ Error: User ID not found.");
+      //   return;
+      // }
+
+      // ✅ Fetch `fullname` of the logged-in user
+      // final userResponse = await supabase
+      //     .from('Users')
+      //     .select('fullname')
+      //     .eq('user_id', userId)
+      //     .maybeSingle();
+
+      // String retrievedBy = userResponse?['fullname'] ?? "Unknown";
+      String? fullNameString = prefs.getString("fullname");
+
+      String? retrievedBy = fullNameString;
+      // ✅ Update existing row instead of inserting a new one
+      final updateResponse = await supabase
+          .from('Compost_Data')
+          .update({
+            'end_date': DateTime.now().toIso8601String(),
+            'retrieved_by': retrievedBy, // ✅ Store the user who retrieved it
+          })
+          .eq('hardware_id', hardwareId)
+          .select();
+
+      if (updateResponse.isEmpty) {
+        print("❌ Error: No rows updated in Compost_Data.");
+        return;
+      }
+
       print(
-          "Inserted compost data for hardware ID: $hardwareId with start date: $startDate");
+          "✅ Compost data updated for hardware ID: $hardwareId, retrieved by: $retrievedBy");
 
-// naka comment to kase risky mag null sa Hardware_Sensors_Test
-      // Step 4: Nullify all sensor data in Hardware_Sensors_Test (except hardware_id & qr_value)
+      // ✅ Nullify `start_date` in `Hardware_Sensors_Test`
+      await supabase
+          .from('Hardware_Sensors_Test')
+          .update({'start_date': null}).eq('hardware_id', hardwareId);
 
-      final updateResponse =
-          await supabase.from('Hardware_Sensors_Test').update({
-        'start_date': null,
-        // 'ph_level': null,  comment out muna kase risky i nullify to lahat
-        // 'ph_level2': null,
-        // 'humidity': null,
-        // 'temperature': null,
-        // 'moisture': null,
-        // 'refreshed_date': null,
-      }).eq('hardware_id', hardwareId);
+      print("✅ Start date set to NULL for hardware ID: $hardwareId");
 
-      if (updateResponse.error != null) {
-        print(
-            "Error updating Hardware_Sensors_Test: ${updateResponse.error!.message}");
-      } else {
-        print(
-            "Successfully cleared sensor data in Hardware_Sensors_Test for hardware ID: $hardwareId");
-      }
-
-      // ✅ Refresh the UI to reflect changes
+      // ✅ Refresh UI
       if (mounted) {
-        setState(() {});
+        setState(() {
+          _containerAddedDate = null;
+          _calculateContainerAge();
+        });
       }
+
+      _refreshData(); // ✅ Ensure UI updates properly
     } catch (e) {
-      print("Error retrieving compost: $e");
+      print("🚨 Error retrieving compost: $e");
     }
   }
 
@@ -1896,9 +1926,32 @@ class _DashboardPageState extends State<DashboardPage> {
 
       String formattedDate = selectedDate!.toIso8601String();
 
+      final prefs = await SharedPreferences.getInstance();
+      // String? userIdString = prefs.getString("user_id_pref");
+      // int? userId = userIdString != null ? int.tryParse(userIdString) : null;
+
+      // if (userId == null) {
+      //   print("❌ Error: User ID not found.");
+      //   return;
+      // }
+
+      // ✅ Fetch full name instead of username
+      // final userResponse = await Supabase.instance.client
+      //     .from('Users')
+      //     .select('fullname') // ✅ Use fullname
+      //     .eq('user_id', userId)
+      //     .maybeSingle();
+      String? fullNameString = prefs.getString('fullname');
+
+      String? startedBy = fullNameString;
+
+      // ✅ Update `start_date` & `started_by` in `Hardware_Sensors_Test`
       final updateResponse = await Supabase.instance.client
           .from('Hardware_Sensors_Test')
-          .update({'start_date': formattedDate})
+          .update({
+            'start_date': formattedDate,
+            'started_by': startedBy, // ✅ Store full name
+          })
           .eq('hardware_id', selectedHardwareId!)
           .select()
           .single();
@@ -1908,12 +1961,25 @@ class _DashboardPageState extends State<DashboardPage> {
         return;
       }
 
+      // ✅ Insert into `Compost_Data` with `started_by` (No `container_id`)
+      final compostInsertResponse =
+          await Supabase.instance.client.from('Compost_Data').insert({
+        'hardware_id': selectedHardwareId!, // ✅ Removed `container_id`
+        'start_date': formattedDate,
+        'started_by': startedBy, // ✅ Store who started the compost
+      }).select();
+
+      if (compostInsertResponse == null || compostInsertResponse.isEmpty) {
+        print("❌ Error: Compost_Data insert failed.");
+        return;
+      }
+
       setState(() {
         _containerAddedDate = selectedDate;
         _calculateContainerAge();
       });
 
-      print("✅ Compost start date updated successfully!");
+      print("✅ Compost start date updated successfully by: $startedBy");
 
       // ✅ Call `_refreshData()` to update UI
       _refreshData();
@@ -2312,7 +2378,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                 'Temperature Monitoring',
                                 '${sensorData['temperature']}°C',
                                 Colors.green),
-                            buildSensorCard(Icons.water_drop, 'Moisture Level',
+                            buildSensorCard(Icons.water_drop, 'Dryness Level',
                                 '${sensorData['moisture']}%', Colors.blue),
                             buildSensorCard(Icons.science, 'pH Level 1',
                                 '${sensorData['ph_level']}', Colors.purple),
@@ -2747,7 +2813,19 @@ class _DashboardPageState extends State<DashboardPage> {
                                       color: Colors.red),
                                 ),
                               );
-                            } else {
+                            } else if (_containerAddedDate == null) {
+                              return Container(
+                                height: 250, // Adjust height as needed
+                                alignment: Alignment.center,
+                                child: const Text(
+                                  'No Compost',
+                                  style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.red),
+                                ),
+                              );
+                              } else {
                               return SingleChildScrollView(
                                 controller: scrollController,
                                 scrollDirection: Axis.horizontal,
@@ -2782,18 +2860,18 @@ class _DashboardPageState extends State<DashboardPage> {
                                     thickness: 2, color: Colors.grey.shade400),
                                 const SizedBox(height: 20),
                                 const Text(
-                                  'Moisture Level',
+                                  'Dryness Level',
                                   style: TextStyle(
                                       fontSize: 20,
                                       fontWeight: FontWeight.bold),
                                 ),
                                 const Text(
-                                  '• Optimal: 50-60%  |  Dry: Below 50%  |  Too Wet: Above 60%',
+                                  '• Optimal: 50-60%  |  Wet: Below 50%  |  Too Dry: Above 60%',
                                   style: TextStyle(
                                       fontSize: 14, color: Colors.grey),
                                 ),
                                 buildChartOrMessage(
-                                    'Moisture', 'moisture', Colors.blue),
+                                    'Dryness', 'moisture', Colors.blue),
                                 const SizedBox(height: 20),
                                 Divider(
                                     thickness: 2, color: Colors.grey.shade400),
@@ -2951,76 +3029,12 @@ Future<Map<String, dynamic>> fetchSensorData(int containerId) async {
     double humidity = (sensorResponse['humidity'] as num?)?.toDouble() ?? 0.0;
 
     print(
-        "✅ Sensor Data: Temp = $temp, Moisture = $moisture, pH1 = $ph1, pH2 = $ph2, Humidity = $humidity");
+        "✅ Sensor Data: Temp = $temp, Dryness = $moisture, pH1 = $ph1, pH2 = $ph2, Humidity = $humidity");
 
     const double minTemp = 10.0, maxTemp = 54.0;
     const double minMoisture = 50.0, maxMoisture = 60.0;
     const double minPH = 6.0, maxPH = 8.0;
     const double minHumidity = 40.0, maxHumidity = 60.0;
-
-    Future<void> logNotification(String title, String message) async {
-      if (hardwareId == null) {
-        print("❌ ERROR: hardware_id is NULL. Cannot insert notification.");
-        return;
-      }
-
-      try {
-        print("🛑 Logging notification: $title - $message");
-
-        final response = await supabase.from('Notifications_Test').insert({
-          'hardware_id': hardwareId,
-          'title': title,
-          'message': message,
-          'timestamp': DateTime.now().toIso8601String(),
-        }).select();
-
-        print("✅ Supabase Insert Response: $response");
-      } catch (error) {
-        print("❌ ERROR logging notification: $error");
-      }
-    }
-
-    if (temp < minTemp) {
-      print("🚨 Temperature too LOW: $temp°C");
-      await logNotification(
-          "Temperature Alert", "Temperature is $temp°C, below normal range.");
-    } else if (temp > maxTemp) {
-      print("🚨 Temperature too HIGH: $temp°C");
-      await logNotification(
-          "Temperature Alert", "Temperature is $temp°C, above normal range.");
-    }
-
-    if (moisture < minMoisture) {
-      print("🚨 Moisture too LOW: $moisture%");
-      await logNotification("Moisture Alert",
-          "Moisture level is $moisture%, below normal range.");
-    } else if (moisture > maxMoisture) {
-      print("🚨 Moisture too HIGH: $moisture%");
-      await logNotification("Moisture Alert",
-          "Moisture level is $moisture%, above normal range.");
-    }
-
-    if (ph1 < minPH || ph1 > maxPH) {
-      print("🚨 pH Level 1 out of range: $ph1");
-      await logNotification(
-          "pH Level 1 Alert", "pH Level 1 is $ph1, out of range.");
-    }
-
-    if (ph2 < minPH || ph2 > maxPH) {
-      print("🚨 pH Level 2 out of range: $ph2");
-      await logNotification(
-          "pH Level 2 Alert", "pH Level 2 is $ph2, out of range.");
-    }
-
-    if (humidity < minHumidity) {
-      print("🚨 Humidity too LOW: $humidity%");
-      await logNotification(
-          "Humidity Alert", "Humidity is $humidity%, below normal range.");
-    } else if (humidity > maxHumidity) {
-      print("🚨 Humidity too HIGH: $humidity%");
-      await logNotification(
-          "Humidity Alert", "Humidity is $humidity%, above normal range.");
-    }
 
     return sensorResponse;
   } catch (error) {
