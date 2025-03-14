@@ -13,6 +13,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart'; // ✅ Fixes rootBundle issue
 import 'package:flutter/foundation.dart';
+import 'package:image/image.dart' as img;
 
 
 class DataReportPage extends StatefulWidget {
@@ -184,7 +185,7 @@ String _formatSensorValue(String sensor, dynamic value) {
   switch (sensor.toLowerCase()) {
     case "temperature":
       return "${parsedValue.toStringAsFixed(1)}°C"; // 1 decimal place
-    case "moisture level":
+    case "dryness level":
       return "${parsedValue.toInt()}%"; // Whole number
     case "ph level 1":
     case "ph level 2":
@@ -231,7 +232,7 @@ String _formatSensorValue(String sensor, dynamic value) {
 
     Map<String, String> parsedData = {
       "Temperature": "${response['temperature'] ?? 'N/A'}°C",
-      "Moisture Level": "${response['moisture'] ?? 'N/A'}%",
+      "Dryness Level": "${response['moisture'] ?? 'N/A'}%",
       "pH Level 1": "${response['ph_level1'] ?? 'N/A'}",
       "pH Level 2": "${response['ph_level2'] ?? 'N/A'}",
       "Humidity": "${response['humidity'] ?? 'N/A'}%",
@@ -343,7 +344,7 @@ String _formatSensorValue(String sensor, dynamic value) {
   Map<String, String> _defaultData(String message) {
     return {
       "Temperature": message,
-      "Moisture Level": message,
+      "Dryness Level": message,
       "pH Level 1": message,
       "pH Level 2": message,
       "Humidity": message,
@@ -458,7 +459,7 @@ List<double> secondValues = labels.map((label) {
     switch (sensorType.toLowerCase()) {
       case "temperature":
         return Icons.thermostat; // 🌡️ Temperature
-      case "moisture level":
+      case "dryness level":
         return Icons.water_drop; // 💧 Moisture Level
       case "ph level 1":
       case "ph level 2":
@@ -557,6 +558,21 @@ List<double> secondValues = labels.map((label) {
     isExportingPDF = true; // 🔄 Show Loading Indicator
   });
 
+    // ✅ Delete old PDFs before generating a new one
+  final output = await getTemporaryDirectory();
+  final List<FileSystemEntity> files = output.listSync();
+
+  for (var file in files) {
+    if (file is File && file.path.contains("data_report_")) {
+      try {
+        await file.delete(); // 🚨 Delete previous PDFs
+        if (kDebugMode) print("🗑️ Deleted old PDF: ${file.path}");
+      } catch (e) {
+        if (kDebugMode) print("⚠️ Error deleting old PDF: $e");
+      }
+    }
+  }
+
   showDialog(
     context: context,
     barrierDismissible: false,
@@ -601,6 +617,7 @@ List<double> secondValues = labels.map((label) {
     if (frequencySummary.trim().isEmpty) {
       if (kDebugMode) {
         print("❌ No data for frequencySummary! Regenerating...");
+        print("🔍 selectedFilter before generating: $selectedFilter"); // ✅ Debugging
       }
       _generateFrequencySummary();
     }
@@ -870,9 +887,9 @@ List<double> secondValues = labels.map((label) {
         ),
       );
     }
-
+List<Uint8List> imagesfrequency = await _captureGraphsAsImages();
     // ✅ Page 5: Frequency Graph
-    if (images.length > 1) {
+    if (imagesfrequency.length > 1) {
       pdf.addPage(
         pw.Page(
           build: (pw.Context context) => pw.Center(
@@ -880,7 +897,7 @@ List<double> secondValues = labels.map((label) {
               children: [
                 pw.Text("Frequency Graph", style: pw.TextStyle(fontSize: 20, font: boldFont)),
                 pw.SizedBox(height: 10),
-                pw.Image(pw.MemoryImage(images[1]), width: 400, height: 300),
+                pw.Image(pw.MemoryImage(imagesfrequency[1]), width: 400, height: 300),
               ],
             ),
           ),
@@ -890,8 +907,9 @@ List<double> secondValues = labels.map((label) {
 
     // ✅ Save and Open the PDF
     final output = await getTemporaryDirectory();
-    final file = File("${output.path}/data_report.pdf");
-    await file.writeAsBytes(await pdf.save());
+final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+final file = File("${output.path}/data_report_$timestamp.pdf"); // Unique filename
+await file.writeAsBytes(await pdf.save());
 
     print("✅ PDF Saved at: ${file.path}");
     await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdf.save());
@@ -913,7 +931,7 @@ List<double> secondValues = labels.map((label) {
 void _generateComparisonSummary() {
   comparisonSummary = ""; // Clear old data
   if (firstDateData.isNotEmpty && secondDateData.isNotEmpty) {
-    List<String> labels = ["Temperature", "Moisture Level", "pH Level 1", "pH Level 2", "Humidity"];
+    List<String> labels = ["Temperature", "Dryness Level", "pH Level 1", "pH Level 2", "Humidity"];
     
     for (String label in labels) {
       double firstValue = double.tryParse(firstDateData[label]?.replaceAll(RegExp('[^0-9.]'), '') ?? "0") ?? 0;
@@ -944,78 +962,126 @@ void _generateFrequencySummary() {
 
   if (kDebugMode) {
     print("🔍 selectedFilter: $selectedFilter");
-  } // ✅ Debugging line
+  } 
 
   if (frequencyAnalysisData.isNotEmpty) {
     List<String> summaries = [];
 
     frequencyAnalysisData.forEach((sensorType, sensorData) {
+      String displaySensorType = sensorType == "moisture" ? "Dryness" : sensorType; // ✅ Change Moisture to Dryness
+
       if (sensorData.isNotEmpty) {
         if (selectedFilter == "Weekly") {
-          double highestWeeklyValue = 0;
-          String highestWeeklyTimestamp = "";
+          double highestWeeklyValue = 0, lowestWeeklyValue = double.infinity;
+          String highestWeeklyTimestamp = "", lowestWeeklyTimestamp = "";
 
           for (var entry in sensorData) {
             double sensorValue = double.tryParse(entry["Value"].toString()) ?? 0;
+            
+            // ✅ Check for highest
             if (sensorValue > highestWeeklyValue) {
               highestWeeklyValue = sensorValue;
               highestWeeklyTimestamp = entry["Time"];
             }
+
+            // ✅ Check for lowest
+            if (sensorValue < lowestWeeklyValue) {
+              lowestWeeklyValue = sensorValue;
+              lowestWeeklyTimestamp = entry["Time"];
+            }
           }
 
-          // ✅ Format timestamp correctly for Weekly mode
-          String formattedTimestamp = "Unknown Time";
+          // ✅ Format timestamps correctly for Weekly mode
+          String highestFormattedTimestamp = "Unknown Time";
+          String lowestFormattedTimestamp = "Unknown Time";
+          
           try {
             DateTime parsedTime = DateFormat("yyyy-MM-dd hh:mm a").parse(highestWeeklyTimestamp);
-            formattedTimestamp = DateFormat("EEE, yyyy-MM-dd hh:mm a").format(parsedTime);
+            highestFormattedTimestamp = DateFormat("EEE, yyyy-MM-dd hh:mm a").format(parsedTime);
           } catch (e) {
             if (kDebugMode) {
-              print("⚠️ Error parsing timestamp: $highestWeeklyTimestamp - $e");
+              print("⚠️ Error parsing highest timestamp: $highestWeeklyTimestamp - $e");
+            }
+          }
+
+          try {
+            DateTime parsedTime = DateFormat("yyyy-MM-dd hh:mm a").parse(lowestWeeklyTimestamp);
+            lowestFormattedTimestamp = DateFormat("EEE, yyyy-MM-dd hh:mm a").format(parsedTime);
+          } catch (e) {
+            if (kDebugMode) {
+              print("⚠️ Error parsing lowest timestamp: $lowestWeeklyTimestamp - $e");
             }
           }
 
           // ✅ Apply proper units
-          String formattedValue = _formatSensorValue(sensorType, highestWeeklyValue);
+          String highestFormattedValue = _formatSensorValue(displaySensorType, highestWeeklyValue);
+          String lowestFormattedValue = _formatSensorValue(displaySensorType, lowestWeeklyValue);
 
-          // ✅ Better formatting
-          summaries.add("• The highest recorded **$sensorType** this week was **$formattedValue** at **$formattedTimestamp**.");
+          // ✅ Improved Weekly Formatting
+          summaries.add(
+            "• The **$displaySensorType** was **highest** at **$highestFormattedTimestamp** with a value of **$highestFormattedValue**, "
+            "while it was **lowest** at **$lowestFormattedTimestamp** with a value of **$lowestFormattedValue** this week."
+          );
+
         } else { // ✅ Daily Mode
           var highestRecord = (sensorData as List<Map<String, dynamic>>).reduce(
             (a, b) => (double.tryParse(a["Value"].toString()) ?? 0) >
                        (double.tryParse(b["Value"].toString()) ?? 0) ? a : b,
           );
 
+          var lowestRecord = (sensorData as List<Map<String, dynamic>>).reduce(
+            (a, b) => (double.tryParse(a["Value"].toString()) ?? double.infinity) <
+                       (double.tryParse(b["Value"].toString()) ?? double.infinity) ? a : b,
+          );
+
           double highestValue = double.tryParse(highestRecord["Value"].toString()) ?? 0;
-          String rawTimestamp = highestRecord["Time"];
-          String formattedTimestamp = "Unknown Time";
+          double lowestValue = double.tryParse(lowestRecord["Value"].toString()) ?? 0;
+
+          String highestRawTimestamp = highestRecord["Time"];
+          String lowestRawTimestamp = lowestRecord["Time"];
+
+          String highestFormattedTimestamp = "Unknown Time";
+          String lowestFormattedTimestamp = "Unknown Time";
 
           try {
-            DateTime parsedTime = DateFormat("yyyy-MM-dd hh:mm a").parse(rawTimestamp);
-            formattedTimestamp = DateFormat("hh:mm a").format(parsedTime);
+            DateTime parsedTime = DateFormat("yyyy-MM-dd hh:mm a").parse(highestRawTimestamp);
+            highestFormattedTimestamp = DateFormat("hh:mm a").format(parsedTime);
           } catch (e) {
             if (kDebugMode) {
-              print("⚠️ Error parsing timestamp: $rawTimestamp - $e");
+              print("⚠️ Error parsing highest timestamp: $highestRawTimestamp - $e");
+            }
+          }
+
+          try {
+            DateTime parsedTime = DateFormat("yyyy-MM-dd hh:mm a").parse(lowestRawTimestamp);
+            lowestFormattedTimestamp = DateFormat("hh:mm a").format(parsedTime);
+          } catch (e) {
+            if (kDebugMode) {
+              print("⚠️ Error parsing lowest timestamp: $lowestRawTimestamp - $e");
             }
           }
 
           // ✅ Apply proper units
-          String formattedValue = _formatSensorValue(sensorType, highestValue);
+          String highestFormattedValue = _formatSensorValue(displaySensorType, highestValue);
+          String lowestFormattedValue = _formatSensorValue(displaySensorType, lowestValue);
 
-          // ✅ Improved formatting
-          summaries.add("• The highest recorded **$sensorType** today was **$formattedValue** at **$formattedTimestamp**.");
+          // ✅ Improved Daily Formatting
+          summaries.add(
+            "• The **$displaySensorType** was **highest** at **$highestFormattedTimestamp** with a value of **$highestFormattedValue**, "
+            "while it was **lowest** at **$lowestFormattedTimestamp** with a value of **$lowestFormattedValue** today."
+          );
         }
       }
     });
 
     // ✅ Combine summaries for all sensor types
-    frequencySummary = summaries.join("\n\n");
+    frequencySummary = summaries.join("\n\n"); 
   }
 
   if (kDebugMode) {
     print("📌 Final frequencySummary: $frequencySummary");
   }
 }
-
 
 
 // ✅ Helper Function: Formats Bullet Points for PDF
@@ -1066,24 +1132,20 @@ pw.Widget _buildPDFBulletPoints(String summary, pw.Font customFont) {
   Future<List<Uint8List>> _captureGraphsAsImages() async {
   List<Uint8List> images = [];
 
-  // ❌ No need to manually wait anymore; _captureGraph() handles it!
-  // await _waitForGraphRender(comparisonGraphKey, "comparisonGraphKey");
-  // await _waitForGraphRender(frequencyGraphKey, "frequencyGraphKey");
+  // ✅ Ensure UI updates before capturing graphs
+  setState(() {});  
+  await Future.delayed(const Duration(milliseconds: 500)); // Allow UI to settle
 
-   // ✅ Capture _buildComparisonGraph() and force rebuild if needed
-  Uint8List? comparisonGraphImage = await _captureGraph(
-    comparisonGraphKey, 
-    "comparisonGraphKey", 
-    () => setState(() {})  // 🔄 Forces a rebuild!
-  );
+  // ✅ Wait for graphs to render
+  await _waitForGraphRender(comparisonGraphKey, "comparisonGraphKey");
+  await _waitForGraphRender(frequencyGraphKey, "frequencyGraphKey");
+
+  // ✅ Capture and Compress _buildComparisonGraph()
+  Uint8List? comparisonGraphImage = await _captureGraphWithCompression(comparisonGraphKey, "comparisonGraphKey");
   if (comparisonGraphImage != null) images.add(comparisonGraphImage);
 
-  // ✅ Capture _buildTimeBasedFrequencyGraph() and force rebuild if needed
-  Uint8List? frequencyGraphImage = await _captureGraph(
-    frequencyGraphKey, 
-    "frequencyGraphKey", 
-    () => setState(() {})  // 🔄 Forces a rebuild!
-  );
+  // ✅ Capture and Compress _buildTimeBasedFrequencyGraph()
+  Uint8List? frequencyGraphImage = await _captureGraphWithCompression(frequencyGraphKey, "frequencyGraphKey");
   if (frequencyGraphImage != null) images.add(frequencyGraphImage);
 
   if (kDebugMode) {
@@ -1093,96 +1155,167 @@ pw.Widget _buildPDFBulletPoints(String summary, pw.Font customFont) {
 }
 
 
-// ✅ Helper Function: Captures a widget as an image
-Future<Uint8List?> _captureGraph(GlobalKey key, String graphName, VoidCallback forceRebuild) async {
+// Future<Uint8List?> _captureFrequencyGraphAsImage() async {
+//   // ✅ Capture only the Frequency Graph
+//   Uint8List? frequencyGraphImage = await _captureGraphWithCompression(
+//     frequencyGraphKey,
+//     "frequencyGraphKey",
+//     // () => setState(() {}), // 🔄 Forces a rebuild!
+//   );
 
+//   if (frequencyGraphImage != null && kDebugMode) {
+//     print("📸 Captured Frequency Graph Image!");
+//   }
+
+//   return frequencyGraphImage;
+// }
+
+Future<Uint8List?> _captureGraphWithCompression(GlobalKey repaintKey, String graphName) async {
   if (kDebugMode) {
     print("🔍 Attempting to capture $graphName...");
   }
 
-  if (kDebugMode) {
-    print("🔍 Checking $graphName BEFORE capturing images: ${key.currentContext != null}");
-  }
-
-  // ✅ Force rebuild if widget is null
-  if (key.currentContext == null) {
-    if (kDebugMode) {
-      print("⚠ $graphName context is NULL! Forcing rebuild...");
-    }
-    forceRebuild();  // 🔄 Calls setState() to trigger a rebuild
-    await Future.delayed(Duration(milliseconds: 500)); // Allow rebuild time
-  }
-
-  // ✅ Double-check after rebuild attempt
-  if (key.currentContext == null) {
-    if (kDebugMode) {
-      print("⚠ $graphName context is STILL NULL after rebuild attempt. Skipping capture.");
-    }
+  if (repaintKey.currentContext == null) {
+    if (kDebugMode) print("⚠ $graphName context is NULL! Skipping capture.");
     return null;
   }
 
-  // ✅ Ensure widget is fully rendered before proceeding
-  await _waitForGraphRender(key, graphName);
+  // ✅ Ensure widget is fully rendered before capturing
+  await Future.delayed(const Duration(milliseconds: 700)); // Added delay
+  await _waitForGraphRender(repaintKey, graphName);
 
-  if (key.currentContext == null || key.currentContext!.findRenderObject() == null) {
-    if (kDebugMode) {
-      print("⚠ $graphName is still NULL, skipping capture.");
-    }
+  // ✅ Get the repaint boundary
+  final boundary = repaintKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+  if (boundary == null || boundary.debugNeedsPaint) {
+    if (kDebugMode) print("⚠ $graphName is not ready! Skipping...");
     return null;
   }
 
-  RenderRepaintBoundary? boundary = key.currentContext!.findRenderObject() as RenderRepaintBoundary?;
+  try {
+    // ✅ Capture at 2x resolution
+    ui.Image image = await boundary.toImage(pixelRatio: 2.0);
+    ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    Uint8List? pngBytes = byteData?.buffer.asUint8List();
 
-  if (boundary == null || boundary.debugNeedsPaint) {
-  if (kDebugMode) {
-    print("⚠ $graphName is not fully painted! Retrying...");
-  }
-
-  // ✅ Force UI rebuild and delay again
-  forceRebuild();
-  await Future.delayed(Duration(milliseconds: 700));
-
-  boundary = key.currentContext?.findRenderObject() as RenderRepaintBoundary?;
-  if (boundary == null || boundary.debugNeedsPaint) {
-    if (kDebugMode) {
-      print("❌ $graphName is STILL NOT READY after waiting! Skipping...");
+    if (pngBytes == null) {
+      if (kDebugMode) print("❌ Failed to convert $graphName to PNG.");
+      return null;
     }
+
+    // ✅ Apply optimized compression
+    Uint8List compressedBytes = await _compressImage(pngBytes);
+
+    if (kDebugMode) {
+      print("✅ Captured & Compressed $graphName - Original: ${pngBytes.length ~/ 1024} KB → Compressed: ${compressedBytes.length ~/ 1024} KB");
+    }
+
+    return compressedBytes;
+  } catch (e) {
+    if (kDebugMode) print("❌ Error capturing $graphName: $e");
     return null;
   }
 }
 
-  if (kDebugMode) {
-    print("✅ $graphName is fully rendered and painted.");
-  }
-  ui.Image image = await boundary.toImage(pixelRatio: 3.0);
-  ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-  return byteData?.buffer.asUint8List();
-}
+
+
+
+// // ✅ Helper Function: Captures a widget as an image
+// Future<Uint8List?> _captureGraph(GlobalKey key, String graphName, VoidCallback forceRebuild) async {
+
+//   if (kDebugMode) {
+//     print("🔍 Attempting to capture $graphName...");
+//   }
+
+//   if (kDebugMode) {
+//     print("🔍 Checking $graphName BEFORE capturing images: ${key.currentContext != null}");
+//   }
+
+//   // ✅ Force rebuild if widget is null
+//   if (key.currentContext == null) {
+//     if (kDebugMode) {
+//       print("⚠ $graphName context is NULL! Forcing rebuild...");
+//     }
+//     forceRebuild();  // 🔄 Calls setState() to trigger a rebuild
+//     await Future.delayed(Duration(milliseconds: 500)); // Allow rebuild time
+//   }
+
+//   // ✅ Double-check after rebuild attempt
+//   if (key.currentContext == null) {
+//     if (kDebugMode) {
+//       print("⚠ $graphName context is STILL NULL after rebuild attempt. Skipping capture.");
+//     }
+//     return null;
+//   }
+
+//   // ✅ Ensure widget is fully rendered before proceeding
+//   await _waitForGraphRender(key, graphName);
+
+//   if (key.currentContext == null || key.currentContext!.findRenderObject() == null) {
+//     if (kDebugMode) {
+//       print("⚠ $graphName is still NULL, skipping capture.");
+//     }
+//     return null;
+//   }
+
+//   RenderRepaintBoundary? boundary = key.currentContext!.findRenderObject() as RenderRepaintBoundary?;
+
+//   if (boundary == null || boundary.debugNeedsPaint) {
+//   if (kDebugMode) {
+//     print("⚠ $graphName is not fully painted! Retrying...");
+//   }
+
+//   // ✅ Force UI rebuild and delay again
+//   forceRebuild();
+//   await Future.delayed(Duration(milliseconds: 700));
+
+//   boundary = key.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+//   if (boundary == null || boundary.debugNeedsPaint) {
+//     if (kDebugMode) {
+//       print("❌ $graphName is STILL NOT READY after waiting! Skipping...");
+//     }
+//     return null;
+//   }
+// }
+
+//   if (kDebugMode) {
+//     print("✅ $graphName is fully rendered and painted.");
+//   }
+//   ui.Image image = await boundary.toImage(pixelRatio: 3.0);
+//   ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+//   return byteData?.buffer.asUint8List();
+// }
 
 
 // ✅ Moved `_waitForGraphRender()` inside `_captureGraph()`
 Future<void> _waitForGraphRender(GlobalKey key, String graphName) async {
-  int retries = 6; // ✅ Increased retries
+  int retries = 5; // ✅ Increased retries slightly for reliability
   while (retries > 0) {
-    await Future.delayed(const Duration(milliseconds: 700)); // ✅ Increased delay
+    await Future.delayed(const Duration(milliseconds: 700)); // ✅ Slightly increased delay
 
-    if (key.currentContext != null) {
-      RenderRepaintBoundary? boundary = key.currentContext!.findRenderObject() as RenderRepaintBoundary?;
-      if (boundary != null && !boundary.debugNeedsPaint) {
-        print("✅ $graphName is fully rendered and painted.");
-        return;
-      }
+    final boundary = key.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+    if (boundary != null && !boundary.debugNeedsPaint) {
+      if (kDebugMode) print("✅ $graphName is fully rendered.");
+      return;
     }
-retries--;
-    if (kDebugMode) {
-      print("⏳ Waiting for $graphName to finish rendering... ($retries retries left)");
-    }
-    
+
+    retries--;
+    if (kDebugMode) print("⏳ Waiting for $graphName to render... ($retries retries left)");
   }
 
-  if (kDebugMode) {
-    print("❌ $graphName is STILL NULL or not painted after waiting!");
+  if (kDebugMode) print("❌ $graphName never finished rendering.");
+}
+
+
+Future<Uint8List> _compressImage(Uint8List imageBytes) async {
+  img.Image? image = img.decodeImage(imageBytes);
+  if (image == null) return imageBytes; // ✅ Return original if decoding fails
+
+  // ✅ Dynamic Resizing - Only resize if image width is > 800px
+  if (image.width > 1000) {
+    image = img.copyResize(image, width: 800);
   }
+
+  return Uint8List.fromList(img.encodeJpg(image, quality: 75)); // ✅ Slightly lower quality for better compression
 }
 
 
@@ -1445,7 +1578,7 @@ retries--;
                 style: TextStyle(fontSize: 16, color: Colors.black54),
               ),
             ...frequencyAnalysisData.entries.expand((entry) {
-              String sensorType = entry.key;
+              String sensorType = entry.key == "moisture" ? "dryness" : entry.key;
               List<dynamic> sensorValues =
                   entry.value
                       .where(
@@ -1853,7 +1986,7 @@ retries--;
   if (firstDateData.isNotEmpty && secondDateData.isNotEmpty) {
     List<String> labels = [
       "Temperature",
-      "Moisture Level",
+      "Dryness Level",
       "pH Level 1",
       "pH Level 2",
       "Humidity",
@@ -1903,44 +2036,143 @@ retries--;
     }
   }
 
-  // 📌 2️⃣ Time-Based Frequency Summary
+  
+// 📌 2️⃣ Time-Based Frequency Summary
+if (kDebugMode) {
   print("📝 Frequency Summary: $frequencySummary");
-  List<InlineSpan> frequencySpans = [];
+}
+List<InlineSpan> frequencySpans = [];
 
-  if (frequencyAnalysisData.isNotEmpty) {
-    frequencyAnalysisData.forEach((sensorType, sensorData) {
-      if (sensorData.isNotEmpty) {
-        var highestRecord = (sensorData as List<Map<String, dynamic>>).reduce(
-          (a, b) =>
-              (double.tryParse(a["Value"].toString()) ?? 0) >
-                      (double.tryParse(b["Value"].toString()) ?? 0)
-                  ? a
-                  : b,
-        );
+if (frequencyAnalysisData.isNotEmpty) {
+  frequencyAnalysisData.forEach((sensorType, sensorData) {
+    if (sensorData.isNotEmpty) {
+      // ✅ **Ensure `sensorData` is properly casted**
+      List<Map<String, dynamic>> typedSensorData =
+          List<Map<String, dynamic>>.from(sensorData);
 
-        double highestValue =
-            double.tryParse(highestRecord["Value"].toString()) ?? 0;
-        String highestValueStr = formatSensorValue(sensorType, highestValue);
-        String rawTimestamp = highestRecord["Time"];
-        String formattedTimestamp = "Unknown Time";
+      // ✅ Find the highest recorded value
+      var highestRecord = typedSensorData.reduce(
+        (a, b) =>
+            (double.tryParse(a["Value"].toString()) ?? 0) >
+                    (double.tryParse(b["Value"].toString()) ?? 0)
+                ? a
+                : b,
+      );
 
-        try {
-          DateTime parsedTime = DateFormat("yyyy-MM-dd hh:mm a").parse(rawTimestamp);
-          formattedTimestamp = (selectedFilter == "Weekly")
-              ? DateFormat("EEE hh:mm a").format(parsedTime) // Example: Mon 08:00 AM
-              : DateFormat("hh:mm a").format(parsedTime); // Example: 08:00 AM
-        } catch (e) {
-          print("⚠️ Error parsing timestamp: $rawTimestamp - $e");
-        }
+      // ✅ Find the lowest recorded value
+      var lowestRecord = typedSensorData.reduce(
+        (a, b) =>
+            (double.tryParse(a["Value"].toString()) ?? double.infinity) <
+                    (double.tryParse(b["Value"].toString()) ?? double.infinity)
+                ? a
+                : b,
+      );
 
-        frequencySpans.add(_buildBulletSpan(
-          sensorType,
-          "was highest at $formattedTimestamp with a value of ",
-          highestValueStr,
-        ));
+      // ✅ Extract values & format them properly
+      double highestValue = double.tryParse(highestRecord["Value"].toString()) ?? 0;
+      double lowestValue = double.tryParse(lowestRecord["Value"].toString()) ?? 0;
+
+      String highestValueStr = formatSensorValue(sensorType, highestValue);
+      String lowestValueStr = formatSensorValue(sensorType, lowestValue);
+
+      // ✅ Extract & format timestamps for highest and lowest
+      String highestRawTimestamp = highestRecord["Time"];
+      String lowestRawTimestamp = lowestRecord["Time"];
+      String highestFormattedTimestamp = "Unknown Time";
+      String lowestFormattedTimestamp = "Unknown Time";
+
+      try {
+        DateTime parsedTime = DateFormat("yyyy-MM-dd hh:mm a").parse(highestRawTimestamp);
+        highestFormattedTimestamp = (selectedFilter == "Weekly")
+            ? DateFormat("EEE hh:mm a").format(parsedTime) // Example: Mon 08:00 AM
+            : DateFormat("hh:mm a").format(parsedTime); // Example: 08:00 AM
+      } catch (e) {
+        print("⚠️ Error parsing highest timestamp: $highestRawTimestamp - $e");
       }
-    });
-  }
+
+      try {
+        DateTime parsedTime = DateFormat("yyyy-MM-dd hh:mm a").parse(lowestRawTimestamp);
+        lowestFormattedTimestamp = (selectedFilter == "Weekly")
+            ? DateFormat("EEE hh:mm a").format(parsedTime) // Example: Mon 08:00 AM
+            : DateFormat("hh:mm a").format(parsedTime); // Example: 08:00 AM
+      } catch (e) {
+        print("⚠️ Error parsing lowest timestamp: $lowestRawTimestamp - $e");
+      }
+
+      // ✅ ADD BULLET FOR EACH SENSOR TYPE WITH SPACING BETWEEN ENTRIES
+      frequencySpans.add(
+        TextSpan(
+          children: [
+            const TextSpan(
+              text: "• ", // 🔹 Bullet Point
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+
+            // 🔹 Sensor Name (Bold)
+            TextSpan(
+              text: (sensorType == "moisture" ? "Dryness" : sensorType),
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const TextSpan(text: " was "),
+
+            // 🔹 Highest (Bold)
+            const TextSpan(
+              text: "highest",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const TextSpan(text: " at "),
+
+            // 🔹 Highest Time (Bold)
+            TextSpan(
+              text: highestFormattedTimestamp,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const TextSpan(text: " with a value of "),
+
+            // 🔹 Highest Value (Blue & Bold)
+            TextSpan(
+              text: highestValueStr,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.blue,
+              ),
+            ),
+            const TextSpan(text: ", while it was "),
+
+            // 🔹 Lowest (Bold)
+            const TextSpan(
+              text: "lowest",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const TextSpan(text: " at "),
+
+            // 🔹 Lowest Time (Bold)
+            TextSpan(
+              text: lowestFormattedTimestamp,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const TextSpan(text: " with a value of "),
+
+            // 🔹 Lowest Value (Blue & Bold)
+            TextSpan(
+              text: lowestValueStr,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.blue,
+              ),
+            ),
+            const TextSpan(text: "."),
+
+            // 🔹 ADD LINE BREAK AFTER EACH SENSOR ENTRY
+            const TextSpan(text: "\n\n"), // 🔥 Ensures proper spacing
+          ],
+        ),
+      );
+    }
+  });
+}
+
+
 
   // 📌 UI Layout
   return Card(
@@ -2111,7 +2343,7 @@ class _ComparisonGraphWidgetState extends State<ComparisonGraphWidget> with Auto
 
   List<String> labels = [
     "Temperature",
-    "Moisture Level",
+    "Dryness Level",
     "pH Level 1",
     "pH Level 2",
     "Humidity",
@@ -2204,7 +2436,7 @@ List<double> secondValues = labels.map((label) {
     switch (sensorType.toLowerCase()) {
       case "temperature":
         return Icons.thermostat; // 🌡️ Temperature
-      case "moisture level":
+      case "dryness level":
         return Icons.water_drop; // 💧 Moisture Level
       case "ph level 1":
       case "ph level 2":
@@ -2277,196 +2509,226 @@ Widget _buildTimeBasedFrequencyGraph() {
     }
   }
 
-// Daily Filter
- if (widget.selectedFilter == "Daily") {
-  bool isScrollable = timestamps.length > 6; // ✅ Enable scrolling dynamically
-  double graphWidth = isScrollable ? timestamps.length * 50.0 : 400.0; // ✅ Dynamic width
+// ✅ Daily Filter (Updated to work like Weekly)
+if (widget.selectedFilter == "Daily") {
+  return SingleChildScrollView(
+    physics: const BouncingScrollPhysics(), // ✅ Retains vertical scrolling
+    child: Column(
+      children: sensorTypes.map((sensor) {
+        String displaySensorType = sensor == "moisture" ? "Dryness" : sensor; // ✅ Replace moisture with Dryness
 
-  return Column(
-    children: [
-      Wrap(
-        spacing: 10,
-        children: sensorTypes.map((sensor) {
-          return Row(
-            mainAxisSize: MainAxisSize.min,
+        List<String> sensorTimestamps = [];
+        for (var entry in widget.frequencyData[sensor] ?? []) {
+          if (!sensorTimestamps.contains(entry["Time"])) {
+            sensorTimestamps.add(entry["Time"]);
+          }
+        }
+
+        bool isScrollable = sensorTimestamps.length > 6; // ✅ Enable scrolling dynamically
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Column(
             children: [
-              Container(
-                width: 12,
-                height: 12,
-                decoration: BoxDecoration(
-                  color: _getSensorColor(sensor),
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 5),
-              Text(
-                sensor,
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-              ),
-            ],
-          );
-        }).toList(),
-      ),
-      const SizedBox(height: 12),
-
-      SingleChildScrollView( // ✅ Enables horizontal scrolling dynamically
-        scrollDirection: Axis.horizontal,
-        child: SizedBox(
-          width: graphWidth, // ✅ Prevents infinite constraints issue
-          height: 300,
-          child: BarChart(
-            BarChartData(
-              barGroups: List.generate(timestamps.length, (index) {
-                String timeLabel = timestamps[index];
-                List<BarChartRodData> bars = [];
-
-                for (var sensor in sensorTypes) {
-                  var sensorData = widget.frequencyData[sensor]
-                          ?.where((data) => data["Time"] == timeLabel)
-                          .toList() ??
-                      [];
-                  if (sensorData.isNotEmpty) {
-                    double sensorValue = double.tryParse(sensorData.first["Value"].toString()) ?? 0;
-                    bars.add(
-                      BarChartRodData(
-                        toY: sensorValue,
-                        color: _getSensorColor(sensor),
-                        width: 16,
-                      ),
-                    );
-                  }
-                }
-
-                return BarChartGroupData(x: index, barRods: bars);
-              }),
-
-              barTouchData: BarTouchData(
-                touchTooltipData: BarTouchTooltipData(
-                  fitInsideVertically: true,
-                            fitInsideHorizontally: true,
-                  
-                  getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                    String formattedTime = _formatTimestamp(timestamps[groupIndex]);
-                    return BarTooltipItem(
-                      "Sensor Value: ${rod.toY}\nTime: $formattedTime",
-                      const TextStyle(color: Colors.white, fontSize: 12),
-                    );
-                  },
-                  getTooltipColor: (group) => Colors.black87,
-                  tooltipRoundedRadius: 8,
-                  tooltipPadding: const EdgeInsets.all(8),
-                ),
+              // ✅ Sensor Legend for Each Graph
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: _getSensorColor(sensor),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    displaySensorType, // ✅ Use updated sensor name
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                  ),
+                ],
               ),
 
-              titlesData: _buildChartTitles(timestamps),
-            ),
+              const SizedBox(height: 10),
+
+// ✅ Dynamic Scrolling - Horizontal for many timestamps, Vertical otherwise
+SingleChildScrollView(
+  scrollDirection: isScrollable ? Axis.horizontal : Axis.vertical,
+  child: SizedBox(
+    width: isScrollable ? sensorTimestamps.length * 50.0 : null, // ✅ Expand width dynamically
+    height: 300,
+    child: BarChart(
+      BarChartData(
+        barGroups: List.generate(sensorTimestamps.length, (index) {
+          String timeLabel = sensorTimestamps[index];
+          List<BarChartRodData> bars = [];
+
+          var sensorData = widget.frequencyData[sensor]
+                  ?.where((data) => data["Time"] == timeLabel)
+                  .toList() ??
+              [];
+          if (sensorData.isNotEmpty) {
+            double sensorValue = double.tryParse(sensorData.first["Value"].toString()) ?? 0;
+            bars.add(
+              BarChartRodData(
+                toY: sensorValue,
+                color: _getSensorColor(sensor),
+                width: 16,
+              ),
+            );
+          }
+
+          return BarChartGroupData(x: index, barRods: bars);
+        }),
+
+        // ✅ Tooltip for Better Data Viewing
+        barTouchData: BarTouchData(
+          touchTooltipData: BarTouchTooltipData(
+            fitInsideVertically: true,
+            fitInsideHorizontally: true,
+            tooltipPadding: const EdgeInsets.all(8),
+            tooltipRoundedRadius: 8,
+            getTooltipItem: (group, groupIndex, rod, rodIndex) {
+              String formattedTime = _formatTimestamp(sensorTimestamps[groupIndex]);
+              return BarTooltipItem(
+                "Sensor Value: ${rod.toY}\nTime: $formattedTime",
+                const TextStyle(color: Colors.white, fontSize: 12),
+              );
+            },
+            getTooltipColor: (group) => Colors.black87,
           ),
         ),
-      ),
-    ],
+
+        // ✅ Properly format titlesData & remove only the highest Y-axis label
+       titlesData: _buildChartTitles(sensorTimestamps), // ✅ Correct way to assign FlTitlesData
+
+    ),
+  ),
+              ),
+)
+            ],
+          ),
+        );
+      }).toList(),
+    ),
   );
 }
 
 
-
   // ✅ **Weekly Logic (Retains Vertical Scrolling for Multiple Sensors)**
-  if (widget.selectedFilter == "Weekly") {
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(), // ✅ Retains vertical scrolling
-      child: Column(
-        children: sensorTypes.map((sensor) {
-          List<String> sensorTimestamps = [];
-          for (var entry in widget.frequencyData[sensor] ?? []) {
-            if (!sensorTimestamps.contains(entry["Time"])) {
-              sensorTimestamps.add(entry["Time"]);
-            }
+ if (widget.selectedFilter == "Weekly") {
+  return SingleChildScrollView(
+    physics: const BouncingScrollPhysics(), // ✅ Retains vertical scrolling
+    child: Column(
+      children: sensorTypes.map((sensor) {
+        String displaySensorType = sensor == "moisture" ? "Dryness" : sensor; // ✅ Replace moisture with Dryness
+
+        List<String> sensorTimestamps = [];
+        for (var entry in widget.frequencyData[sensor] ?? []) {
+          if (!sensorTimestamps.contains(entry["Time"])) {
+            sensorTimestamps.add(entry["Time"]);
           }
+        }
 
-          bool isScrollable = sensorTimestamps.length > 6; // ✅ Enable scrolling dynamically
+        bool isScrollable = sensorTimestamps.length > 6; // ✅ Enable scrolling dynamically
 
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: _getSensorColor(sensor),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 5),
-                    Text(
-                      sensor,
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 10),
-
-                SingleChildScrollView(
-                  scrollDirection: isScrollable ? Axis.horizontal : Axis.vertical, // ✅ Scroll dynamically
-                  child: SizedBox(
-                    width: isScrollable ? sensorTimestamps.length * 50.0 : null, // ✅ Expand width dynamically
-                    height: 300,
-                    child: BarChart(
-                      BarChartData(
-                        barGroups: List.generate(sensorTimestamps.length, (index) {
-                          String timeLabel = sensorTimestamps[index];
-                          List<BarChartRodData> bars = [];
-
-                          var sensorData = widget.frequencyData[sensor]
-                                  ?.where((data) => data["Time"] == timeLabel)
-                                  .toList() ??
-                              [];
-                          if (sensorData.isNotEmpty) {
-                            double sensorValue = double.tryParse(sensorData.first["Value"].toString()) ?? 0;
-                            bars.add(
-                              BarChartRodData(
-                                toY: sensorValue,
-                                color: _getSensorColor(sensor),
-                                width: 16,
-                              ),
-                            );
-                          }
-
-                          return BarChartGroupData(x: index, barRods: bars);
-                        }),
-
-                        barTouchData: BarTouchData(
-                          touchTooltipData: BarTouchTooltipData(
-                            fitInsideVertically: true,
-                            fitInsideHorizontally: true,
-                            tooltipPadding: const EdgeInsets.all(8),
-                            tooltipRoundedRadius: 8,
-                            getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                              String formattedTime = _formatTimestamp(sensorTimestamps[groupIndex]);
-                              return BarTooltipItem(
-                                "Sensor Value: ${rod.toY}\nTime: $formattedTime",
-                                const TextStyle(color: Colors.white, fontSize: 12),
-                              );
-                            },
-                            getTooltipColor: (group) => Colors.black87,
-                          ),
-                        ),
-
-                        titlesData: _buildChartTitles(sensorTimestamps),
-                      ),
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: _getSensorColor(sensor),
+                      shape: BoxShape.circle,
                     ),
                   ),
-                ),
-              ],
-            ),
+                  const SizedBox(width: 5),
+                  Text(
+                    displaySensorType, // ✅ Use updated sensor name
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 10),
+
+              SingleChildScrollView(
+                scrollDirection: isScrollable ? Axis.horizontal : Axis.vertical, // ✅ Scroll dynamically
+                child: SizedBox(
+                  width: isScrollable ? sensorTimestamps.length * 50.0 : null, // ✅ Expand width dynamically
+                  height: 300,
+                  child: BarChart(
+  BarChartData(
+    // ✅ Find the highest value dynamically for padding
+    maxY: (() {
+      double highestSensorValue = widget.frequencyData[sensor]?.map((data) {
+        return double.tryParse(data["Value"].toString()) ?? 0;
+      }).reduce((a, b) => a > b ? a : b) ?? 0;
+
+      return highestSensorValue + (highestSensorValue * 0.1); // ✅ Add 10% buffer
+    })(),
+
+    barGroups: List.generate(sensorTimestamps.length, (index) {
+      String timeLabel = sensorTimestamps[index];
+      List<BarChartRodData> bars = [];
+
+      String displaySensorType = sensor == "moisture" ? "Dryness" : sensor; // ✅ Ensure correct naming in the graph
+
+      var sensorData = widget.frequencyData[sensor]
+              ?.where((data) => data["Time"] == timeLabel)
+              .toList() ??
+          [];
+      if (sensorData.isNotEmpty) {
+        double sensorValue = double.tryParse(sensorData.first["Value"].toString()) ?? 0;
+        bars.add(
+          BarChartRodData(
+            toY: sensorValue,
+            color: _getSensorColor(sensor),
+            width: 16,
+          ),
+        );
+      }
+
+      return BarChartGroupData(x: index, barRods: bars);
+    }),
+
+    barTouchData: BarTouchData(
+      touchTooltipData: BarTouchTooltipData(
+        fitInsideVertically: true,
+        fitInsideHorizontally: true,
+        tooltipPadding: const EdgeInsets.all(8),
+        tooltipRoundedRadius: 8,
+        getTooltipItem: (group, groupIndex, rod, rodIndex) {
+          String formattedTime = _formatTimestamp(sensorTimestamps[groupIndex]);
+          return BarTooltipItem(
+            "Sensor Value: ${rod.toY}\nTime: $formattedTime",
+            const TextStyle(color: Colors.white, fontSize: 12),
           );
-        }).toList(),
+        },
+        getTooltipColor: (group) => Colors.black87,
       ),
-    );
-  }
+    ),
+
+    titlesData: _buildChartTitles(sensorTimestamps),
+  ),
+),
+
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    ),
+  );
+}
+
 
   return const SizedBox(); // Default fallback
 }
@@ -2477,28 +2739,53 @@ Widget _buildTimeBasedFrequencyGraph() {
 
   /// ✅ **Move `_buildChartTitles` inside `FrequencyGraphWidget`**
   FlTitlesData _buildChartTitles(List<String> timestamps) {
-    return FlTitlesData(
-      topTitles: AxisTitles(
-        sideTitles: SideTitles(showTitles: false), // ✅ Hide top numbers
+  return FlTitlesData(
+    topTitles: AxisTitles(
+      sideTitles: SideTitles(showTitles: false), // ✅ Hide top numbers
+    ),
+    leftTitles: AxisTitles(
+      sideTitles: SideTitles(
+        showTitles: true,
+        reservedSize: 40,
+        getTitlesWidget: (value, meta) {
+          // ✅ Hide only the highest Y-axis label (LEFT SIDE)
+          if (value >= meta.max) return Container();
+          return Text(
+            value.toInt().toString(),
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+          );
+        },
       ),
-      leftTitles: AxisTitles(
-        sideTitles: SideTitles(showTitles: true, reservedSize: 40),
+    ),
+    rightTitles: AxisTitles(
+      sideTitles: SideTitles(
+        showTitles: true,
+        reservedSize: 40,
+        getTitlesWidget: (value, meta) {
+          // ✅ Hide only the highest Y-axis label (RIGHT SIDE)
+          if (value >= meta.max) return Container();
+          return Text(
+            value.toInt().toString(),
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+          );
+        },
       ),
-      bottomTitles: AxisTitles(
-        sideTitles: SideTitles(
-          showTitles: true,
-          reservedSize: 60,
-          getTitlesWidget: (value, meta) {
-            int index = value.toInt();
-            if (index >= 0 && index < timestamps.length) {
-              return _buildFormattedTimestampLabel(index, timestamps);
-            }
-            return const Text("");
-          },
-        ),
+    ),
+    bottomTitles: AxisTitles(
+      sideTitles: SideTitles(
+        showTitles: true,
+        reservedSize: 60,
+        getTitlesWidget: (value, meta) {
+          int index = value.toInt();
+          if (index >= 0 && index < timestamps.length) {
+            return _buildFormattedTimestampLabel(index, timestamps);
+          }
+          return const Text("");
+        },
       ),
-    );
-  }
+    ),
+  );
+}
 
   /// ✅ **Move `_formatTimestamp` inside `FrequencyGraphWidget`**
   String _formatTimestamp(String timestamp) {
