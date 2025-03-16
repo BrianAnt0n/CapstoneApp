@@ -214,7 +214,7 @@ String _formatSensorValue(String sensor, dynamic value) {
 
   try {
     final response = await Supabase.instance.client
-        .from('History_Test')
+        .from('History_Test_Average')
         .select()
         .eq('hardware_id', hardwareId)
         .gte('timestamp', startOfDay)
