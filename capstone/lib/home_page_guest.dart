@@ -402,20 +402,22 @@ class _DashboardPageState extends State<DashboardPage> {
                         if (_containerAddedDate != null) {
                           DateTime compostEndDate = _containerAddedDate!
                               .add(const Duration(days: 112)); // 16 weeks later
-                          DateTime cycleDayOne = _containerAddedDate!.add(
-                              const Duration(days: 1)); // Day 1 of the cycle
 
                           bool isWithinCycle =
                               day.isAfter(_containerAddedDate!) &&
-                                  day.isBefore(compostEndDate);
+                                  day.isBefore(
+                                      compostEndDate.add(Duration(days: 1)));
+
                           bool isToday = day.year == today.year &&
                               day.month == today.month &&
                               day.day == today.day;
 
                           if (isWithinCycle || isToday) {
-                            bool isDayOne = day.year == cycleDayOne.year &&
-                                day.month == cycleDayOne.month &&
-                                day.day == cycleDayOne.day;
+                            bool isStartDate =
+                                day.year == _containerAddedDate!.year &&
+                                    day.month == _containerAddedDate!.month &&
+                                    day.day == _containerAddedDate!.day;
+
                             bool isEndDate = day.year == compostEndDate.year &&
                                 day.month == compostEndDate.month &&
                                 day.day == compostEndDate.day;
@@ -429,10 +431,18 @@ class _DashboardPageState extends State<DashboardPage> {
                                 color: Colors.grey
                                     .withOpacity(0.3), // Gray shading effect
                                 borderRadius: BorderRadius.horizontal(
-                                  left: isDayOne
+                                  left: (isStartDate ||
+                                          day.weekday == DateTime.sunday ||
+                                          day.day ==
+                                              1) // Rounded left edge on Sunday or 1st day of the month
                                       ? const Radius.circular(20)
                                       : Radius.zero,
-                                  right: isEndDate
+                                  right: (isEndDate ||
+                                          (day.weekday == DateTime.saturday ||
+                                              day.day ==
+                                                  DateTime(day.year,
+                                                          day.month + 1, 0)
+                                                      .day))
                                       ? const Radius.circular(20)
                                       : Radius.zero,
                                 ),
@@ -455,6 +465,27 @@ class _DashboardPageState extends State<DashboardPage> {
                     },
                     todayBuilder: (context, day, _) {
                       if (_containerAddedDate != null) {
+                        DateTime today = DateTime.now();
+                        DateTime compostEndDate = _containerAddedDate!
+                              .add(const Duration(days: 112)); // 16 weeks later
+
+                          bool isWithinCycle =
+                              day.isAfter(_containerAddedDate!) &&
+                                  day.isBefore(
+                                      compostEndDate.add(Duration(days: 1)));
+
+                          bool isToday = day.year == today.year &&
+                              day.month == today.month &&
+                              day.day == today.day;
+                        if (isWithinCycle || isToday) {
+                            bool isStartDate =
+                                day.year == _containerAddedDate!.year &&
+                                    day.month == _containerAddedDate!.month &&
+                                    day.day == _containerAddedDate!.day;
+
+                            bool isEndDate = day.year == compostEndDate.year &&
+                                day.month == compostEndDate.month &&
+                                day.day == compostEndDate.day;
                         return Stack(
                           alignment: Alignment.center,
                           children: [
@@ -465,11 +496,22 @@ class _DashboardPageState extends State<DashboardPage> {
                               padding: const EdgeInsets.symmetric(vertical: 4),
                               decoration: BoxDecoration(
                                 color: Colors.grey.withOpacity(
-                                    0.3), // Maintain shading effect
-                                // borderRadius: BorderRadius.horizontal(
-                                //   left: const Radius.circular(20), // Smooth connection on the left
-                                //   right: const Radius.circular(20), // Smooth connection on the right
-                                // ),
+                                    0.3), borderRadius: BorderRadius.horizontal(
+                                    left: (isStartDate ||
+                                            day.weekday == DateTime.sunday ||
+                                            day.day ==
+                                                1) // Rounded left edge on Sunday or 1st day of the month
+                                        ? const Radius.circular(20)
+                                        : Radius.zero,
+                                    right: (isEndDate ||
+                                            (day.weekday == DateTime.saturday ||
+                                                day.day ==
+                                                    DateTime(day.year,
+                                                            day.month + 1, 0)
+                                                        .day))
+                                        ? const Radius.circular(20)
+                                        : Radius.zero,
+                                  ),
                               ),
                               height: 40, // Maintain shading visibility
                               width: double.infinity,
@@ -499,6 +541,7 @@ class _DashboardPageState extends State<DashboardPage> {
                             ),
                           ],
                         );
+}
                       } else {
                         return Stack(
                           alignment: Alignment.center,
@@ -529,41 +572,47 @@ class _DashboardPageState extends State<DashboardPage> {
                         );
                       }
                     },
-                    selectedBuilder: (context, day, _) {
+                    selectedBuilder: (context, day, focusedDay) {
                       if (_containerAddedDate != null) {
+                        DateTime today = DateTime.now();
                         DateTime compostEndDate = _containerAddedDate != null
                             ? _containerAddedDate!
                                 .add(const Duration(days: 112))
                             : DateTime.now();
-                        DateTime cycleDayOne = _containerAddedDate != null
-                            ? _containerAddedDate!.add(const Duration(days: 1))
-                            : DateTime.now();
 
-                        bool isWithinCycle =
-                            day.isAfter(_containerAddedDate!) &&
-                                day.isBefore(compostEndDate);
-                        bool isDayOne = day.year == cycleDayOne.year &&
-                            day.month == cycleDayOne.month &&
-                            day.day == cycleDayOne.day;
+                        bool isWithinCycle = day
+                                .isAfter(_containerAddedDate!) &&
+                            day.isBefore(compostEndDate.add(Duration(days: 1)));
+                        bool isStartDate =
+                            day.year == _containerAddedDate!.year &&
+                                day.month == _containerAddedDate!.month &&
+                                day.day == _containerAddedDate!.day;
 
                         bool isEndDate = day.year == compostEndDate.year &&
                             day.month == compostEndDate.month &&
                             day.day == compostEndDate.day;
-
                         return Stack(
                           alignment: Alignment.center,
                           children: [
                             // Preserve shading effect
-                            if (isWithinCycle)
+                            if (isWithinCycle && day.month == focusedDay.month && day.year == focusedDay.year) 
                               Container(
                                 decoration: BoxDecoration(
                                   color: Colors.grey
                                       .withOpacity(0.3), // Shading effect
                                   borderRadius: BorderRadius.horizontal(
-                                    left: isDayOne
+                                    left: (isStartDate ||
+                                            day.weekday == DateTime.sunday ||
+                                            day.day ==
+                                                1) // Rounded left edge on Sunday or 1st day of the month
                                         ? const Radius.circular(20)
                                         : Radius.zero,
-                                    right: isEndDate
+                                    right: (isEndDate ||
+                                            (day.weekday == DateTime.saturday ||
+                                                day.day ==
+                                                    DateTime(day.year,
+                                                            day.month + 1, 0)
+                                                        .day))
                                         ? const Radius.circular(20)
                                         : Radius.zero,
                                   ),
@@ -571,7 +620,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                 height: 40, // Maintain shading visibility
                                 width: double.infinity,
                               ),
-
+                              
                             // Selection circle (on top)
                             Container(
                               height: 36,
@@ -598,6 +647,7 @@ class _DashboardPageState extends State<DashboardPage> {
                             ),
                           ],
                         );
+                            
                       } else {
                         return Stack(
                           alignment: Alignment.center,
@@ -780,8 +830,6 @@ class _DashboardPageState extends State<DashboardPage> {
                     const SizedBox(height: 20),
                     const Divider(thickness: 2),
                     const SizedBox(height: 10),
-
-// TableCalendar with Compost Age and Built-in Navigation
                     Column(
                       children: [
                         // Weekly Calendar
@@ -996,6 +1044,146 @@ class _DashboardPageState extends State<DashboardPage> {
                         } else if (snapshot.hasError || snapshot.data == null) {
                           return const Center(
                               child: Text('No historical data available.'));
+                        } else {
+                          List<Map<String, dynamic>> historyData =
+                              (snapshot.data as List<Map<String, dynamic>>)
+                                  .toList();
+
+                          ScrollController scrollController =
+                              ScrollController();
+
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            scrollController.jumpTo(
+                                scrollController.position.maxScrollExtent);
+                          });
+
+                          Widget buildChartOrMessage(
+                              String title, String key, Color color) {
+                            if (historyData.length <= 1) {
+                              return Container(
+                                height: 250, // Adjust height as needed
+                                alignment: Alignment.center,
+                                child: const Text(
+                                  'Insufficient Data',
+                                  style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.red),
+                                ),
+                              );
+                            } else if (_containerAddedDate == null) {
+                              return Container(
+                                height: 250, // Adjust height as needed
+                                alignment: Alignment.center,
+                                child: const Text(
+                                  'No Compost',
+                                  style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.red),
+                                ),
+                              );
+                            } else {
+                              return SingleChildScrollView(
+                                controller: scrollController,
+                                scrollDirection: Axis.horizontal,
+                                reverse: true,
+                                child: buildBarChart(
+                                    historyData, title, key, color),
+                              );
+                            }
+                          }
+
+                          return SingleChildScrollView(
+                            scrollDirection: Axis.vertical,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const SizedBox(height: 20),
+                                const Text(
+                                  'Temperature Monitoring',
+                                  style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                                const Text(
+                                  '• Safe: Between 10°C to 54°C  |  Critical: Above 54°C',
+                                  style: TextStyle(
+                                      fontSize: 14, color: Colors.grey),
+                                ),
+                                buildChartOrMessage(
+                                    'Temperature', 'temperature', Colors.green),
+                                const SizedBox(height: 20),
+                                Divider(
+                                    thickness: 2, color: Colors.grey.shade400),
+                                const SizedBox(height: 20),
+                                const Text(
+                                  'Dryness Level',
+                                  style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                                const Text(
+                                  '• Optimal: 50-60%  |  Wet: Below 50%  |  Too Dry: Above 60%',
+                                  style: TextStyle(
+                                      fontSize: 14, color: Colors.grey),
+                                ),
+                                buildChartOrMessage(
+                                    'Dryness', 'moisture', Colors.blue),
+                                const SizedBox(height: 20),
+                                Divider(
+                                    thickness: 2, color: Colors.grey.shade400),
+                                const SizedBox(height: 20),
+                                const Text(
+                                  'pH Level 1',
+                                  style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                                const Text(
+                                  '• Ideal: 6.0 - 8.0 | Too Acidic: Below 6.0 | Too Basic: Above 8',
+                                  style: TextStyle(
+                                      fontSize: 14, color: Colors.grey),
+                                ),
+                                buildChartOrMessage(
+                                    'pH Level 1', 'ph_level1', Colors.purple),
+                                const SizedBox(height: 20),
+                                Divider(
+                                    thickness: 2, color: Colors.grey.shade400),
+                                const SizedBox(height: 20),
+                                const Text(
+                                  'pH Level 2',
+                                  style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                                const Text(
+                                  '• Ideal: 6.0 - 8.0 | Too Acidic: Below 6.0 | Too Basic: Above 8',
+                                  style: TextStyle(
+                                      fontSize: 14, color: Colors.grey),
+                                ),
+                                buildChartOrMessage('pH Level 2', 'ph_level2',
+                                    Colors.deepPurple),
+                                const SizedBox(height: 20),
+                                Divider(
+                                    thickness: 2, color: Colors.grey.shade400),
+                                const SizedBox(height: 20),
+                                const Text(
+                                  'Humidity Level',
+                                  style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                                const Text(
+                                  '• Optimal: 30-60%  |  Low: Below 30%  |  High: Above 60%',
+                                  style: TextStyle(
+                                      fontSize: 14, color: Colors.grey),
+                                ),
+                                buildChartOrMessage(
+                                    'Humidity', 'humidity', Colors.orange),
+                              ],
+                            ),
+                          );
                         }
 
                         List<Map<String, dynamic>> historyData =
