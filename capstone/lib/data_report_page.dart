@@ -2005,35 +2005,69 @@ Future<Uint8List> _compressImage(Uint8List imageBytes) async {
 
 
     for (String label in labels) {
-      double firstValue =
-          double.tryParse(firstDateData[label]?.replaceAll(RegExp('[^0-9.]'), '') ?? "0") ?? 0;
-      double secondValue =
-          double.tryParse(secondDateData[label]?.replaceAll(RegExp('[^0-9.]'), '') ?? "0") ?? 0;
+  String? firstRaw = firstDateData[label];
+  String? secondRaw = secondDateData[label];
 
-      if (firstValue > secondValue) {
-          double diff = (firstValue - secondValue);
-          comparisonSpans.add(_buildBulletSpan(
-            label,
-            "on $firstDateStr (${formatSensorValue(label, firstValue)}) was higher than $secondDateStr (${formatSensorValue(label, secondValue)}) by ",
-            formatSensorValue(label, diff),
-          ));
-        } else if (firstValue < secondValue) {
-          double diff = (secondValue - firstValue);
-          comparisonSpans.add(_buildBulletSpan(
-            label,
-            "on $secondDateStr (${formatSensorValue(label, secondValue)}) was higher than $firstDateStr (${formatSensorValue(label, firstValue)}) by ",
-            formatSensorValue(label, diff),
-          ));
-        } else {
-          comparisonSpans.add(_buildBulletSpan(
-            label,
-            "was the same on both dates ($firstDateStr: ${formatSensorValue(label, firstValue)}, $secondDateStr: ${formatSensorValue(label, secondValue)}).",
-            "",
-          ));
-        }
+  // ✅ If either date has "N/A", show only the available data.
+  if ((firstRaw == null || firstRaw.toLowerCase() == "n/a") &&
+      (secondRaw == null || secondRaw.toLowerCase() == "n/a")) {
+    comparisonSpans.add(_buildBulletSpan(
+      label,
+      "No data available for both selected dates.",
+      "",
+    ));
+    continue; // ✅ Skip further processing
+  }
 
+  // ✅ If only first date has data
+  if (firstRaw != null && firstRaw.toLowerCase() != "n/a" &&
+      (secondRaw == null || secondRaw.toLowerCase() == "n/a")) {
+    comparisonSpans.add(_buildBulletSpan(
+      label,
+      "on $firstDateStr (${formatSensorValue(label, double.parse(firstRaw.replaceAll(RegExp('[^0-9.]'), '')))})",
+      "",
+    ));
+    continue;
+  }
 
-    }
+  // ✅ If only second date has data
+  if (secondRaw != null && secondRaw.toLowerCase() != "n/a" &&
+      (firstRaw == null || firstRaw.toLowerCase() == "n/a")) {
+    comparisonSpans.add(_buildBulletSpan(
+      label,
+      "on $secondDateStr (${formatSensorValue(label, double.parse(secondRaw.replaceAll(RegExp('[^0-9.]'), '')))})",
+      "",
+    ));
+    continue;
+  }
+
+  // ✅ Normal Comparison (if both dates have valid data)
+  double firstValue = double.tryParse(firstRaw?.replaceAll(RegExp('[^0-9.]'), '') ?? "0") ?? 0;
+  double secondValue = double.tryParse(secondRaw?.replaceAll(RegExp('[^0-9.]'), '') ?? "0") ?? 0;
+
+  if (firstValue > secondValue) {
+    double diff = (firstValue - secondValue);
+    comparisonSpans.add(_buildBulletSpan(
+      label,
+      "on $firstDateStr (${formatSensorValue(label, firstValue)}) was higher than $secondDateStr (${formatSensorValue(label, secondValue)}) by ",
+      formatSensorValue(label, diff),
+    ));
+  } else if (firstValue < secondValue) {
+    double diff = (secondValue - firstValue);
+    comparisonSpans.add(_buildBulletSpan(
+      label,
+      "on $secondDateStr (${formatSensorValue(label, secondValue)}) was higher than $firstDateStr (${formatSensorValue(label, firstValue)}) by ",
+      formatSensorValue(label, diff),
+    ));
+  } else {
+    comparisonSpans.add(_buildBulletSpan(
+      label,
+      "was the same on both dates ($firstDateStr: ${formatSensorValue(label, firstValue)}, $secondDateStr: ${formatSensorValue(label, secondValue)}).",
+      "",
+    ));
+  }
+}
+
   }
 
   
@@ -2285,6 +2319,7 @@ InlineSpan _buildBulletSpan(String label, String text, String boldValue) {
 
 }
 
+// Comparison Widget
 class ComparisonGraphWidget extends StatefulWidget {
   final GlobalKey<_ComparisonGraphWidgetState> widgetKey; // ✅ Added GlobalKey
   final GlobalKey repaintKey;
