@@ -1181,7 +1181,7 @@ Future<Uint8List?> _captureGraphWithCompression(GlobalKey repaintKey, String gra
   }
 
   // ✅ Ensure widget is fully rendered before capturing
-  await Future.delayed(const Duration(milliseconds: 700)); // Added delay
+  await Future.delayed(const Duration(milliseconds: 500)); // Added delay
   await _waitForGraphRender(repaintKey, graphName);
 
   // ✅ Get the repaint boundary
@@ -1288,9 +1288,9 @@ Future<Uint8List?> _captureGraphWithCompression(GlobalKey repaintKey, String gra
 
 // ✅ Moved `_waitForGraphRender()` inside `_captureGraph()`
 Future<void> _waitForGraphRender(GlobalKey key, String graphName) async {
-  int retries = 5; // ✅ Increased retries slightly for reliability
+  int retries = 4; // ✅ Increased retries slightly for reliability
   while (retries > 0) {
-    await Future.delayed(const Duration(milliseconds: 700)); // ✅ Slightly increased delay
+    await Future.delayed(const Duration(milliseconds: 500)); // ✅ Slightly increased delay
 
     final boundary = key.currentContext?.findRenderObject() as RenderRepaintBoundary?;
     if (boundary != null && !boundary.debugNeedsPaint) {
