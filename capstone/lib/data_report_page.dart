@@ -18,8 +18,10 @@ import 'package:image/image.dart' as img;
 
 class DataReportPage extends StatefulWidget {
   final int selectedHardwareId; // ✅ Using hardware_id
+  
 
   const DataReportPage({super.key, required this.selectedHardwareId});
+  
 
   @override
   _DataReportPageState createState() => _DataReportPageState();
@@ -38,9 +40,9 @@ class _DataReportPageState extends State<DataReportPage> {
   String comparisonSummary = "";
   String frequencySummary = "";
 
-  final GlobalKey comparisonGraphKey = GlobalKey();
+ 
+ final GlobalKey comparisonGraphKey = GlobalKey();
 final GlobalKey frequencyGraphKey = GlobalKey();
-
 
   final GlobalKey<_ComparisonGraphWidgetState> comparisonGraphWidgetKey = GlobalKey<_ComparisonGraphWidgetState>();
  final GlobalKey<_FrequencyGraphWidgetState> frequencyGraphWidgetKey = GlobalKey<_FrequencyGraphWidgetState>();
@@ -594,6 +596,7 @@ List<double> secondValues = labels.map((label) {
     if (kDebugMode) {
       print("📄 Exporting PDF...");
     }
+    
 
     await Future.delayed(const Duration(milliseconds: 1000)); // Ensure UI updates
 
@@ -868,43 +871,53 @@ List<double> secondValues = labels.map((label) {
       );
     }
 
+    // ✅ Ensure the UI updates before capturing
+setState(() {});  
+await Future.delayed(const Duration(milliseconds: 700)); // Allow UI to settle
+
+// ✅ Force Graphs to Rebuild BEFORE Capturing
+comparisonGraphWidgetKey.currentState?.forceRebuild();
+frequencyGraphWidgetKey.currentState?.forceRebuild();
+
+await Future.delayed(const Duration(milliseconds: 500)); // Allow graphs to repaint
+
+
     // ✅ Capture Graphs
     List<Uint8List> images = await _captureGraphsAsImages();
 
     // ✅ Page 4: Comparison Graph
-    if (images.isNotEmpty) {
-      pdf.addPage(
-        pw.Page(
-          build: (pw.Context context) => pw.Center(
-            child: pw.Column(
-              children: [
-                pw.Text("Comparison Graph", style: pw.TextStyle(fontSize: 20, font: boldFont)),
-                pw.SizedBox(height: 10),
-                pw.Image(pw.MemoryImage(images[0]), width: 400, height: 300),
-              ],
-            ),
-          ),
+if (images.isNotEmpty) {
+  pdf.addPage(
+    pw.Page(
+      build: (pw.Context context) => pw.Center(
+        child: pw.Column(
+          children: [
+            pw.Text("Comparison Graph", style: pw.TextStyle(fontSize: 20, font: boldFont)),
+            pw.SizedBox(height: 10),
+            pw.Image(pw.MemoryImage(images[0]), width: 400, height: 300),
+          ],
         ),
-      );
-    }
-List<Uint8List> imagesfrequency = await _captureGraphsAsImages();
-    // ✅ Page 5: Frequency Graph
-    if (imagesfrequency.length > 1) {
-      pdf.addPage(
-        pw.Page(
-          build: (pw.Context context) => pw.Center(
-            child: pw.Column(
-              children: [
-                pw.Text("Frequency Graph", style: pw.TextStyle(fontSize: 20, font: boldFont)),
-                pw.SizedBox(height: 10),
-                pw.Image(pw.MemoryImage(imagesfrequency[1]), width: 400, height: 300),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
+      ),
+    ),
+  );
+}
 
+// ✅ Page 5: Frequency Graph (if available)
+if (images.length > 1) {
+  pdf.addPage(
+    pw.Page(
+      build: (pw.Context context) => pw.Center(
+        child: pw.Column(
+          children: [
+            pw.Text("Frequency Graph", style: pw.TextStyle(fontSize: 20, font: boldFont)),
+            pw.SizedBox(height: 10),
+            pw.Image(pw.MemoryImage(images[1]), width: 400, height: 300),
+          ],
+        ),
+      ),
+    ),
+  );
+}
     // ✅ Save and Open the PDF
     final output = await getTemporaryDirectory();
 final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
@@ -1167,64 +1180,39 @@ pw.Widget _buildPDFBulletPoints(String summary, pw.Font customFont) {
 }
 
 
-
+// ✅ Helper Function: Captures and Compresses Graphs
 
   Future<List<Uint8List>> _captureGraphsAsImages() async {
-  List<Uint8List> images = [];
+  if (kDebugMode) print("📸 Starting parallel graph capture...");
 
-  // ✅ Ensure UI updates before capturing graphs
-  setState(() {});  
-  await Future.delayed(const Duration(milliseconds: 500)); // Allow UI to settle
+  // ✅ Run both captures at the same time (no unnecessary waiting)
+  final List<Future<Uint8List?>> captureTasks = [
+    _captureGraphWithCompression(comparisonGraphKey, "comparisonGraphKey"),
+    _captureGraphWithCompression(frequencyGraphKey, "frequencyGraphKey"),
+  ];
 
-  // ✅ Wait for graphs to render
-  await _waitForGraphRender(comparisonGraphKey, "comparisonGraphKey");
-  await _waitForGraphRender(frequencyGraphKey, "frequencyGraphKey");
+  final results = await Future.wait(captureTasks);
 
-  // ✅ Capture and Compress _buildComparisonGraph()
-  Uint8List? comparisonGraphImage = await _captureGraphWithCompression(comparisonGraphKey, "comparisonGraphKey");
-  if (comparisonGraphImage != null) images.add(comparisonGraphImage);
+  // ✅ Filter out null results and return captured images
+  final images = results.whereType<Uint8List>().toList();
 
-  // ✅ Capture and Compress _buildTimeBasedFrequencyGraph()
-  Uint8List? frequencyGraphImage = await _captureGraphWithCompression(frequencyGraphKey, "frequencyGraphKey");
-  if (frequencyGraphImage != null) images.add(frequencyGraphImage);
-
-  if (kDebugMode) {
-    print("📸 Total images captured: ${images.length}");
-  }
+  if (kDebugMode) print("📸 Total images captured: ${images.length}");
   return images;
 }
 
 
-// Future<Uint8List?> _captureFrequencyGraphAsImage() async {
-//   // ✅ Capture only the Frequency Graph
-//   Uint8List? frequencyGraphImage = await _captureGraphWithCompression(
-//     frequencyGraphKey,
-//     "frequencyGraphKey",
-//     // () => setState(() {}), // 🔄 Forces a rebuild!
-//   );
-
-//   if (frequencyGraphImage != null && kDebugMode) {
-//     print("📸 Captured Frequency Graph Image!");
-//   }
-
-//   return frequencyGraphImage;
-// }
 
 Future<Uint8List?> _captureGraphWithCompression(GlobalKey repaintKey, String graphName) async {
-  if (kDebugMode) {
-    print("🔍 Attempting to capture $graphName...");
-  }
+  if (kDebugMode) print("🔍 Attempting to capture $graphName...");
 
-  if (repaintKey.currentContext == null) {
-    if (kDebugMode) print("⚠ $graphName context is NULL! Skipping capture.");
+  if (repaintKey.currentContext == null || !repaintKey.currentContext!.mounted) {
+    if (kDebugMode) print("⚠ $graphName context is NULL or not mounted! Skipping capture.");
     return null;
   }
 
-  // ✅ Ensure widget is fully rendered before capturing
-  await Future.delayed(const Duration(milliseconds: 500)); // Added delay
+  // ✅ Ensure the widget is rendered BEFORE checking its paint status
   await _waitForGraphRender(repaintKey, graphName);
 
-  // ✅ Get the repaint boundary
   final boundary = repaintKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
   if (boundary == null || boundary.debugNeedsPaint) {
     if (kDebugMode) print("⚠ $graphName is not ready! Skipping...");
@@ -1232,17 +1220,15 @@ Future<Uint8List?> _captureGraphWithCompression(GlobalKey repaintKey, String gra
   }
 
   try {
-    // ✅ Capture at 2x resolution
-    ui.Image image = await boundary.toImage(pixelRatio: 2.0);
+    ui.Image image = await boundary.toImage(pixelRatio: 2.5);
     ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
     Uint8List? pngBytes = byteData?.buffer.asUint8List();
 
     if (pngBytes == null) {
-      if (kDebugMode) print("❌ Failed to convert $graphName to PNG.");
+      if (kDebugMode) print("❌ Failed to capture $graphName.");
       return null;
     }
 
-    // ✅ Apply optimized compression
     Uint8List compressedBytes = await _compressImage(pngBytes);
 
     if (kDebugMode) {
@@ -1258,82 +1244,14 @@ Future<Uint8List?> _captureGraphWithCompression(GlobalKey repaintKey, String gra
 
 
 
-
-// // ✅ Helper Function: Captures a widget as an image
-// Future<Uint8List?> _captureGraph(GlobalKey key, String graphName, VoidCallback forceRebuild) async {
-
-//   if (kDebugMode) {
-//     print("🔍 Attempting to capture $graphName...");
-//   }
-
-//   if (kDebugMode) {
-//     print("🔍 Checking $graphName BEFORE capturing images: ${key.currentContext != null}");
-//   }
-
-//   // ✅ Force rebuild if widget is null
-//   if (key.currentContext == null) {
-//     if (kDebugMode) {
-//       print("⚠ $graphName context is NULL! Forcing rebuild...");
-//     }
-//     forceRebuild();  // 🔄 Calls setState() to trigger a rebuild
-//     await Future.delayed(Duration(milliseconds: 500)); // Allow rebuild time
-//   }
-
-//   // ✅ Double-check after rebuild attempt
-//   if (key.currentContext == null) {
-//     if (kDebugMode) {
-//       print("⚠ $graphName context is STILL NULL after rebuild attempt. Skipping capture.");
-//     }
-//     return null;
-//   }
-
-//   // ✅ Ensure widget is fully rendered before proceeding
-//   await _waitForGraphRender(key, graphName);
-
-//   if (key.currentContext == null || key.currentContext!.findRenderObject() == null) {
-//     if (kDebugMode) {
-//       print("⚠ $graphName is still NULL, skipping capture.");
-//     }
-//     return null;
-//   }
-
-//   RenderRepaintBoundary? boundary = key.currentContext!.findRenderObject() as RenderRepaintBoundary?;
-
-//   if (boundary == null || boundary.debugNeedsPaint) {
-//   if (kDebugMode) {
-//     print("⚠ $graphName is not fully painted! Retrying...");
-//   }
-
-//   // ✅ Force UI rebuild and delay again
-//   forceRebuild();
-//   await Future.delayed(Duration(milliseconds: 700));
-
-//   boundary = key.currentContext?.findRenderObject() as RenderRepaintBoundary?;
-//   if (boundary == null || boundary.debugNeedsPaint) {
-//     if (kDebugMode) {
-//       print("❌ $graphName is STILL NOT READY after waiting! Skipping...");
-//     }
-//     return null;
-//   }
-// }
-
-//   if (kDebugMode) {
-//     print("✅ $graphName is fully rendered and painted.");
-//   }
-//   ui.Image image = await boundary.toImage(pixelRatio: 3.0);
-//   ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-//   return byteData?.buffer.asUint8List();
-// }
-
-
 // ✅ Moved `_waitForGraphRender()` inside `_captureGraph()`
 Future<void> _waitForGraphRender(GlobalKey key, String graphName) async {
-  int retries = 4; // ✅ Increased retries slightly for reliability
+  int retries = 5; // Maximum retries
   while (retries > 0) {
-    await Future.delayed(const Duration(milliseconds: 500)); // ✅ Slightly increased delay
+    await Future.delayed(const Duration(milliseconds: 300));
 
     final boundary = key.currentContext?.findRenderObject() as RenderRepaintBoundary?;
-    if (boundary != null && !boundary.debugNeedsPaint) {
+    if (boundary != null && boundary.paintBounds.isFinite && !boundary.debugNeedsPaint) {
       if (kDebugMode) print("✅ $graphName is fully rendered.");
       return;
     }
@@ -1350,12 +1268,12 @@ Future<Uint8List> _compressImage(Uint8List imageBytes) async {
   img.Image? image = img.decodeImage(imageBytes);
   if (image == null) return imageBytes; // ✅ Return original if decoding fails
 
-  // ✅ Dynamic Resizing - Only resize if image width is > 800px
+  // ✅ Resize only if the image is too large
   if (image.width > 1000) {
-    image = img.copyResize(image, width: 800);
+    image = img.copyResize(image, width: 900);
   }
 
-  return Uint8List.fromList(img.encodeJpg(image, quality: 75)); // ✅ Slightly lower quality for better compression
+  return Uint8List.fromList(img.encodeJpg(image, quality: 80)); // ✅ Adjust quality for better balance
 }
 
 
@@ -2545,6 +2463,11 @@ class FrequencyGraphWidget extends StatefulWidget {
 class _FrequencyGraphWidgetState extends State<FrequencyGraphWidget> with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true; // ✅ Keeps widget in memory
+
+    // ✅ Add this method to trigger a rebuild
+  void forceRebuild() {
+    setState(() {}); // 🔄 Triggers a rebuild when called
+  }
 
   @override
   Widget build(BuildContext context) {
