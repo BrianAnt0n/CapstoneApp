@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'home_page.dart';
 import 'home_page_members.dart';
+import 'package:bcrypt/bcrypt.dart';
 
 class ForcedPasswordChangePage extends StatefulWidget {
   const ForcedPasswordChangePage({super.key});
@@ -57,9 +58,12 @@ class _ForcedPasswordChangePageState extends State<ForcedPasswordChangePage> {
     }
 
     try {
+      // ✅ Hash the password before storing
+      String hashedPassword = BCrypt.hashpw(newPassword, BCrypt.gensalt());
+
       await supabase
           .from('Users')
-          .update({'password': newPassword})
+          .update({'password': hashedPassword})
           .eq('user_id', int.parse(userId!));
 
       ScaffoldMessenger.of(context).showSnackBar(

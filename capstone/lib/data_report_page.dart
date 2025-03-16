@@ -930,29 +930,69 @@ await file.writeAsBytes(await pdf.save());
 // ✅ Helper Functions to Recalculate Summaries
 void _generateComparisonSummary() {
   comparisonSummary = ""; // Clear old data
-  if (firstDateData.isNotEmpty && secondDateData.isNotEmpty) {
-    List<String> labels = ["Temperature", "Dryness Level", "pH Level 1", "pH Level 2", "Humidity"];
-    
-    for (String label in labels) {
-      double firstValue = double.tryParse(firstDateData[label]?.replaceAll(RegExp('[^0-9.]'), '') ?? "0") ?? 0;
-      double secondValue = double.tryParse(secondDateData[label]?.replaceAll(RegExp('[^0-9.]'), '') ?? "0") ?? 0;
 
-      //   // ✅ Format Dates Correctly (Removes Time)
-      // String firstDateFormatted = DateFormat('yyyy-MM-dd').format(firstSelectedDate);
-      // String secondDateFormatted = DateFormat('yyyy-MM-dd').format(secondSelectedDate);
+  if (firstDateData.isNotEmpty || secondDateData.isNotEmpty) {
+    List<String> labels = ["Temperature", "Dryness Level", "pH Level 1", "pH Level 2", "Humidity"];
+
+    String formatSensorValue(String sensor, double value) {
+      if (sensor.contains("Temperature")) {
+        return "${value.toStringAsFixed(1)}°C"; // ✅ 1 decimal + °C
+      } else if (sensor.contains("Moisture") || sensor.contains("Humidity")) {
+        return "${value.toStringAsFixed(0)}%"; // ✅ Whole number + %
+      } else if (sensor.contains("pH")) {
+        return value.toStringAsFixed(2); // ✅ 2 decimal places for pH
+      }
+      return value.toString(); // Default case
+    }
+
+    // ✅ Format Dates Correctly (Removes Time)
+    String firstDateStr = DateFormat('yyyy-MM-dd').format(firstSelectedDate);
+    String secondDateStr = DateFormat('yyyy-MM-dd').format(secondSelectedDate);
+
+    for (String label in labels) {
+      String? firstRaw = firstDateData[label];
+      String? secondRaw = secondDateData[label];
+
+      // ✅ If both dates have "N/A", mention no data is available.
+      if ((firstRaw == null || firstRaw.toLowerCase() == "n/a") &&
+          (secondRaw == null || secondRaw.toLowerCase() == "n/a")) {
+        comparisonSummary += "• $label: No data available for both selected dates.\n\n";
+        continue;
+      }
+
+      // ✅ If only first date has data
+      if (firstRaw != null && firstRaw.toLowerCase() != "n/a" &&
+          (secondRaw == null || secondRaw.toLowerCase() == "n/a")) {
+        double firstValue = double.tryParse(firstRaw.replaceAll(RegExp('[^0-9.]'), '')) ?? 0.0;
+        comparisonSummary += "• $label was recorded on $firstDateStr (${formatSensorValue(label, firstValue)}), but no data was available for $secondDateStr.\n\n";
+        continue;
+      }
+
+      // ✅ If only second date has data
+      if (secondRaw != null && secondRaw.toLowerCase() != "n/a" &&
+          (firstRaw == null || firstRaw.toLowerCase() == "n/a")) {
+        double secondValue = double.tryParse(secondRaw.replaceAll(RegExp('[^0-9.]'), '')) ?? 0.0;
+        comparisonSummary += "• $label was recorded on $secondDateStr (${formatSensorValue(label, secondValue)}), but no data was available for $firstDateStr.\n\n";
+        continue;
+      }
+
+      // ✅ Normal Comparison (if both dates have valid data)
+      double firstValue = double.tryParse(firstRaw?.replaceAll(RegExp('[^0-9.]'), '') ?? "0") ?? 0.0;
+      double secondValue = double.tryParse(secondRaw?.replaceAll(RegExp('[^0-9.]'), '') ?? "0") ?? 0.0;
 
       if (firstValue > secondValue) {
-        double diff = (firstValue - secondValue);
-        comparisonSummary += "• $label on $firstSelectedDate (${firstValue.toStringAsFixed(2)}) was higher than $secondSelectedDate (${secondValue.toStringAsFixed(2)}) by ${diff.toStringAsFixed(2)}.\n\n";
+        double diff = firstValue - secondValue;
+        comparisonSummary += "• $label on $firstDateStr (${formatSensorValue(label, firstValue)}) was higher than $secondDateStr (${formatSensorValue(label, secondValue)}) by ${formatSensorValue(label, diff)}.\n\n";
       } else if (firstValue < secondValue) {
-        double diff = (secondValue - firstValue);
-        comparisonSummary += "• $label on $secondSelectedDate (${secondValue.toStringAsFixed(2)}) was higher than $firstSelectedDate (${firstValue.toStringAsFixed(2)}) by ${diff.toStringAsFixed(2)}.\n\n";
+        double diff = secondValue - firstValue;
+        comparisonSummary += "• $label on $secondDateStr (${formatSensorValue(label, secondValue)}) was higher than $firstDateStr (${formatSensorValue(label, firstValue)}) by ${formatSensorValue(label, diff)}.\n\n";
       } else {
-        comparisonSummary += "• $label was the same on both dates ($firstSelectedDate: ${firstValue.toStringAsFixed(2)}, $secondSelectedDate: ${secondValue.toStringAsFixed(2)}).\n\n";
+        comparisonSummary += "• $label was the same on both dates ($firstDateStr: ${formatSensorValue(label, firstValue)}, $secondDateStr: ${formatSensorValue(label, secondValue)}).\n\n";
       }
     }
   }
 }
+
 
 void _generateFrequencySummary() {
   if (kDebugMode) {
@@ -1181,7 +1221,7 @@ Future<Uint8List?> _captureGraphWithCompression(GlobalKey repaintKey, String gra
   }
 
   // ✅ Ensure widget is fully rendered before capturing
-  await Future.delayed(const Duration(milliseconds: 700)); // Added delay
+  await Future.delayed(const Duration(milliseconds: 500)); // Added delay
   await _waitForGraphRender(repaintKey, graphName);
 
   // ✅ Get the repaint boundary
@@ -1288,9 +1328,9 @@ Future<Uint8List?> _captureGraphWithCompression(GlobalKey repaintKey, String gra
 
 // ✅ Moved `_waitForGraphRender()` inside `_captureGraph()`
 Future<void> _waitForGraphRender(GlobalKey key, String graphName) async {
-  int retries = 5; // ✅ Increased retries slightly for reliability
+  int retries = 4; // ✅ Increased retries slightly for reliability
   while (retries > 0) {
-    await Future.delayed(const Duration(milliseconds: 700)); // ✅ Slightly increased delay
+    await Future.delayed(const Duration(milliseconds: 500)); // ✅ Slightly increased delay
 
     final boundary = key.currentContext?.findRenderObject() as RenderRepaintBoundary?;
     if (boundary != null && !boundary.debugNeedsPaint) {
@@ -2005,35 +2045,69 @@ Future<Uint8List> _compressImage(Uint8List imageBytes) async {
 
 
     for (String label in labels) {
-      double firstValue =
-          double.tryParse(firstDateData[label]?.replaceAll(RegExp('[^0-9.]'), '') ?? "0") ?? 0;
-      double secondValue =
-          double.tryParse(secondDateData[label]?.replaceAll(RegExp('[^0-9.]'), '') ?? "0") ?? 0;
+  String? firstRaw = firstDateData[label];
+  String? secondRaw = secondDateData[label];
 
-      if (firstValue > secondValue) {
-          double diff = (firstValue - secondValue);
-          comparisonSpans.add(_buildBulletSpan(
-            label,
-            "on $firstDateStr (${formatSensorValue(label, firstValue)}) was higher than $secondDateStr (${formatSensorValue(label, secondValue)}) by ",
-            formatSensorValue(label, diff),
-          ));
-        } else if (firstValue < secondValue) {
-          double diff = (secondValue - firstValue);
-          comparisonSpans.add(_buildBulletSpan(
-            label,
-            "on $secondDateStr (${formatSensorValue(label, secondValue)}) was higher than $firstDateStr (${formatSensorValue(label, firstValue)}) by ",
-            formatSensorValue(label, diff),
-          ));
-        } else {
-          comparisonSpans.add(_buildBulletSpan(
-            label,
-            "was the same on both dates ($firstDateStr: ${formatSensorValue(label, firstValue)}, $secondDateStr: ${formatSensorValue(label, secondValue)}).",
-            "",
-          ));
-        }
+  // ✅ If either date has "N/A", show only the available data.
+  if ((firstRaw == null || firstRaw.toLowerCase() == "n/a") &&
+      (secondRaw == null || secondRaw.toLowerCase() == "n/a")) {
+    comparisonSpans.add(_buildBulletSpan(
+      label,
+      "No data available for both selected dates.",
+      "",
+    ));
+    continue; // ✅ Skip further processing
+  }
 
+  // ✅ If only first date has data
+  if (firstRaw != null && firstRaw.toLowerCase() != "n/a" &&
+      (secondRaw == null || secondRaw.toLowerCase() == "n/a")) {
+    comparisonSpans.add(_buildBulletSpan(
+      label,
+      "on $firstDateStr (${formatSensorValue(label, double.parse(firstRaw.replaceAll(RegExp('[^0-9.]'), '')))})",
+      "",
+    ));
+    continue;
+  }
 
-    }
+  // ✅ If only second date has data
+  if (secondRaw != null && secondRaw.toLowerCase() != "n/a" &&
+      (firstRaw == null || firstRaw.toLowerCase() == "n/a")) {
+    comparisonSpans.add(_buildBulletSpan(
+      label,
+      "on $secondDateStr (${formatSensorValue(label, double.parse(secondRaw.replaceAll(RegExp('[^0-9.]'), '')))})",
+      "",
+    ));
+    continue;
+  }
+
+  // ✅ Normal Comparison (if both dates have valid data)
+  double firstValue = double.tryParse(firstRaw?.replaceAll(RegExp('[^0-9.]'), '') ?? "0") ?? 0;
+  double secondValue = double.tryParse(secondRaw?.replaceAll(RegExp('[^0-9.]'), '') ?? "0") ?? 0;
+
+  if (firstValue > secondValue) {
+    double diff = (firstValue - secondValue);
+    comparisonSpans.add(_buildBulletSpan(
+      label,
+      "on $firstDateStr (${formatSensorValue(label, firstValue)}) was higher than $secondDateStr (${formatSensorValue(label, secondValue)}) by ",
+      formatSensorValue(label, diff),
+    ));
+  } else if (firstValue < secondValue) {
+    double diff = (secondValue - firstValue);
+    comparisonSpans.add(_buildBulletSpan(
+      label,
+      "on $secondDateStr (${formatSensorValue(label, secondValue)}) was higher than $firstDateStr (${formatSensorValue(label, firstValue)}) by ",
+      formatSensorValue(label, diff),
+    ));
+  } else {
+    comparisonSpans.add(_buildBulletSpan(
+      label,
+      "was the same on both dates ($firstDateStr: ${formatSensorValue(label, firstValue)}, $secondDateStr: ${formatSensorValue(label, secondValue)}).",
+      "",
+    ));
+  }
+}
+
   }
 
   
@@ -2285,6 +2359,7 @@ InlineSpan _buildBulletSpan(String label, String text, String boldValue) {
 
 }
 
+// Comparison Widget
 class ComparisonGraphWidget extends StatefulWidget {
   final GlobalKey<_ComparisonGraphWidgetState> widgetKey; // ✅ Added GlobalKey
   final GlobalKey repaintKey;

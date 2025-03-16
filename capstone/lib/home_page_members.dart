@@ -86,7 +86,7 @@ class _HomePageMemberState extends State<HomePageMember> {
     _checkSelectedContainer();
 
     // Start a timer that refreshes notifications every second
-    _timer = Timer.periodic(const Duration(seconds: 2), (Timer t) {
+    _timer = Timer.periodic(const Duration(seconds: 30), (Timer t) {
       _refreshNotifications();
     });
   }
@@ -1182,21 +1182,21 @@ class _DashboardPageState extends State<DashboardPage> {
                               DateTime compostEndDate = _containerAddedDate!
                                   .add(const Duration(
                                       days: 112)); // 16 weeks later
-                              DateTime cycleDayOne = _containerAddedDate!.add(
-                                  const Duration(
-                                      days: 1)); // Day 1 of the cycle
 
-                              bool isWithinCycle =
-                                  date.isAfter(_containerAddedDate!) &&
-                                      date.isBefore(compostEndDate);
+                              bool isWithinCycle = date
+                                      .isAfter(_containerAddedDate!) &&
+                                  date.isBefore(
+                                      compostEndDate.add(Duration(days: 1)));
                               bool isToday = date.year == today.year &&
                                   date.month == today.month &&
                                   date.day == today.day;
 
                               if (isWithinCycle || isToday) {
-                                bool isDayOne = date.year == cycleDayOne.year &&
-                                    date.month == cycleDayOne.month &&
-                                    date.day == cycleDayOne.day;
+                                bool isStartDate = date.year ==
+                                        _containerAddedDate!.year &&
+                                    date.month == _containerAddedDate!.month &&
+                                    date.day == _containerAddedDate!.day;
+
                                 bool isEndDate =
                                     date.year == compostEndDate.year &&
                                         date.month == compostEndDate.month &&
@@ -1212,10 +1212,19 @@ class _DashboardPageState extends State<DashboardPage> {
                                     color: Colors.grey.withOpacity(
                                         0.3), // Gray shading effect
                                     borderRadius: BorderRadius.horizontal(
-                                      left: isDayOne
+                                      left: (isStartDate ||
+                                              date.weekday == DateTime.sunday ||
+                                              date.day ==
+                                                  1) // Rounded left edge on Sunday or 1st day of the month
                                           ? const Radius.circular(20)
                                           : Radius.zero,
-                                      right: isEndDate
+                                      right: (isEndDate ||
+                                              (date.weekday ==
+                                                      DateTime.saturday ||
+                                                  date.day ==
+                                                      DateTime(date.year,
+                                                              date.month + 1, 0)
+                                                          .day))
                                           ? const Radius.circular(20)
                                           : Radius.zero,
                                     ),
@@ -1236,192 +1245,222 @@ class _DashboardPageState extends State<DashboardPage> {
                             return null; // Default calendar rendering
                           },
                           todayBuilder: (context, date, _) {
-                            if (_containerAddedDate != null) {
-                              return Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  // Background shading extending to adjacent dates
-                                  Container(
-                                    margin: const EdgeInsets.symmetric(
-                                        vertical: 6, horizontal: 0),
-                                    padding:
-                                        const EdgeInsets.symmetric(vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey.withOpacity(
-                                          0.3), // Maintain shading effect
-                                      // borderRadius: BorderRadius.horizontal(
-                                      //   left: const Radius.circular(20), // Smooth connection on the left
-                                      //   right: const Radius.circular(20), // Smooth connection on the right
-                                      // ),
-                                    ),
-                                    height: 40, // Maintain shading visibility
-                                    width: double.infinity,
-                                  ),
+                      if (_containerAddedDate != null) {
+                        DateTime today = DateTime.now();
+                        DateTime compostEndDate = _containerAddedDate!
+                              .add(const Duration(days: 112)); // 16 weeks later
 
-                                  // Today indicator
-                                  Container(
-                                    height: 36,
-                                    width: 36,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: Colors.green.withOpacity(
-                                          0.5), // Highlight today's date
-                                    ),
-                                  ),
+                          bool isWithinCycle =
+                              date.isAfter(_containerAddedDate!) &&
+                                  date.isBefore(
+                                      compostEndDate.add(Duration(days: 1)));
 
-                                  // Date number
-                                  Center(
-                                    child: Text(
-                                      date.day.toString(),
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color:
-                                            Colors.black87, // Ensure visibility
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              );
-                            } else {
-                              return Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  // Today indicator
-                                  Container(
-                                    height: 36,
-                                    width: 36,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: Colors.green.withOpacity(
-                                          0.5), // Highlight today's date
-                                    ),
-                                  ),
+                          bool isToday = date.year == today.year &&
+                              date.month == today.month &&
+                              date.day == today.day;
+                        if (isWithinCycle || isToday) {
+                            bool isStartDate =
+                                date.year == _containerAddedDate!.year &&
+                                    date.month == _containerAddedDate!.month &&
+                                    date.day == _containerAddedDate!.day;
 
-                                  // Date number
-                                  Center(
-                                    child: Text(
-                                      date.day.toString(),
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color:
-                                            Colors.black87, // Ensure visibility
-                                      ),
-                                    ),
+                            bool isEndDate = date.year == compostEndDate.year &&
+                                date.month == compostEndDate.month &&
+                                date.day == compostEndDate.day;
+                        return Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            // Background shading extending to adjacent dates
+                            Container(
+                              margin: const EdgeInsets.symmetric(
+                                  vertical: 6, horizontal: 0),
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.withOpacity(
+                                    0.3), borderRadius: BorderRadius.horizontal(
+                                    left: (isStartDate ||
+                                            date.weekday == DateTime.sunday ||
+                                            date.day ==
+                                                1) // Rounded left edge on Sunday or 1st day of the month
+                                        ? const Radius.circular(20)
+                                        : Radius.zero,
+                                    right: (isEndDate ||
+                                            (date.weekday == DateTime.saturday ||
+                                                date.day ==
+                                                    DateTime(date.year,
+                                                            date.month + 1, 0)
+                                                        .day))
+                                        ? const Radius.circular(20)
+                                        : Radius.zero,
                                   ),
-                                ],
-                              );
-                            }
-                          },
-                          selectedBuilder: (context, date, _) {
-                            if (_containerAddedDate != null) {
-                              DateTime compostEndDate =
-                                  _containerAddedDate != null
-                                      ? _containerAddedDate!
-                                          .add(const Duration(days: 112))
-                                      : DateTime.now();
-                              DateTime cycleDayOne = _containerAddedDate != null
-                                  ? _containerAddedDate!
-                                      .add(const Duration(days: 1))
-                                  : DateTime.now();
+                              ),
+                              height: 40, // Maintain shading visibility
+                              width: double.infinity,
+                            ),
 
-                              bool isWithinCycle =
-                                  date.isAfter(_containerAddedDate!) &&
-                                      date.isBefore(compostEndDate);
-                              bool isDayOne = date.year == cycleDayOne.year &&
-                                  date.month == cycleDayOne.month &&
-                                  date.day == cycleDayOne.day;
+                            // Today indicator
+                            Container(
+                              height: 36,
+                              width: 36,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.green
+                                    .withOpacity(0.5), // Highlight today's date
+                              ),
+                            ),
 
-                              bool isEndDate =
-                                  date.year == compostEndDate.year &&
-                                      date.month == compostEndDate.month &&
-                                      date.day == compostEndDate.day;
+                            // Date number
+                            Center(
+                              child: Text(
+                                date.day.toString(),
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87, // Ensure visibility
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+}
+                      } else {
+                        return Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            // Today indicator
+                            Container(
+                              height: 36,
+                              width: 36,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.green
+                                    .withOpacity(0.5), // Highlight today's date
+                              ),
+                            ),
 
-                              return Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  // Preserve shading effect
-                                  if (isWithinCycle)
-                                    Container(
-                                      decoration: BoxDecoration(
-                                        color: Colors.grey
-                                            .withOpacity(0.3), // Shading effect
-                                        borderRadius: BorderRadius.horizontal(
-                                          left: isDayOne
-                                              ? const Radius.circular(20)
-                                              : Radius.zero,
-                                          right: isEndDate
-                                              ? const Radius.circular(20)
-                                              : Radius.zero,
-                                        ),
-                                      ),
-                                      height: 40, // Maintain shading visibility
-                                      width: double.infinity,
-                                    ),
+                            // Date number
+                            Center(
+                              child: Text(
+                                date.day.toString(),
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87, // Ensure visibility
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      }
+                    },
+                          selectedBuilder: (context, date, focusedDay) {
+                      if (_containerAddedDate != null) {
+                        DateTime today = DateTime.now();
+                        DateTime compostEndDate = _containerAddedDate != null
+                            ? _containerAddedDate!
+                                .add(const Duration(days: 112))
+                            : DateTime.now();
 
-                                  // Selection circle (on top)
-                                  Container(
-                                    height: 36,
-                                    width: 36,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                          color: Colors.green,
-                                          width:
-                                              2), // Green outline for selection
-                                      color: Colors
-                                          .transparent, // Keep shading visible
-                                    ),
+                        bool isWithinCycle = date
+                                .isAfter(_containerAddedDate!) &&
+                            date.isBefore(compostEndDate.add(Duration(days: 1)));
+                        bool isStartDate =
+                            date.year == _containerAddedDate!.year &&
+                                date.month == _containerAddedDate!.month &&
+                                date.day == _containerAddedDate!.day;
+
+                        bool isEndDate = date.year == compostEndDate.year &&
+                            date.month == compostEndDate.month &&
+                            date.day == compostEndDate.day;
+                        return Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            // Preserve shading effect
+                            if (isWithinCycle && date.month == focusedDay.month && date.year == focusedDay.year) 
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.grey
+                                      .withOpacity(0.3), // Shading effect
+                                  borderRadius: BorderRadius.horizontal(
+                                    left: (isStartDate ||
+                                            date.weekday == DateTime.sunday ||
+                                            date.day ==
+                                                1) // Rounded left edge on Sunday or 1st day of the month
+                                        ? const Radius.circular(20)
+                                        : Radius.zero,
+                                    right: (isEndDate ||
+                                            (date.weekday == DateTime.saturday ||
+                                                date.day ==
+                                                    DateTime(date.year,
+                                                            date.month + 1, 0)
+                                                        .day))
+                                        ? const Radius.circular(20)
+                                        : Radius.zero,
                                   ),
-                                  // Date number (ensures readability)
-                                  Center(
-                                    child: Text(
-                                      date.day.toString(),
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors
-                                            .black87, // Keep text readable
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              );
-                            } else {
-                              return Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  // Selection circle (on top)
-                                  Container(
-                                    height: 36,
-                                    width: 36,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                          color: Colors.green,
-                                          width:
-                                              2), // Green outline for selection
-                                      color: Colors
-                                          .transparent, // Keep shading visible
-                                    ),
-                                  ),
-                                  // Date number (ensures readability)
-                                  Center(
-                                    child: Text(
-                                      date.day.toString(),
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors
-                                            .black87, // Keep text readable
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              );
-                            }
-                          },
+                                ),
+                                height: 40, // Maintain shading visibility
+                                width: double.infinity,
+                              ),
+                              
+                            // Selection circle (on top)
+                            Container(
+                              height: 36,
+                              width: 36,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                    color: Colors.green,
+                                    width: 2), // Green outline for selection
+                                color:
+                                    Colors.transparent, // Keep shading visible
+                              ),
+                            ),
+                            // Date number (ensures readability)
+                            Center(
+                              child: Text(
+                                date.day.toString(),
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87, // Keep text readable
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                            
+                      } else {
+                        return Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            // Selection circle (on top)
+                            Container(
+                              height: 36,
+                              width: 36,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                    color: Colors.green,
+                                    width: 2), // Green outline for selection
+                                color:
+                                    Colors.transparent, // Keep shading visible
+                              ),
+                            ),
+                            // Date number (ensures readability)
+                            Center(
+                              child: Text(
+                                date.day.toString(),
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87, // Keep text readable
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      }
+                    },
                         ),
                         selectedDayPredicate: (day) =>
                             isSameDay(_selectedDate, day),
@@ -1457,7 +1496,6 @@ class _DashboardPageState extends State<DashboardPage> {
       );
     });
   }
-
   int _calculateContainerAge() {
     if (_containerAddedDate == null) {
       _containerAge = "NOT YET STARTED";
@@ -1847,24 +1885,6 @@ class _DashboardPageState extends State<DashboardPage> {
                       );
                       if (pickedDate != null) {
                         setState(() => tempDate = pickedDate);
-                      }
-                    },
-                  ),
-                  ListTile(
-                    leading:
-                        const Icon(Icons.access_time, color: Colors.orange),
-                    title: const Text("Select Time",
-                        style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.w500)),
-                    subtitle: Text(tempTime.format(context)),
-                    trailing: const Icon(Icons.arrow_forward_ios, size: 18),
-                    onTap: () async {
-                      TimeOfDay? pickedTime = await showTimePicker(
-                        context: context,
-                        initialTime: tempTime,
-                      );
-                      if (pickedTime != null) {
-                        setState(() => tempTime = pickedTime);
                       }
                     },
                   ),

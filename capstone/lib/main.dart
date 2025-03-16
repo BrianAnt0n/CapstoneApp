@@ -75,12 +75,12 @@ Future<void> checkForNotifications() async {
     for (var entry in containerResponse) entry['hardware_id']: entry['container_name']
   };
   List<int> hardwareIds = hardwareIdToContainerName.keys.toList();
-  int lastSeenId = prefs.getInt('last_seen_notification') ?? -1;
+  //int lastSeenId = prefs.getInt('last_seen_notification') ?? -1;
 
-DateTime fiveMinutesAgo = DateTime.now().subtract(Duration(minutes: 5));
+DateTime twoMinutesAgo = DateTime.now().subtract(Duration(minutes: 2));
 DateTime now = DateTime.now();
 
-  print("🔢 Last seen notification ID: $lastSeenId");
+  //print("🔢 Last seen notification ID: $lastSeenId");
 
   try {
     final response = await supabase
@@ -90,9 +90,9 @@ DateTime now = DateTime.now();
 
 final filteredNotifications = response.where((n) => 
   hardwareIds.contains(n['hardware_id']) && 
-  n['notification_id'] > lastSeenId &&
+  //n['notification_id'] > lastSeenId &&
   hardwareIdToContainerName.containsKey(n['hardware_id']) &&
-  DateTime.parse(n['timestamp']).isAfter(fiveMinutesAgo) &&
+  DateTime.parse(n['timestamp']).isAfter(twoMinutesAgo) &&
   DateTime.parse(n['timestamp']).isBefore(now)
 ).toList();
 
@@ -113,9 +113,9 @@ final filteredNotifications = response.where((n) =>
 
     if (filteredNotifications.isNotEmpty) {
       await _showGroupedNotifications(filteredNotifications, hardwareIdToContainerName);
-      int newLastSeenId = filteredNotifications.last['notification_id'];
-      await prefs.setInt('last_seen_notification', newLastSeenId);
-      print("✅ Updated last seen notification ID to: $newLastSeenId");
+      //int newLastSeenId = filteredNotifications.last['notification_id'];
+      //await prefs.setInt('last_seen_notification', newLastSeenId);
+      //print("✅ Updated last seen notification ID to: $newLastSeenId");
     }
   } catch (e) {
     print("❌ Error fetching notifications: $e");
