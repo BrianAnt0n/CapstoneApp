@@ -9,17 +9,17 @@ class ForgotPasswordPage extends StatefulWidget {
 }
 
 class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
-  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _usernameController = TextEditingController();
   bool _isLoading = false;
   String? _message;
   bool _isError = false;
 
   Future<void> _requestPasswordReset() async {
-    final String email = _emailController.text.trim();
+    final String username = _usernameController.text.trim();
 
-    if (email.isEmpty) {
+    if (username.isEmpty) {
       setState(() {
-        _message = "Please enter your email.";
+        _message = "Please enter your username.";
         _isError = true;
       });
       return;
@@ -33,16 +33,16 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     final supabase = Supabase.instance.client;
 
     try {
-      // Check if the email exists in the database
+      // Check if the username exists in the database
       final response = await supabase
           .from('Users')
           .select('user_id') // Only fetch user_id
-          .eq('email', email)
+          .eq('username', username)
           .maybeSingle();
 
       if (response == null) {
         setState(() {
-          _message = "Email not found. Please check and try again.";
+          _message = "username not found. Please check and try again.";
           _isError = true;
         });
         return;
@@ -51,7 +51,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       // Store password reset request in the database
       await supabase.from('Users').update({
         'reset_requested': true,
-      }).eq('email', email);
+      }).eq('username', username);
 
       setState(() {
         _message =
@@ -82,18 +82,18 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
             const Icon(Icons.lock_reset, size: 80, color: Colors.green),
             const SizedBox(height: 20),
             const Text(
-              'Enter your email to request a password reset. An Admin will reset your password manually.',
+              'Enter your username to request a password reset. An Admin will reset your password manually.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 16),
             ),
             const SizedBox(height: 20),
             TextField(
-              controller: _emailController,
-              keyboardType: TextInputType.emailAddress,
+              controller: _usernameController,
+              keyboardType: TextInputType.text,
               decoration: InputDecoration(
-                labelText: 'Email',
+                labelText: 'Username',
                 border: OutlineInputBorder(),
-                prefixIcon: const Icon(Icons.email, color: Colors.green),
+                prefixIcon: const Icon(Icons.person, color: Colors.green),
               ),
             ),
             if (_message != null) ...[

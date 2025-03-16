@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'add_account_page.dart';
 import 'account_settings_page.dart';
 import 'package:flutter/services.dart';
+import 'package:bcrypt/bcrypt.dart';
 
 
 class AccountManagementPage extends StatefulWidget {
@@ -31,7 +32,7 @@ class _AccountManagementPageState extends State<AccountManagementPage> {
     final supabase = Supabase.instance.client;
     final response = await supabase
         .from('Users')
-        .select('user_id, user_level, fullname, email, reset_requested')
+        .select('user_id, user_level, fullname, username, reset_requested')
         .order('user_id', ascending: true);
     return List<Map<String, dynamic>>.from(response);
   }
@@ -63,7 +64,13 @@ class _AccountManagementPageState extends State<AccountManagementPage> {
   final supabase = Supabase.instance.client;
   const String defaultPassword = "Temp1234!"; // Default reset password
 
-  await supabase.from('Users').update({'password': defaultPassword}).eq('user_id', userId);
+  // Hash the password using bcrypt
+  String hashedPassword = BCrypt.hashpw(defaultPassword, BCrypt.gensalt());
+
+  await supabase
+    .from('Users')
+    .update({'password': hashedPassword})
+    .eq('user_id', userId);
 
   ScaffoldMessenger.of(context).showSnackBar(
     const SnackBar(
@@ -278,7 +285,7 @@ void _showPasswordCopiedDialog(BuildContext context) {
                                 color: account['user_level'] == 'Admin' ? Colors.red : Colors.blue,
                               ),
                               title: Text(account['fullname']),
-                              subtitle: Text('${account['user_level']} | ${account['email']}'),
+                              subtitle: Text('${account['user_level']} | ${account['username']}'),
                               trailing: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
