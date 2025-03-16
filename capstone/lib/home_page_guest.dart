@@ -154,11 +154,9 @@ class _DashboardPageState extends State<DashboardPage> {
   Future<List<Map<String, dynamic>>> fetchHistoryData(int containerId) async {
     final supabase = Supabase.instance.client;
     try {
-
       final hardwareResponse = await supabase
           .from('Hardware_Sensors_Test')
-          .select('start_date'
-              )
+          .select('start_date')
           .eq('hardware_id', containerId)
           .maybeSingle();
 
@@ -167,8 +165,7 @@ class _DashboardPageState extends State<DashboardPage> {
       // Step 2: Fetch historical data using the correct hardware_id
       final response = await supabase
           .from('History_Average')
-          .select(
-              )
+          .select()
           .eq('hardware_id', containerId)
           .gte('timestamp', startDate)
           .order('timestamp', ascending: true);
@@ -389,268 +386,258 @@ class _DashboardPageState extends State<DashboardPage> {
                   firstDay: DateTime(2000),
                   lastDay: DateTime(2100),
                   calendarFormat: CalendarFormat.month,
-                                          headerStyle: HeaderStyle(
-                          titleCentered: true,
-                          formatButtonVisible: false,
-                          leftChevronIcon: const Icon(Icons.chevron_left),
-                          rightChevronIcon: const Icon(Icons.chevron_right),
-                          titleTextFormatter: (date, locale) {
-                            return DateFormat.yMMMM(locale).format(date);
-                          },
-                        ),
+                  headerStyle: HeaderStyle(
+                    titleCentered: true,
+                    formatButtonVisible: false,
+                    leftChevronIcon: const Icon(Icons.chevron_left),
+                    rightChevronIcon: const Icon(Icons.chevron_right),
+                    titleTextFormatter: (date, locale) {
+                      return DateFormat.yMMMM(locale).format(date);
+                    },
+                  ),
                   calendarBuilders: CalendarBuilders(
-                      defaultBuilder: (context, day, focusedDay) {
-                    if (isWithinCompostCycle(day, _containerAddedDate)) {
-                      DateTime today = DateTime.now();
+                    defaultBuilder: (context, day, focusedDay) {
+                      if (isWithinCompostCycle(day, _containerAddedDate)) {
+                        DateTime today = DateTime.now();
+                        if (_containerAddedDate != null) {
+                          DateTime compostEndDate = _containerAddedDate!
+                              .add(const Duration(days: 112)); // 16 weeks later
+                          DateTime cycleDayOne = _containerAddedDate!.add(
+                              const Duration(days: 1)); // Day 1 of the cycle
+
+                          bool isWithinCycle =
+                              day.isAfter(_containerAddedDate!) &&
+                                  day.isBefore(compostEndDate);
+                          bool isToday = day.year == today.year &&
+                              day.month == today.month &&
+                              day.day == today.day;
+
+                          if (isWithinCycle || isToday) {
+                            bool isDayOne = day.year == cycleDayOne.year &&
+                                day.month == cycleDayOne.month &&
+                                day.day == cycleDayOne.day;
+                            bool isEndDate = day.year == compostEndDate.year &&
+                                day.month == compostEndDate.month &&
+                                day.day == compostEndDate.day;
+                            return Container(
+                              margin: const EdgeInsets.symmetric(
+                                  vertical: 6, horizontal: 0),
+                              padding: const EdgeInsets.symmetric(
+                                  vertical:
+                                      4), // Shortens top and bottom spacing
+                              decoration: BoxDecoration(
+                                color: Colors.grey
+                                    .withOpacity(0.3), // Gray shading effect
+                                borderRadius: BorderRadius.horizontal(
+                                  left: isDayOne
+                                      ? const Radius.circular(20)
+                                      : Radius.zero,
+                                  right: isEndDate
+                                      ? const Radius.circular(20)
+                                      : Radius.zero,
+                                ),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  day.day.toString(),
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
+                        }
+                        return null;
+                      }
+                    },
+                    todayBuilder: (context, day, _) {
                       if (_containerAddedDate != null) {
-                        DateTime compostEndDate = _containerAddedDate!
-                            .add(const Duration(days: 112)); // 16 weeks later
-                        DateTime cycleDayOne = _containerAddedDate!
-                            .add(const Duration(days: 1)); // Day 1 of the cycle
+                        return Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            // Background shading extending to adjacent dates
+                            Container(
+                              margin: const EdgeInsets.symmetric(
+                                  vertical: 6, horizontal: 0),
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.withOpacity(
+                                    0.3), // Maintain shading effect
+                                // borderRadius: BorderRadius.horizontal(
+                                //   left: const Radius.circular(20), // Smooth connection on the left
+                                //   right: const Radius.circular(20), // Smooth connection on the right
+                                // ),
+                              ),
+                              height: 40, // Maintain shading visibility
+                              width: double.infinity,
+                            ),
 
-                        bool isWithinCycle =
-                            day.isAfter(_containerAddedDate!) &&
-                                day.isBefore(compostEndDate);
-                        bool isToday = day.year == today.year &&
-                            day.month == today.month &&
-                            day.day == today.day;
-
-                        if (isWithinCycle || isToday) {
-                          bool isDayOne = day.year == cycleDayOne.year &&
-                              day.month == cycleDayOne.month &&
-                              day.day == cycleDayOne.day;
-                          bool isEndDate = day.year == compostEndDate.year &&
-                              day.month == compostEndDate.month &&
-                              day.day == compostEndDate.day;
-                          return Container(
-                            margin: const EdgeInsets.symmetric(
-                                vertical: 6, horizontal: 0),
-                            padding: const EdgeInsets.symmetric(
-                                vertical: 4), // Shortens top and bottom spacing
-                            decoration: BoxDecoration(
-                              color: Colors.grey
-                                  .withOpacity(0.3), // Gray shading effect
-                              borderRadius: BorderRadius.horizontal(
-                                left: isDayOne
-                                    ? const Radius.circular(20)
-                                    : Radius.zero,
-                                right: isEndDate
-                                    ? const Radius.circular(20)
-                                    : Radius.zero,
+                            // Today indicator
+                            Container(
+                              height: 36,
+                              width: 36,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.green
+                                    .withOpacity(0.5), // Highlight today's date
                               ),
                             ),
-                            child: Center(
+
+                            // Date number
+                            Center(
                               child: Text(
                                 day.day.toString(),
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
+                                  color: Colors.black87, // Ensure visibility
                                 ),
                               ),
                             ),
-                          );
-                        }
+                          ],
+                        );
+                      } else {
+                        return Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            // Today indicator
+                            Container(
+                              height: 36,
+                              width: 36,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.green
+                                    .withOpacity(0.5), // Highlight today's date
+                              ),
+                            ),
+
+                            // Date number
+                            Center(
+                              child: Text(
+                                day.day.toString(),
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87, // Ensure visibility
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
                       }
-                      return null;
-                    }
+                    },
+                    selectedBuilder: (context, day, _) {
+                      if (_containerAddedDate != null) {
+                        DateTime compostEndDate = _containerAddedDate != null
+                            ? _containerAddedDate!
+                                .add(const Duration(days: 112))
+                            : DateTime.now();
+                        DateTime cycleDayOne = _containerAddedDate != null
+                            ? _containerAddedDate!.add(const Duration(days: 1))
+                            : DateTime.now();
+
+                        bool isWithinCycle =
+                            day.isAfter(_containerAddedDate!) &&
+                                day.isBefore(compostEndDate);
+                        bool isDayOne = day.year == cycleDayOne.year &&
+                            day.month == cycleDayOne.month &&
+                            day.day == cycleDayOne.day;
+
+                        bool isEndDate = day.year == compostEndDate.year &&
+                            day.month == compostEndDate.month &&
+                            day.day == compostEndDate.day;
+
+                        return Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            // Preserve shading effect
+                            if (isWithinCycle)
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.grey
+                                      .withOpacity(0.3), // Shading effect
+                                  borderRadius: BorderRadius.horizontal(
+                                    left: isDayOne
+                                        ? const Radius.circular(20)
+                                        : Radius.zero,
+                                    right: isEndDate
+                                        ? const Radius.circular(20)
+                                        : Radius.zero,
+                                  ),
+                                ),
+                                height: 40, // Maintain shading visibility
+                                width: double.infinity,
+                              ),
+
+                            // Selection circle (on top)
+                            Container(
+                              height: 36,
+                              width: 36,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                    color: Colors.green,
+                                    width: 2), // Green outline for selection
+                                color:
+                                    Colors.transparent, // Keep shading visible
+                              ),
+                            ),
+                            // Date number (ensures readability)
+                            Center(
+                              child: Text(
+                                day.day.toString(),
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87, // Keep text readable
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      } else {
+                        return Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            // Selection circle (on top)
+                            Container(
+                              height: 36,
+                              width: 36,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                    color: Colors.green,
+                                    width: 2), // Green outline for selection
+                                color:
+                                    Colors.transparent, // Keep shading visible
+                              ),
+                            ),
+                            // Date number (ensures readability)
+                            Center(
+                              child: Text(
+                                day.day.toString(),
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87, // Keep text readable
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      }
+                    },
+                  ),
+                  selectedDayPredicate: (day) => isSameDay(_selectedDate, day),
+                  onDaySelected: (selectedDay, focusedDay) async {
+                    setState(() {
+                      _selectedDate = selectedDay;
+                    });
+                    Navigator.pop(context);
                   },
-                  todayBuilder: (context, day, _) {
-                            if (_containerAddedDate != null) {
-                            return Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                // Background shading extending to adjacent dates
-                                Container(
-                                  margin: const EdgeInsets.symmetric(
-                                      vertical: 6, horizontal: 0),
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey.withOpacity(
-                                        0.3), // Maintain shading effect
-                                    // borderRadius: BorderRadius.horizontal(
-                                    //   left: const Radius.circular(20), // Smooth connection on the left
-                                    //   right: const Radius.circular(20), // Smooth connection on the right
-                                    // ),
-                                  ),
-                                  height: 40, // Maintain shading visibility
-                                  width: double.infinity,
-                                ),
-
-                                // Today indicator
-                                Container(
-                                  height: 36,
-                                  width: 36,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: Colors.green.withOpacity(
-                                        0.5), // Highlight today's date
-                                  ),
-                                ),
-
-                                // Date number
-                                Center(
-                                  child: Text(
-                                    day.day.toString(),
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color:
-                                          Colors.black87, // Ensure visibility
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            );
-                          }
-                          else {
-                            return Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                // Today indicator
-                                Container(
-                                  height: 36,
-                                  width: 36,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: Colors.green.withOpacity(
-                                        0.5), // Highlight today's date
-                                  ),
-                                ),
-
-                                // Date number
-                                Center(
-                                  child: Text(
-                                    day.day.toString(),
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color:
-                                          Colors.black87, // Ensure visibility
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            );
-                          }
-                          },
-                          selectedBuilder: (context, day, _) {
-                            if (_containerAddedDate != null) {
-                            DateTime compostEndDate =
-                                _containerAddedDate != null
-                                    ? _containerAddedDate!
-                                        .add(const Duration(days: 112))
-                                    : DateTime.now();
-                            DateTime cycleDayOne = _containerAddedDate != null
-                                ? _containerAddedDate!
-                                    .add(const Duration(days: 1))
-                                : DateTime.now();
-
-                            bool isWithinCycle =
-                                day.isAfter(_containerAddedDate!) &&
-                                    day.isBefore(compostEndDate);
-                            bool isDayOne = day.year == cycleDayOne.year &&
-                                day.month == cycleDayOne.month &&
-                                day.day == cycleDayOne.day;
-
-                            bool isEndDate = day.year == compostEndDate.year &&
-                                day.month == compostEndDate.month &&
-                                day.day == compostEndDate.day;
-
-                            return Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                // Preserve shading effect
-                                if (isWithinCycle)
-                                  Container(
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey
-                                          .withOpacity(0.3), // Shading effect
-                                      borderRadius: BorderRadius.horizontal(
-                                        left: isDayOne
-                                            ? const Radius.circular(20)
-                                            : Radius.zero,
-                                        right: isEndDate
-                                            ? const Radius.circular(20)
-                                            : Radius.zero,
-                                      ),
-                                    ),
-                                    height: 40, // Maintain shading visibility
-                                    width: double.infinity,
-                                  ),
-
-                                // Selection circle (on top)
-                                Container(
-                                  height: 36,
-                                  width: 36,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                        color: Colors.green,
-                                        width:
-                                            2), // Green outline for selection
-                                    color: Colors
-                                        .transparent, // Keep shading visible
-                                  ),
-                                ),
-                                // Date number (ensures readability)
-                                Center(
-                                  child: Text(
-                                    day.day.toString(),
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color:
-                                          Colors.black87, // Keep text readable
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            );
-                            }
-                            else {
-                              return Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                // Selection circle (on top)
-                                Container(
-                                  height: 36,
-                                  width: 36,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                        color: Colors.green,
-                                        width:
-                                            2), // Green outline for selection
-                                    color: Colors
-                                        .transparent, // Keep shading visible
-                                  ),
-                                ),
-                                // Date number (ensures readability)
-                                Center(
-                                  child: Text(
-                                    day.day.toString(),
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color:
-                                          Colors.black87, // Keep text readable
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            );
-                            }
-                          },),
-                           selectedDayPredicate: (day) =>
-                            isSameDay(_selectedDate, day),
-                        onDaySelected: (selectedDay, focusedDay) async {
-                          setState(() {
-                            _selectedDate = selectedDay;
-                          });
-                          Navigator.pop(context);
-                        },
                 ),
                 const SizedBox(height: 10),
                 ElevatedButton(
@@ -665,7 +652,7 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
- int _calculateContainerAge() {
+  int _calculateContainerAge() {
     if (_containerAddedDate == null) {
       _containerAge = "NOT YET STARTED";
       _ageColor = Colors.black;
@@ -774,11 +761,8 @@ class _DashboardPageState extends State<DashboardPage> {
                                   'Temperature Monitoring',
                                   '${sensorData['temperature']}°C',
                                   Colors.green),
-                              buildSensorCard(
-                                  Icons.water_drop,
-                                  'Dryness Level',
-                                  '${sensorData['moisture']}%',
-                                  Colors.blue),
+                              buildSensorCard(Icons.water_drop, 'Dryness Level',
+                                  '${sensorData['moisture']}%', Colors.blue),
                               buildSensorCard(Icons.science, 'pH Level 1',
                                   '${sensorData['ph_level']}', Colors.purple),
                               buildSensorCard(
@@ -818,29 +802,83 @@ class _DashboardPageState extends State<DashboardPage> {
                           ),
                           calendarBuilders: CalendarBuilders(
                             headerTitleBuilder: (context, date) {
-                              return Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment
+                                    .stretch, // ✅ Full width alignment
                                 children: [
-                                  Opacity(
-                                    opacity: 0.0,
-                                    child: IconButton(
-                                      icon: const Icon(Icons.arrow_left),
-                                      onPressed: () {},
+                                  // 📌 Full Calendar Section (Sleek, Minimalist, and Structured)
+                                  Container(
+                                    margin: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 8), // ✅ Balanced spacing
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 12, horizontal: 16),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(
+                                          12), // ✅ Smooth rounded corners
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black12,
+                                          blurRadius: 4,
+                                          offset: Offset(0,
+                                              2), // ✅ Subtle shadow for depth
+                                        ),
+                                      ],
+                                    ),
+                                    child: InkWell(
+                                      onTap:
+                                          _openFullCalendar, // ✅ Opens full calendar
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment
+                                            .center, // ✅ Centers everything
+                                        children: [
+                                          const Icon(Icons.calendar_month,
+                                              color: Colors.blueGrey, size: 24),
+                                          const SizedBox(
+                                              width: 10), // ✅ Proper spacing
+                                          const Text(
+                                            "Full Calendar",
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.black87,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
-                                  Text(
-                                    DateFormat.yMMMM().format(date),
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
+
+                                  const SizedBox(
+                                      height:
+                                          10), // ✅ Space before the month display
+
+                                  // 📌 Month Display (Perfectly Centered)
+                                  Align(
+                                    alignment: Alignment
+                                        .center, // ✅ Ensures text is perfectly centered
+                                    child: Text(
+                                      DateFormat.yMMMM().format(date),
+                                      style: const TextStyle(
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black87,
+                                      ),
+                                      textAlign: TextAlign.center,
                                     ),
                                   ),
-                                  IconButton(
-                                    icon: const Icon(Icons.calendar_month),
-                                    onPressed: () {
-                                      _openFullCalendar(); // Open full calendar
-                                    },
+
+                                  const SizedBox(
+                                      height: 8), // ✅ Space before divider
+
+                                  // 📌 Clean Divider for Structure
+                                  const Divider(
+                                    thickness: 1.5,
+                                    color: Colors.black26,
+                                    indent: 20,
+                                    endIndent: 20,
                                   ),
                                 ],
                               );
@@ -948,7 +986,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           fontSize: 14, fontWeight: FontWeight.normal),
                     ),
 
-                   FutureBuilder(
+                    FutureBuilder(
                       future: _historyFuture,
                       builder: (context, snapshot) {
                         if (snapshot.connectionState ==
@@ -958,147 +996,141 @@ class _DashboardPageState extends State<DashboardPage> {
                         } else if (snapshot.hasError || snapshot.data == null) {
                           return const Center(
                               child: Text('No historical data available.'));
-                        } else {
-                          List<Map<String, dynamic>> historyData =
-                              (snapshot.data as List<Map<String, dynamic>>)
-                                  .toList();
-
-                          ScrollController scrollController =
-                              ScrollController();
-
-                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                            scrollController.jumpTo(
-                                scrollController.position.maxScrollExtent);
-                          });
-
-                          Widget buildChartOrMessage(
-                              String title, String key, Color color) {
-                            if (historyData.length <= 1) {
-                              return Container(
-                                height: 250, // Adjust height as needed
-                                alignment: Alignment.center,
-                                child: const Text(
-                                  'Insufficient Data',
-                                  style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.red),
-                                ),
-                              );
-                            } else if (_containerAddedDate == null) {
-                              return Container(
-                                height: 250, // Adjust height as needed
-                                alignment: Alignment.center,
-                                child: const Text(
-                                  'No Compost',
-                                  style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.red),
-                                ),
-                              );
-                              } else {
-                              return SingleChildScrollView(
-                                controller: scrollController,
-                                scrollDirection: Axis.horizontal,
-                                reverse: true,
-                                child: buildBarChart(
-                                    historyData, title, key, color),
-                              );
-                            }
-                          }
-
-                          return SingleChildScrollView(
-                            scrollDirection: Axis.vertical,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const SizedBox(height: 20),
-                                const Text(
-                                  'Temperature Monitoring',
-                                  style: TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold),
-                                ),
-                                const Text(
-                                  '• Safe: Between 10°C to 54°C  |  Critical: Above 54°C',
-                                  style: TextStyle(
-                                      fontSize: 14, color: Colors.grey),
-                                ),
-                                buildChartOrMessage(
-                                    'Temperature', 'temperature', Colors.green),
-                                const SizedBox(height: 20),
-                                Divider(
-                                    thickness: 2, color: Colors.grey.shade400),
-                                const SizedBox(height: 20),
-                                const Text(
-                                  'Dryness Level',
-                                  style: TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold),
-                                ),
-                                const Text(
-                                  '• Optimal: 50-60%  |  Wet: Below 50%  |  Too Dry: Above 60%',
-                                  style: TextStyle(
-                                      fontSize: 14, color: Colors.grey),
-                                ),
-                                buildChartOrMessage(
-                                    'Dryness', 'moisture', Colors.blue),
-                                const SizedBox(height: 20),
-                                Divider(
-                                    thickness: 2, color: Colors.grey.shade400),
-                                const SizedBox(height: 20),
-                                const Text(
-                                  'pH Level 1',
-                                  style: TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold),
-                                ),
-                                const Text(
-                                  '• Ideal: 6.0 - 8.0 | Too Acidic: Below 6.0 | Too Basic: Above 8',
-                                  style: TextStyle(
-                                      fontSize: 14, color: Colors.grey),
-                                ),
-                                buildChartOrMessage(
-                                    'pH Level 1', 'ph_level1', Colors.purple),
-                                const SizedBox(height: 20),
-                                Divider(
-                                    thickness: 2, color: Colors.grey.shade400),
-                                const SizedBox(height: 20),
-                                const Text(
-                                  'pH Level 2',
-                                  style: TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold),
-                                ),
-                                const Text(
-                                  '• Ideal: 6.0 - 8.0 | Too Acidic: Below 6.0 | Too Basic: Above 8',
-                                  style: TextStyle(
-                                      fontSize: 14, color: Colors.grey),
-                                ),
-                                buildChartOrMessage('pH Level 2', 'ph_level2',
-                                    Colors.deepPurple),
-                                const SizedBox(height: 20),
-                                Divider(
-                                    thickness: 2, color: Colors.grey.shade400),
-                                const SizedBox(height: 20),
-                                const Text(
-                                  'Humidity Level',
-                                  style: TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold),
-                                ),
-                                const Text(
-                                  '• Optimal: 30-60%  |  Low: Below 30%  |  High: Above 60%',
-                                  style: TextStyle(
-                                      fontSize: 14, color: Colors.grey),
-                                ),
-                                buildChartOrMessage(
-                                    'Humidity', 'humidity', Colors.orange),
-                              ],
-                            ),
-                          );
                         }
+
+                        List<Map<String, dynamic>> historyData =
+                            (snapshot.data as List<Map<String, dynamic>>)
+                                .toList();
+
+                        ScrollController scrollController = ScrollController();
+
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          scrollController.jumpTo(
+                              scrollController.position.maxScrollExtent);
+                        });
+
+                        Widget buildChartOrMessage(
+                            String title, String key, Color color) {
+                          if (historyData.length <= 2) {
+                            return Container(
+                              height: 250, // ✅ Keep consistent chart height
+                              alignment: Alignment.center,
+                              child: const Text(
+                                'Insufficient Historical Data',
+                                style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.red),
+                              ),
+                            );
+                          } else if (_containerAddedDate == null) {
+                            return Container(
+                              height: 250,
+                              alignment: Alignment.center,
+                              child: const Text(
+                                'No Compost',
+                                style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.red),
+                              ),
+                            );
+                          } else {
+                            return SingleChildScrollView(
+                              controller: scrollController,
+                              scrollDirection: Axis.horizontal,
+                              reverse: true,
+                              child:
+                                  buildBarChart(historyData, title, key, color),
+                            );
+                          }
+                        }
+
+                        return SingleChildScrollView(
+                          scrollDirection: Axis.vertical,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 20),
+                              const Text(
+                                'Temperature Monitoring',
+                                style: TextStyle(
+                                    fontSize: 20, fontWeight: FontWeight.bold),
+                              ),
+                              const Text(
+                                '• Safe: Between 10°C to 54°C  |  Critical: Above 54°C',
+                                style:
+                                    TextStyle(fontSize: 14, color: Colors.grey),
+                              ),
+                              buildChartOrMessage(
+                                  'Temperature', 'temperature', Colors.green),
+                              const SizedBox(height: 20),
+                              Divider(
+                                  thickness: 2, color: Colors.grey.shade400),
+                              const SizedBox(height: 20),
+                              const Text(
+                                'Dryness Level',
+                                style: TextStyle(
+                                    fontSize: 20, fontWeight: FontWeight.bold),
+                              ),
+                              const Text(
+                                '• Optimal: 50-60%  |  Wet: Below 50%  |  Too Dry: Above 60%',
+                                style:
+                                    TextStyle(fontSize: 14, color: Colors.grey),
+                              ),
+                              buildChartOrMessage(
+                                  'Dryness', 'moisture', Colors.blue),
+                              const SizedBox(height: 20),
+                              Divider(
+                                  thickness: 2, color: Colors.grey.shade400),
+                              const SizedBox(height: 20),
+                              const Text(
+                                'pH Level 1',
+                                style: TextStyle(
+                                    fontSize: 20, fontWeight: FontWeight.bold),
+                              ),
+                              const Text(
+                                '• Ideal: 6.0 - 8.0 | Too Acidic: Below 6.0 | Too Basic: Above 8',
+                                style:
+                                    TextStyle(fontSize: 14, color: Colors.grey),
+                              ),
+                              buildChartOrMessage(
+                                  'pH Level 1', 'ph_level1', Colors.purple),
+                              const SizedBox(height: 20),
+                              Divider(
+                                  thickness: 2, color: Colors.grey.shade400),
+                              const SizedBox(height: 20),
+                              const Text(
+                                'pH Level 2',
+                                style: TextStyle(
+                                    fontSize: 20, fontWeight: FontWeight.bold),
+                              ),
+                              const Text(
+                                '• Ideal: 6.0 - 8.0 | Too Acidic: Below 6.0 | Too Basic: Above 8',
+                                style:
+                                    TextStyle(fontSize: 14, color: Colors.grey),
+                              ),
+                              buildChartOrMessage(
+                                  'pH Level 2', 'ph_level2', Colors.deepPurple),
+                              const SizedBox(height: 20),
+                              Divider(
+                                  thickness: 2, color: Colors.grey.shade400),
+                              const SizedBox(height: 20),
+                              const Text(
+                                'Humidity Level',
+                                style: TextStyle(
+                                    fontSize: 20, fontWeight: FontWeight.bold),
+                              ),
+                              const Text(
+                                '• Optimal: 30-60%  |  Low: Below 30%  |  High: Above 60%',
+                                style:
+                                    TextStyle(fontSize: 14, color: Colors.grey),
+                              ),
+                              buildChartOrMessage(
+                                  'Humidity', 'humidity', Colors.orange),
+                            ],
+                          ),
+                        );
                       },
                     ),
                   ],
