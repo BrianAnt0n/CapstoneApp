@@ -81,6 +81,11 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _refreshNotifications();
     _checkSelectedContainer();
+     _checkResetRequests(); // ✅ Check for password reset requests
+     
+    
+
+    
 
     // Start a timer that refreshes notifications every second
     _timer = Timer.periodic(const Duration(seconds: 30), (Timer t) {
@@ -107,6 +112,25 @@ class _HomePageState extends State<HomePage> {
   //     _notifications = notifications;
   //   });
   // }
+
+
+  Future<void> _checkResetRequests() async {
+  final supabase = Supabase.instance.client;
+  
+  try {
+    final response = await supabase
+        .from('Users')
+        .select('user_id')
+        .eq('reset_requested', true);
+
+    setState(() {
+      _hasResetRequests = response.isNotEmpty; // If there's any request, show indicator
+    });
+  } catch (error) {
+    print("❌ Error checking reset requests: $error");
+  }
+}
+
 
   Future<void> _checkSelectedContainer() async {
     final prefs = await SharedPreferences.getInstance();
@@ -186,31 +210,48 @@ class _HomePageState extends State<HomePage> {
 
         // Updated Bottom Navigation Bar with green theme
         bottomNavigationBar: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          selectedItemColor:
-              Colors.green, // Change selected icon color to green
-          unselectedItemColor:
-              Colors.green[300], // Light green for unselected icons
-          onTap: (index) {
-            setState(() {
-              _currentIndex = index; // Update the selected tab
-            });
-          },
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.dashboard),
-              label: 'Dashboard',
+  currentIndex: _currentIndex,
+  selectedItemColor: Colors.green, // Change selected icon color to green
+  unselectedItemColor: Colors.green[300], // Light green for unselected icons
+  onTap: (index) {
+    setState(() {
+      _currentIndex = index; // Update the selected tab
+    });
+  },
+  items: [
+    const BottomNavigationBarItem(
+      icon: Icon(Icons.dashboard),
+      label: 'Dashboard',
+    ),
+    const BottomNavigationBarItem(
+      icon: Icon(Icons.inbox),
+      label: 'Container',
+    ),
+    BottomNavigationBarItem(
+      icon: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          const Icon(Icons.more_horiz), // "Others" icon
+          if (_hasResetRequests) // ✅ Show red dot if reset requests exist
+            Positioned(
+              right: -2,
+              top: -2,
+              child: Container(
+                width: 10,
+                height: 10,
+                decoration: const BoxDecoration(
+                  color: Colors.red,
+                  shape: BoxShape.circle,
+                ),
+              ),
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.inbox),
-              label: 'Container',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.more_horiz),
-              label: 'Others',
-            ),
-          ],
-        ),
+        ],
+      ),
+      label: 'Others',
+    ),
+  ],
+),
+
       ),
     );
   }
@@ -3752,6 +3793,11 @@ Future<List<Map<String, dynamic>>> fetchContainers() async {
   }
 }
 
+
+bool _hasResetRequests = false; // Track if reset requests exist
+
+
+
 // Others Page: Displays options like Account Management, ESP Connection, App Guide, and Log Out
 class OthersPage extends StatelessWidget {
   const OthersPage({super.key});
@@ -3771,10 +3817,26 @@ class OthersPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView(
       children: [
-        // Account Management
-        ListTile(
-          leading: const Icon(Icons.person, color: Colors.green),
-          title: const Text('Account Management'),
+       // Account Management
+ListTile(
+  leading: const Icon(Icons.person, color: Colors.green),
+  title: Row(
+    children: [
+      const Text('Account Management'),
+      if (_hasResetRequests) // ✅ Show red dot if reset requests exist
+        Padding(
+          padding: const EdgeInsets.only(left: 8.0),
+          child: Container(
+            width: 10,
+            height: 10,
+            decoration: const BoxDecoration(
+              color: Colors.red,
+              shape: BoxShape.circle,
+            ),
+          ),
+        ),
+    ],
+  ),
           onTap: () {
             Navigator.push(
               context,
