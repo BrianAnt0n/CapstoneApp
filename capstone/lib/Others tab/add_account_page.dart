@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:bcrypt/bcrypt.dart';
 
 final supabase = Supabase.instance.client;
 
@@ -68,11 +69,15 @@ class _AddAccountPageState extends State<AddAccountPage> {
         return;
       }
 
+      // ✅ Hash password using bcrypt
+      final String hashedPassword = BCrypt.hashpw(password, BCrypt.gensalt());
+
+
       // ✅ Insert new user
       await supabase.from('Users').insert({
         'fullname': fullname,
         'username': username, // ✅ Save username instead of email
-        'password': password,
+        'password': hashedPassword,
         'user_level': userLevel,
       });
 
