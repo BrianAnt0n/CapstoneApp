@@ -12,71 +12,86 @@ class AddAccountPage extends StatefulWidget {
 
 class _AddAccountPageState extends State<AddAccountPage> {
   final TextEditingController _fullnameController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _usernameController = TextEditingController(); // ✅ Changed from email to username
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();
   String _selectedUserLevel = 'Admin';
   String? _passwordError; // To store password mismatch error
 
   Future<void> _addAccount() async {
-  final String fullname = _fullnameController.text.trim();
-  final String email = _emailController.text.trim().toLowerCase(); // ✅ Force lowercase
-  final String password = _passwordController.text.trim();
-  final String confirmPassword = _confirmPasswordController.text.trim();
-  final String userLevel = _selectedUserLevel;
+    final String fullname = _fullnameController.text.trim();
+    final String username = _usernameController.text.trim().toLowerCase(); // ✅ Convert to lowercase
+    final String password = _passwordController.text.trim();
+    final String confirmPassword = _confirmPasswordController.text.trim();
+    final String userLevel = _selectedUserLevel;
 
-  // ✅ Email format validation
-  final emailRegex = RegExp(r'^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$');
-  if (!emailRegex.hasMatch(email)) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Invalid email format. Please enter a valid email.')),
-    );
-    return;
+    // ✅ Validate username (no spaces and only lowercase letters)
+    final usernameRegex = RegExp(r'^[a-z0-9]+$');
+    if (!usernameRegex.hasMatch(username)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Username must be lowercase and contain no spaces.')),
+      );
+      return;
+    }
+
+    // ✅ Check if passwords match
+    if (password != confirmPassword) {
+      setState(() {
+        _passwordError = "Passwords do not match!";
+      });
+      return;
+    } else {
+      setState(() {
+        _passwordError = null; // Clear error if matched
+      });
+    }
+
+    if (fullname.isEmpty || username.isEmpty || password.isEmpty || userLevel.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill in all fields')),
+      );
+      return;
+    }
+
+    try {
+      // ✅ Check if the username already exists
+      final existingUser = await supabase
+          .from('Users')
+          .select('user_id')
+          .eq('username', username)
+          .maybeSingle();
+
+      if (existingUser != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Username already exists. Choose another.')),
+        );
+        return;
+      }
+
+      // ✅ Insert new user
+      await supabase.from('Users').insert({
+        'fullname': fullname,
+        'username': username, // ✅ Save username instead of email
+        'password': password,
+        'user_level': userLevel,
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Account added successfully!')),
+      );
+      Navigator.pop(context, true);
+    } catch (error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error adding account: $error')),
+      );
+    }
   }
-
-  // ✅ Check if passwords match
-  if (password != confirmPassword) {
-    setState(() {
-      _passwordError = "Passwords do not match!";
-    });
-    return;
-  } else {
-    setState(() {
-      _passwordError = null; // Clear error if matched
-    });
-  }
-
-  if (fullname.isEmpty || email.isEmpty || password.isEmpty || userLevel.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Please fill in all fields')),
-    );
-    return;
-  }
-
-  try {
-    await supabase.from('Users').insert({
-      'fullname': fullname,
-      'email': email, // ✅ Ensure email is saved in lowercase
-      'password': password,
-      'user_level': userLevel,
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Account added successfully!')),
-    );
-    Navigator.pop(context, true);
-  } catch (error) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Error adding account: $error')),
-    );
-  }
-}
 
   Widget _buildTextField({
     required String label,
     required TextEditingController controller,
     bool isPassword = false,
-    bool isEmail = false, // ✅ Added this
+    bool isUsername = false, // ✅ Change from email to username
     String? errorText,
   }) {
     return Column(
@@ -87,7 +102,7 @@ class _AddAccountPageState extends State<AddAccountPage> {
         TextField(
           controller: controller,
           obscureText: isPassword,
-          keyboardType: isEmail ? TextInputType.emailAddress : TextInputType.text,
+          keyboardType: isUsername ? TextInputType.text : TextInputType.text,
           decoration: InputDecoration(
             hintText: 'Enter $label',
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
@@ -95,9 +110,9 @@ class _AddAccountPageState extends State<AddAccountPage> {
             errorText: errorText,
           ),
           onChanged: (value) {
-            if (isEmail) {
+            if (isUsername) {
               controller.value = controller.value.copyWith(
-                text: value.toLowerCase(), // ✅ Converts input to lowercase
+                text: value.toLowerCase().replaceAll(' ', ''), // ✅ Ensure lowercase & no spaces
                 selection: TextSelection.collapsed(offset: value.length),
               );
             }
@@ -107,7 +122,6 @@ class _AddAccountPageState extends State<AddAccountPage> {
       ],
     );
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -126,7 +140,7 @@ class _AddAccountPageState extends State<AddAccountPage> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     _buildTextField(label: 'Fullname', controller: _fullnameController),
-                    _buildTextField(label: 'Email', controller: _emailController, isEmail: true),
+                    _buildTextField(label: 'Username', controller: _usernameController, isUsername: true), // ✅ Change from email
 
                     _buildTextField(label: 'Password', controller: _passwordController, isPassword: true),
                     _buildTextField(
