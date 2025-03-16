@@ -1774,10 +1774,9 @@ Column(
     try {
       final supabase = Supabase.instance.client;
 
-      // ✅ Fetch Start Date from `Hardware_Sensors_Test`
       final sensorData = await supabase
           .from('Hardware_Sensors_Test')
-          .select('start_date')
+          .select('start_date, started_by')
           .eq('hardware_id', hardwareId)
           .maybeSingle();
 
@@ -1786,7 +1785,14 @@ Column(
         return;
       }
 
+      if (sensorData == null || sensorData['started_by'] == null) {
+        print("No start date found for hardware ID: $hardwareId");
+        return;
+      }
+
       final startDate = sensorData['start_date'];
+      print("Fetched start date: $startDate");
+      final startedBy = sensorData['started_by'];
       print("Fetched start date: $startDate");
 
       // ✅ Fetch the logged-in user's ID
@@ -1815,11 +1821,13 @@ Column(
       // ✅ Update existing row instead of inserting a new one
       final updateResponse = await supabase
           .from('Compost_Data')
-          .update({
+          .insert({
+            'hardware_id' : hardwareId,
+            'start_date': startDate,
+            'started_by': startedBy, // ✅ Store who started the compost
             'end_date': DateTime.now().toIso8601String(),
             'retrieved_by': retrievedBy, // ✅ Store the user who retrieved it
           })
-          .eq('hardware_id', hardwareId)
           .select();
 
       if (updateResponse.isEmpty) {
@@ -2025,19 +2033,6 @@ Column(
 
       if (updateResponse == null) {
         print("❌ Error: Update failed, no rows affected.");
-        return;
-      }
-
-      // ✅ Insert into `Compost_Data` with `started_by` (No `container_id`)
-      final compostInsertResponse =
-          await Supabase.instance.client.from('Compost_Data').insert({
-        'hardware_id': selectedHardwareId!, // ✅ Removed `container_id`
-        'start_date': formattedDate,
-        'started_by': startedBy, // ✅ Store who started the compost
-      }).select();
-
-      if (compostInsertResponse == null || compostInsertResponse.isEmpty) {
-        print("❌ Error: Compost_Data insert failed.");
         return;
       }
 

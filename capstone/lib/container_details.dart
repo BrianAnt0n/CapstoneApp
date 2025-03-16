@@ -67,7 +67,7 @@ class _ContainerDetailsState extends State<ContainerDetails> {
         .from('Compost_Data')
         .select()
         .eq('hardware_id', hardwareId)
-        .order('end_date', ascending: false);
+        .order('compost_id', ascending: false);
     return response ?? [];
   }
 
