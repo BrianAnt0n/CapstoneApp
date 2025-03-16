@@ -1181,21 +1181,21 @@ class _DashboardPageState extends State<DashboardPage> {
                               DateTime compostEndDate = _containerAddedDate!
                                   .add(const Duration(
                                       days: 112)); // 16 weeks later
-                              DateTime cycleDayOne = _containerAddedDate!.add(
-                                  const Duration(
-                                      days: 1)); // Day 1 of the cycle
 
-                              bool isWithinCycle =
-                                  date.isAfter(_containerAddedDate!) &&
-                                      date.isBefore(compostEndDate);
+                              bool isWithinCycle = date
+                                      .isAfter(_containerAddedDate!) &&
+                                  date.isBefore(
+                                      compostEndDate.add(Duration(days: 1)));
                               bool isToday = date.year == today.year &&
                                   date.month == today.month &&
                                   date.day == today.day;
 
                               if (isWithinCycle || isToday) {
-                                bool isDayOne = date.year == cycleDayOne.year &&
-                                    date.month == cycleDayOne.month &&
-                                    date.day == cycleDayOne.day;
+                                bool isStartDate = date.year ==
+                                        _containerAddedDate!.year &&
+                                    date.month == _containerAddedDate!.month &&
+                                    date.day == _containerAddedDate!.day;
+
                                 bool isEndDate =
                                     date.year == compostEndDate.year &&
                                         date.month == compostEndDate.month &&
@@ -1211,10 +1211,19 @@ class _DashboardPageState extends State<DashboardPage> {
                                     color: Colors.grey.withOpacity(
                                         0.3), // Gray shading effect
                                     borderRadius: BorderRadius.horizontal(
-                                      left: isDayOne
+                                      left: (isStartDate ||
+                                              date.weekday == DateTime.sunday ||
+                                              date.day ==
+                                                  1) // Rounded left edge on Sunday or 1st day of the month
                                           ? const Radius.circular(20)
                                           : Radius.zero,
-                                      right: isEndDate
+                                      right: (isEndDate ||
+                                              (date.weekday ==
+                                                      DateTime.saturday ||
+                                                  date.day ==
+                                                      DateTime(date.year,
+                                                              date.month + 1, 0)
+                                                          .day))
                                           ? const Radius.circular(20)
                                           : Radius.zero,
                                     ),
@@ -1235,192 +1244,222 @@ class _DashboardPageState extends State<DashboardPage> {
                             return null; // Default calendar rendering
                           },
                           todayBuilder: (context, date, _) {
-                            if (_containerAddedDate != null) {
-                              return Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  // Background shading extending to adjacent dates
-                                  Container(
-                                    margin: const EdgeInsets.symmetric(
-                                        vertical: 6, horizontal: 0),
-                                    padding:
-                                        const EdgeInsets.symmetric(vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: Colors.grey.withOpacity(
-                                          0.3), // Maintain shading effect
-                                      // borderRadius: BorderRadius.horizontal(
-                                      //   left: const Radius.circular(20), // Smooth connection on the left
-                                      //   right: const Radius.circular(20), // Smooth connection on the right
-                                      // ),
-                                    ),
-                                    height: 40, // Maintain shading visibility
-                                    width: double.infinity,
-                                  ),
+                      if (_containerAddedDate != null) {
+                        DateTime today = DateTime.now();
+                        DateTime compostEndDate = _containerAddedDate!
+                              .add(const Duration(days: 112)); // 16 weeks later
 
-                                  // Today indicator
-                                  Container(
-                                    height: 36,
-                                    width: 36,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: Colors.green.withOpacity(
-                                          0.5), // Highlight today's date
-                                    ),
-                                  ),
+                          bool isWithinCycle =
+                              date.isAfter(_containerAddedDate!) &&
+                                  date.isBefore(
+                                      compostEndDate.add(Duration(days: 1)));
 
-                                  // Date number
-                                  Center(
-                                    child: Text(
-                                      date.day.toString(),
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color:
-                                            Colors.black87, // Ensure visibility
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              );
-                            } else {
-                              return Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  // Today indicator
-                                  Container(
-                                    height: 36,
-                                    width: 36,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: Colors.green.withOpacity(
-                                          0.5), // Highlight today's date
-                                    ),
-                                  ),
+                          bool isToday = date.year == today.year &&
+                              date.month == today.month &&
+                              date.day == today.day;
+                        if (isWithinCycle || isToday) {
+                            bool isStartDate =
+                                date.year == _containerAddedDate!.year &&
+                                    date.month == _containerAddedDate!.month &&
+                                    date.day == _containerAddedDate!.day;
 
-                                  // Date number
-                                  Center(
-                                    child: Text(
-                                      date.day.toString(),
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color:
-                                            Colors.black87, // Ensure visibility
-                                      ),
-                                    ),
+                            bool isEndDate = date.year == compostEndDate.year &&
+                                date.month == compostEndDate.month &&
+                                date.day == compostEndDate.day;
+                        return Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            // Background shading extending to adjacent dates
+                            Container(
+                              margin: const EdgeInsets.symmetric(
+                                  vertical: 6, horizontal: 0),
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.withOpacity(
+                                    0.3), borderRadius: BorderRadius.horizontal(
+                                    left: (isStartDate ||
+                                            date.weekday == DateTime.sunday ||
+                                            date.day ==
+                                                1) // Rounded left edge on Sunday or 1st day of the month
+                                        ? const Radius.circular(20)
+                                        : Radius.zero,
+                                    right: (isEndDate ||
+                                            (date.weekday == DateTime.saturday ||
+                                                date.day ==
+                                                    DateTime(date.year,
+                                                            date.month + 1, 0)
+                                                        .day))
+                                        ? const Radius.circular(20)
+                                        : Radius.zero,
                                   ),
-                                ],
-                              );
-                            }
-                          },
-                          selectedBuilder: (context, date, _) {
-                            if (_containerAddedDate != null) {
-                              DateTime compostEndDate =
-                                  _containerAddedDate != null
-                                      ? _containerAddedDate!
-                                          .add(const Duration(days: 112))
-                                      : DateTime.now();
-                              DateTime cycleDayOne = _containerAddedDate != null
-                                  ? _containerAddedDate!
-                                      .add(const Duration(days: 1))
-                                  : DateTime.now();
+                              ),
+                              height: 40, // Maintain shading visibility
+                              width: double.infinity,
+                            ),
 
-                              bool isWithinCycle =
-                                  date.isAfter(_containerAddedDate!) &&
-                                      date.isBefore(compostEndDate);
-                              bool isDayOne = date.year == cycleDayOne.year &&
-                                  date.month == cycleDayOne.month &&
-                                  date.day == cycleDayOne.day;
+                            // Today indicator
+                            Container(
+                              height: 36,
+                              width: 36,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.green
+                                    .withOpacity(0.5), // Highlight today's date
+                              ),
+                            ),
 
-                              bool isEndDate =
-                                  date.year == compostEndDate.year &&
-                                      date.month == compostEndDate.month &&
-                                      date.day == compostEndDate.day;
+                            // Date number
+                            Center(
+                              child: Text(
+                                date.day.toString(),
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87, // Ensure visibility
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+}
+                      } else {
+                        return Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            // Today indicator
+                            Container(
+                              height: 36,
+                              width: 36,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.green
+                                    .withOpacity(0.5), // Highlight today's date
+                              ),
+                            ),
 
-                              return Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  // Preserve shading effect
-                                  if (isWithinCycle)
-                                    Container(
-                                      decoration: BoxDecoration(
-                                        color: Colors.grey
-                                            .withOpacity(0.3), // Shading effect
-                                        borderRadius: BorderRadius.horizontal(
-                                          left: isDayOne
-                                              ? const Radius.circular(20)
-                                              : Radius.zero,
-                                          right: isEndDate
-                                              ? const Radius.circular(20)
-                                              : Radius.zero,
-                                        ),
-                                      ),
-                                      height: 40, // Maintain shading visibility
-                                      width: double.infinity,
-                                    ),
+                            // Date number
+                            Center(
+                              child: Text(
+                                date.day.toString(),
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87, // Ensure visibility
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      }
+                    },
+                          selectedBuilder: (context, date, focusedDay) {
+                      if (_containerAddedDate != null) {
+                        DateTime today = DateTime.now();
+                        DateTime compostEndDate = _containerAddedDate != null
+                            ? _containerAddedDate!
+                                .add(const Duration(days: 112))
+                            : DateTime.now();
 
-                                  // Selection circle (on top)
-                                  Container(
-                                    height: 36,
-                                    width: 36,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                          color: Colors.green,
-                                          width:
-                                              2), // Green outline for selection
-                                      color: Colors
-                                          .transparent, // Keep shading visible
-                                    ),
+                        bool isWithinCycle = date
+                                .isAfter(_containerAddedDate!) &&
+                            date.isBefore(compostEndDate.add(Duration(days: 1)));
+                        bool isStartDate =
+                            date.year == _containerAddedDate!.year &&
+                                date.month == _containerAddedDate!.month &&
+                                date.day == _containerAddedDate!.day;
+
+                        bool isEndDate = date.year == compostEndDate.year &&
+                            date.month == compostEndDate.month &&
+                            date.day == compostEndDate.day;
+                        return Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            // Preserve shading effect
+                            if (isWithinCycle && date.month == focusedDay.month && date.year == focusedDay.year) 
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.grey
+                                      .withOpacity(0.3), // Shading effect
+                                  borderRadius: BorderRadius.horizontal(
+                                    left: (isStartDate ||
+                                            date.weekday == DateTime.sunday ||
+                                            date.day ==
+                                                1) // Rounded left edge on Sunday or 1st day of the month
+                                        ? const Radius.circular(20)
+                                        : Radius.zero,
+                                    right: (isEndDate ||
+                                            (date.weekday == DateTime.saturday ||
+                                                date.day ==
+                                                    DateTime(date.year,
+                                                            date.month + 1, 0)
+                                                        .day))
+                                        ? const Radius.circular(20)
+                                        : Radius.zero,
                                   ),
-                                  // Date number (ensures readability)
-                                  Center(
-                                    child: Text(
-                                      date.day.toString(),
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors
-                                            .black87, // Keep text readable
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              );
-                            } else {
-                              return Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  // Selection circle (on top)
-                                  Container(
-                                    height: 36,
-                                    width: 36,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                          color: Colors.green,
-                                          width:
-                                              2), // Green outline for selection
-                                      color: Colors
-                                          .transparent, // Keep shading visible
-                                    ),
-                                  ),
-                                  // Date number (ensures readability)
-                                  Center(
-                                    child: Text(
-                                      date.day.toString(),
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors
-                                            .black87, // Keep text readable
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              );
-                            }
-                          },
+                                ),
+                                height: 40, // Maintain shading visibility
+                                width: double.infinity,
+                              ),
+                              
+                            // Selection circle (on top)
+                            Container(
+                              height: 36,
+                              width: 36,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                    color: Colors.green,
+                                    width: 2), // Green outline for selection
+                                color:
+                                    Colors.transparent, // Keep shading visible
+                              ),
+                            ),
+                            // Date number (ensures readability)
+                            Center(
+                              child: Text(
+                                date.day.toString(),
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87, // Keep text readable
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                            
+                      } else {
+                        return Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            // Selection circle (on top)
+                            Container(
+                              height: 36,
+                              width: 36,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                    color: Colors.green,
+                                    width: 2), // Green outline for selection
+                                color:
+                                    Colors.transparent, // Keep shading visible
+                              ),
+                            ),
+                            // Date number (ensures readability)
+                            Center(
+                              child: Text(
+                                date.day.toString(),
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87, // Keep text readable
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      }
+                    },
                         ),
                         selectedDayPredicate: (day) =>
                             isSameDay(_selectedDate, day),
@@ -1844,24 +1883,6 @@ class _DashboardPageState extends State<DashboardPage> {
                       );
                       if (pickedDate != null) {
                         setState(() => tempDate = pickedDate);
-                      }
-                    },
-                  ),
-                  ListTile(
-                    leading:
-                        const Icon(Icons.access_time, color: Colors.orange),
-                    title: const Text("Select Time",
-                        style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.w500)),
-                    subtitle: Text(tempTime.format(context)),
-                    trailing: const Icon(Icons.arrow_forward_ios, size: 18),
-                    onTap: () async {
-                      TimeOfDay? pickedTime = await showTimePicker(
-                        context: context,
-                        initialTime: tempTime,
-                      );
-                      if (pickedTime != null) {
-                        setState(() => tempTime = pickedTime);
                       }
                     },
                   ),
@@ -2838,6 +2859,146 @@ class _DashboardPageState extends State<DashboardPage> {
                         } else if (snapshot.hasError || snapshot.data == null) {
                           return const Center(
                               child: Text('No historical data available.'));
+                        } else {
+                          List<Map<String, dynamic>> historyData =
+                              (snapshot.data as List<Map<String, dynamic>>)
+                                  .toList();
+
+                          ScrollController scrollController =
+                              ScrollController();
+
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            scrollController.jumpTo(
+                                scrollController.position.maxScrollExtent);
+                          });
+
+                          Widget buildChartOrMessage(
+                              String title, String key, Color color) {
+                            if (historyData.length <= 1) {
+                              return Container(
+                                height: 250, // Adjust height as needed
+                                alignment: Alignment.center,
+                                child: const Text(
+                                  'Insufficient Data',
+                                  style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.red),
+                                ),
+                              );
+                            } else if (_containerAddedDate == null) {
+                              return Container(
+                                height: 250, // Adjust height as needed
+                                alignment: Alignment.center,
+                                child: const Text(
+                                  'No Compost',
+                                  style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.red),
+                                ),
+                              );
+                            } else {
+                              return SingleChildScrollView(
+                                controller: scrollController,
+                                scrollDirection: Axis.horizontal,
+                                reverse: true,
+                                child: buildBarChart(
+                                    historyData, title, key, color),
+                              );
+                            }
+                          }
+
+                          return SingleChildScrollView(
+                            scrollDirection: Axis.vertical,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const SizedBox(height: 20),
+                                const Text(
+                                  'Temperature Monitoring',
+                                  style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                                const Text(
+                                  '• Safe: Between 10°C to 54°C  |  Critical: Above 54°C',
+                                  style: TextStyle(
+                                      fontSize: 14, color: Colors.grey),
+                                ),
+                                buildChartOrMessage(
+                                    'Temperature', 'temperature', Colors.green),
+                                const SizedBox(height: 20),
+                                Divider(
+                                    thickness: 2, color: Colors.grey.shade400),
+                                const SizedBox(height: 20),
+                                const Text(
+                                  'Dryness Level',
+                                  style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                                const Text(
+                                  '• Optimal: 50-60%  |  Wet: Below 50%  |  Too Dry: Above 60%',
+                                  style: TextStyle(
+                                      fontSize: 14, color: Colors.grey),
+                                ),
+                                buildChartOrMessage(
+                                    'Dryness', 'moisture', Colors.blue),
+                                const SizedBox(height: 20),
+                                Divider(
+                                    thickness: 2, color: Colors.grey.shade400),
+                                const SizedBox(height: 20),
+                                const Text(
+                                  'pH Level 1',
+                                  style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                                const Text(
+                                  '• Ideal: 6.0 - 8.0 | Too Acidic: Below 6.0 | Too Basic: Above 8',
+                                  style: TextStyle(
+                                      fontSize: 14, color: Colors.grey),
+                                ),
+                                buildChartOrMessage(
+                                    'pH Level 1', 'ph_level1', Colors.purple),
+                                const SizedBox(height: 20),
+                                Divider(
+                                    thickness: 2, color: Colors.grey.shade400),
+                                const SizedBox(height: 20),
+                                const Text(
+                                  'pH Level 2',
+                                  style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                                const Text(
+                                  '• Ideal: 6.0 - 8.0 | Too Acidic: Below 6.0 | Too Basic: Above 8',
+                                  style: TextStyle(
+                                      fontSize: 14, color: Colors.grey),
+                                ),
+                                buildChartOrMessage('pH Level 2', 'ph_level2',
+                                    Colors.deepPurple),
+                                const SizedBox(height: 20),
+                                Divider(
+                                    thickness: 2, color: Colors.grey.shade400),
+                                const SizedBox(height: 20),
+                                const Text(
+                                  'Humidity Level',
+                                  style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                                const Text(
+                                  '• Optimal: 30-60%  |  Low: Below 30%  |  High: Above 60%',
+                                  style: TextStyle(
+                                      fontSize: 14, color: Colors.grey),
+                                ),
+                                buildChartOrMessage(
+                                    'Humidity', 'humidity', Colors.orange),
+                              ],
+                            ),
+                          );
                         }
 
                         List<Map<String, dynamic>> historyData =
