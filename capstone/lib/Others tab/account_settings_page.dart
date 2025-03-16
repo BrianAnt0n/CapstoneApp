@@ -3,7 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:capstone/home_page.dart';
 import 'package:capstone/home_page_members.dart';
-
+import 'package:bcrypt/bcrypt.dart';
 
 class AccountSettingsPage extends StatefulWidget {
   const AccountSettingsPage({super.key});
@@ -14,12 +14,12 @@ class AccountSettingsPage extends StatefulWidget {
 
 class _AccountSettingsPageState extends State<AccountSettingsPage> {
   final supabase = Supabase.instance.client;
-  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _newPasswordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();
   String? _errorText;
   String _fullname = "Loading..."; // Placeholder while fetching data
-  String _email = "Loading..."; // ✅ Store email
+  String _username = "Loading..."; // ✅ Store username
   String _userLevel = "Loading..."; // ✅ Store user level
   final TextEditingController _fullnameController = TextEditingController(); // ✅ Controller for full name
 
@@ -37,7 +37,7 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
   if (userId == null) {
     setState(() {
       _fullname = "User";
-      _email = "No Email"; // ✅ Default value for email
+      _username = "No Username"; // ✅ Default value for username
       _userLevel = "Member"; // ✅ Default value for role
     });
     return;
@@ -46,19 +46,19 @@ class _AccountSettingsPageState extends State<AccountSettingsPage> {
   try {
     final response = await supabase
         .from('Users')
-        .select('fullname, email, user_level') // ✅ Fetch email & role
+        .select('fullname, username, user_level') // ✅ Fetch username & role
         .eq('user_id', int.parse(userId))
         .single();
 
     setState(() {
       _fullname = response['fullname'] ?? "User";
-      _email = response['email'] ?? "No Email"; // ✅ Store email
+      _username = response['username'] ?? "No Username"; // ✅ Store username
       _userLevel = response['user_level'] ?? "Member"; // ✅ Store user role
     });
   } catch (error) {
     setState(() {
       _fullname = "User";
-      _email = "Error loading email";
+      _username = "Error loading username";
       _userLevel = "Member";
     });
   }
@@ -104,10 +104,10 @@ Future<void> _updateFullName() async {
 }
 
 
-  Future<void> _updateEmail() async {
+  Future<void> _updateUsername() async {
   final prefs = await SharedPreferences.getInstance();
   final userId = prefs.getString("user_id_pref");
-  final newEmail = _emailController.text.trim();
+  final newUsername = _usernameController.text.trim();
 
   if (userId == null) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -116,29 +116,31 @@ Future<void> _updateFullName() async {
     return;
   }
 
-  if (newEmail.isEmpty) {
-    setState(() => _errorText = "Email cannot be empty");
+  if (newUsername.isEmpty) {
+    setState(() => _errorText = "Username cannot be empty");
     return;
   }
 
-  // ✅ Email format validation
-  final emailRegex = RegExp(r'^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$');
-  if (!emailRegex.hasMatch(newEmail)) {
-    setState(() => _errorText = "Invalid email format");
-    return;
-  }
+// ✅ Validate username (no spaces and only lowercase letters)
+    final usernameRegex = RegExp(r'^[a-z0-9]+$');
+    if (!usernameRegex.hasMatch(newUsername)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Username must be lowercase and contain no spaces.')),
+      );
+      return;
+    }
 
   try {
-    await supabase.from('Users').update({'email': newEmail}).eq('user_id', int.parse(userId));
+    await supabase.from('Users').update({'username': newUsername}).eq('user_id', int.parse(userId));
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Email updated successfully!')),
+      const SnackBar(content: Text('Username updated successfully!')),
     );
 
     _refreshPage();
   } catch (error) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Error updating email: $error')),
+      SnackBar(content: Text('Error updating username: $error')),
     );
   }
 }
@@ -167,7 +169,9 @@ Future<void> _updateFullName() async {
     }
 
     try {
-      await supabase.from('Users').update({'password': newPassword}).eq('user_id', int.parse(userId));
+       // ✅ Hash the password before storing
+    String hashedPassword = BCrypt.hashpw(newPassword, BCrypt.gensalt());
+      await supabase.from('Users').update({'password': hashedPassword}).eq('user_id', int.parse(userId));
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Password updated successfully!')),
@@ -186,7 +190,7 @@ Future<void> _updateFullName() async {
       _loadUserDetails();
       _newPasswordController.clear();
       _confirmPasswordController.clear();
-      _emailController.clear();
+      _usernameController.clear();
       _errorText = null;
     });
   }
@@ -217,9 +221,9 @@ Future<void> _updateFullName() async {
                 ),
                 const SizedBox(height: 5),
 
-                // ✅ Display Email
+                // ✅ Display Username
                 Text(
-                  "Email: $_email",
+                  "Username: $_username",
                   style: const TextStyle(fontSize: 16, color: Colors.black),
                 ),
                 const SizedBox(height: 5),
@@ -252,21 +256,21 @@ Future<void> _updateFullName() async {
                 ],
               ),
             ),
-            const SizedBox(height: 20), // ✅ Add spacing before "Update Email"
+            const SizedBox(height: 20), // ✅ Add spacing before "Update Username"
 
 
             const SizedBox(height: 20),
 
             _buildSectionCard(
-              title: "Update Email",
+              title: "Update Username",
               child: Column(
                 children: [
                   TextField(
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(labelText: 'New Email'),
+                    controller: _usernameController,
+                    keyboardType: TextInputType.text,
+                    decoration: const InputDecoration(labelText: 'New Username'),
                     onChanged: (value) {
-                      _emailController.value = _emailController.value.copyWith(
+                      _usernameController.value = _usernameController.value.copyWith(
                         text: value
                             .toLowerCase(), // ✅ Converts input to lowercase
                         selection:
@@ -276,7 +280,7 @@ Future<void> _updateFullName() async {
                   ),
 
                   const SizedBox(height: 10),
-                  _buildButton("Update Email", _updateEmail),
+                  _buildButton("Update Username", _updateUsername),
                 ],
               ),
             ),

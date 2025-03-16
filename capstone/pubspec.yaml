@@ -53,6 +53,7 @@ dependencies:
   workmanager: ^0.5.2
   pdf: ^3.10.4
   printing: ^5.11.0
+  bcrypt: ^1.1.3
   
 
 
