@@ -1180,6 +1180,26 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
+Widget _buildLegendItemCalendar(Color color, String label, {bool hasBorder = false}) {
+  return Row(
+    children: [
+      Container(
+        width: 16,
+        height: 16,
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+          border: hasBorder ? Border.all(color: Colors.green, width: 2) : null,
+        ),
+      ),
+      const SizedBox(width: 8),
+      Text(label, style: const TextStyle(fontSize: 14)),
+      const SizedBox(width: 16),
+    ],
+  );
+}
+
+
   void _openFullCalendar() {
     //Ensure keyboard is fully dismissed before opening the calendar
     FocusScope.of(context).requestFocus(FocusNode());
@@ -1522,6 +1542,31 @@ class _DashboardPageState extends State<DashboardPage> {
                         },
                       ),
                       const SizedBox(height: 10),
+
+Column(
+  mainAxisAlignment: MainAxisAlignment.center,
+  children: [
+    const Text(
+      "Legend",
+      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+    ),
+    const SizedBox(height: 8),
+
+    // 🔹 Use Wrap instead of Row to prevent overflow
+    Wrap(
+      spacing: 12, // Space between items
+      runSpacing: 6, // Space between rows if wrapped
+      alignment: WrapAlignment.center,
+      children: [
+        _buildLegendItemCalendar(Colors.grey.withOpacity(0.3), "Compost Cycle"),
+        _buildLegendItemCalendar(Colors.green.withOpacity(0.5), "Today"),
+        _buildLegendItemCalendar(Colors.transparent, "Selected", hasBorder: true),
+      ],
+    ),
+  ],
+),
+
+                      const SizedBox(height: 10),
                       ElevatedButton(
                         onPressed: () => Navigator.pop(context),
                         child: const Text("Close"),
@@ -1774,7 +1819,7 @@ class _DashboardPageState extends State<DashboardPage> {
       // ✅ Fetch Start Date from `Hardware_Sensors_Test`
       final sensorData = await supabase
           .from('Hardware_Sensors_Test')
-          .select('start_date')
+          .select('start_date, started_by')
           .eq('hardware_id', hardwareId)
           .maybeSingle();
 
@@ -1783,7 +1828,14 @@ class _DashboardPageState extends State<DashboardPage> {
         return;
       }
 
+      if (sensorData == null || sensorData['started_by'] == null) {
+        print("No start date found for hardware ID: $hardwareId");
+        return;
+      }
+
       final startDate = sensorData['start_date'];
+      print("Fetched start date: $startDate");
+      final startedBy = sensorData['started_by'];
       print("Fetched start date: $startDate");
 
       // ✅ Fetch the logged-in user's ID
@@ -1810,11 +1862,13 @@ class _DashboardPageState extends State<DashboardPage> {
       // ✅ Update existing row instead of inserting a new one
       final updateResponse = await supabase
           .from('Compost_Data')
-          .update({
+          .insert({
+            'hardware_id' : hardwareId,
+            'start_date': startDate,
+            'started_by': startedBy, // ✅ Store who started the compost
             'end_date': DateTime.now().toIso8601String(),
             'retrieved_by': retrievedBy, // ✅ Store the user who retrieved it
           })
-          .eq('hardware_id', hardwareId)
           .select();
 
       if (updateResponse.isEmpty) {
@@ -1920,7 +1974,7 @@ class _DashboardPageState extends State<DashboardPage> {
                         context: context,
                         initialDate: tempDate,
                         firstDate: DateTime(2000),
-                        lastDate: DateTime(2100),
+                        lastDate: DateTime.now(), // Prevents selecting future dates
                       );
                       if (pickedDate != null) {
                         setState(() => tempDate = pickedDate);
@@ -2022,17 +2076,17 @@ class _DashboardPageState extends State<DashboardPage> {
       }
 
       // ✅ Insert into `Compost_Data` with `started_by` (No `container_id`)
-      final compostInsertResponse =
-          await Supabase.instance.client.from('Compost_Data').insert({
-        'hardware_id': selectedHardwareId!, // ✅ Removed `container_id`
-        'start_date': formattedDate,
-        'started_by': startedBy, // ✅ Store who started the compost
-      }).select();
+      // final compostInsertResponse =
+      //     await Supabase.instance.client.from('Compost_Data').insert({
+      //   'hardware_id': selectedHardwareId!, // ✅ Removed `container_id`
+      //   'start_date': formattedDate,
+      //   'started_by': startedBy, // ✅ Store who started the compost
+      // }).select();
 
-      if (compostInsertResponse == null || compostInsertResponse.isEmpty) {
-        print("❌ Error: Compost_Data insert failed.");
-        return;
-      }
+      // if (compostInsertResponse == null || compostInsertResponse.isEmpty) {
+      //   print("❌ Error: Compost_Data insert failed.");
+      //   return;
+      // }
 
       setState(() {
         _containerAddedDate = selectedDate;
@@ -3041,140 +3095,6 @@ class _DashboardPageState extends State<DashboardPage> {
                             ),
                           );
                         }
-
-                        List<Map<String, dynamic>> historyData =
-                            (snapshot.data as List<Map<String, dynamic>>)
-                                .toList();
-
-                        ScrollController scrollController = ScrollController();
-
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          scrollController.jumpTo(
-                              scrollController.position.maxScrollExtent);
-                        });
-
-                        Widget buildChartOrMessage(
-                            String title, String key, Color color) {
-                          if (historyData.length <= 2) {
-                            return Container(
-                              height: 250, // ✅ Keep consistent chart height
-                              alignment: Alignment.center,
-                              child: const Text(
-                                'Insufficient Historical Data',
-                                style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.red),
-                              ),
-                            );
-                          } else if (_containerAddedDate == null) {
-                            return Container(
-                              height: 250,
-                              alignment: Alignment.center,
-                              child: const Text(
-                                'No Compost',
-                                style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.red),
-                              ),
-                            );
-                          } else {
-                            return SingleChildScrollView(
-                              controller: scrollController,
-                              scrollDirection: Axis.horizontal,
-                              reverse: true,
-                              child:
-                                  buildBarChart(historyData, title, key, color),
-                            );
-                          }
-                        }
-
-                        return SingleChildScrollView(
-                          scrollDirection: Axis.vertical,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const SizedBox(height: 20),
-                              const Text(
-                                'Temperature Monitoring',
-                                style: TextStyle(
-                                    fontSize: 20, fontWeight: FontWeight.bold),
-                              ),
-                              const Text(
-                                '• Safe: Between 10°C to 54°C  |  Critical: Above 54°C',
-                                style:
-                                    TextStyle(fontSize: 14, color: Colors.grey),
-                              ),
-                              buildChartOrMessage(
-                                  'Temperature', 'temperature', Colors.green),
-                              const SizedBox(height: 20),
-                              Divider(
-                                  thickness: 2, color: Colors.grey.shade400),
-                              const SizedBox(height: 20),
-                              const Text(
-                                'Dryness Level',
-                                style: TextStyle(
-                                    fontSize: 20, fontWeight: FontWeight.bold),
-                              ),
-                              const Text(
-                                '• Optimal: 50-60%  |  Wet: Below 50%  |  Too Dry: Above 60%',
-                                style:
-                                    TextStyle(fontSize: 14, color: Colors.grey),
-                              ),
-                              buildChartOrMessage(
-                                  'Dryness', 'moisture', Colors.blue),
-                              const SizedBox(height: 20),
-                              Divider(
-                                  thickness: 2, color: Colors.grey.shade400),
-                              const SizedBox(height: 20),
-                              const Text(
-                                'pH Level 1',
-                                style: TextStyle(
-                                    fontSize: 20, fontWeight: FontWeight.bold),
-                              ),
-                              const Text(
-                                '• Ideal: 6.0 - 8.0 | Too Acidic: Below 6.0 | Too Basic: Above 8',
-                                style:
-                                    TextStyle(fontSize: 14, color: Colors.grey),
-                              ),
-                              buildChartOrMessage(
-                                  'pH Level 1', 'ph_level1', Colors.purple),
-                              const SizedBox(height: 20),
-                              Divider(
-                                  thickness: 2, color: Colors.grey.shade400),
-                              const SizedBox(height: 20),
-                              const Text(
-                                'pH Level 2',
-                                style: TextStyle(
-                                    fontSize: 20, fontWeight: FontWeight.bold),
-                              ),
-                              const Text(
-                                '• Ideal: 6.0 - 8.0 | Too Acidic: Below 6.0 | Too Basic: Above 8',
-                                style:
-                                    TextStyle(fontSize: 14, color: Colors.grey),
-                              ),
-                              buildChartOrMessage(
-                                  'pH Level 2', 'ph_level2', Colors.deepPurple),
-                              const SizedBox(height: 20),
-                              Divider(
-                                  thickness: 2, color: Colors.grey.shade400),
-                              const SizedBox(height: 20),
-                              const Text(
-                                'Humidity Level',
-                                style: TextStyle(
-                                    fontSize: 20, fontWeight: FontWeight.bold),
-                              ),
-                              const Text(
-                                '• Optimal: 30-60%  |  Low: Below 30%  |  High: Above 60%',
-                                style:
-                                    TextStyle(fontSize: 14, color: Colors.grey),
-                              ),
-                              buildChartOrMessage(
-                                  'Humidity', 'humidity', Colors.orange),
-                            ],
-                          ),
-                        );
                       },
                     ),
                   ],
