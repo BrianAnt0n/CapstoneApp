@@ -13,6 +13,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'constants.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter/services.dart'; // For full-screen mode
+
 
 // State Management: Tracks the selected container
 class ContainerState extends ChangeNotifier {
@@ -50,43 +52,107 @@ class _HomePageGuestState extends State<HomePageGuest> {
     const OthersPage(),
   ];
 
+  
+
   @override
+  void initState() {
+    super.initState();
+    _enableFullScreen(); // Activate immersive mode
+  }
+
+  @override
+  void dispose() {
+    _disableFullScreen(); // Restore system UI on exit
+    super.dispose();
+  }
+
+  // Enables immersive mode to reduce accidental swipes
+  void _enableFullScreen() {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+  }
+
+  // Restores system UI when leaving the page
+  void _disableFullScreen() {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  }
+
+    // Lifecycle state changes
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      _showPreventExitDialog();
+    }
+  }
+
+  Future<void> _showPreventExitDialog() async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text("Prevent Exit"),
+        content: const Text("Please go to the others tab to exit."),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text("OK"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Block back gesture
+  Future<bool> _onWillPop() async {
+    return false;
+  }
+
+   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
       create: (_) => ContainerState(),
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('E-ComposThink Home - Guest'),
-        ),
-        body: _pages[_currentIndex],
-        bottomNavigationBar: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          selectedItemColor: Colors.green,
-          unselectedItemColor: Colors.green[300],
-          onTap: (index) {
-            setState(() {
-              _currentIndex = index;
-            });
-          },
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.dashboard),
-              label: 'Dashboard',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.inbox),
-              label: 'Container',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.more_horiz),
-              label: 'Others',
-            ),
-          ],
+      child: PopScope(
+        canPop: false, // Prevents popping automatically
+        onPopInvokedWithResult: (didPop, result) {
+          if (didPop) {
+            _showPreventExitDialog(); // Show dialog if a pop attempt is made
+          }
+        },
+        child: Scaffold(
+          appBar: AppBar(
+            title: const Text('E-ComposThink Home - Guest'),
+            automaticallyImplyLeading: false, // Removes the back button
+          ),
+          body: _pages[_currentIndex],
+          bottomNavigationBar: BottomNavigationBar(
+            currentIndex: _currentIndex,
+            selectedItemColor: Colors.green,
+            unselectedItemColor: Colors.green[300],
+            onTap: (index) {
+              setState(() {
+                _currentIndex = index;
+              });
+            },
+            items: const [
+              BottomNavigationBarItem(
+                icon: Icon(Icons.dashboard),
+                label: 'Dashboard',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.inbox),
+                label: 'Container',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.more_horiz),
+                label: 'Others',
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
+
 
 // Dashboard Page: Displays sensor data for the selected container
 // Dashboard Page with pull-to-refresh functionality
