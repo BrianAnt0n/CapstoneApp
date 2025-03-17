@@ -1658,7 +1658,6 @@ Column(
     ),
   ],
 ),
-
                       const SizedBox(height: 10),
                       ElevatedButton(
                         onPressed: () => Navigator.pop(context),
@@ -3779,7 +3778,8 @@ Future<void> deleteContainer(int containerId) async {
   await supabase
       .from('Containers_test')
       .delete()
-      .eq('container_id', containerId);
+      .eq('container_id', containerId)
+      .select();
 }
 
 void _removeSelectedContainer() async {
