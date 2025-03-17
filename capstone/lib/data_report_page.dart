@@ -109,7 +109,8 @@ Future<void> _fetchAvailableDates() async {
     if (response.isNotEmpty) {
       setState(() {
         availableDataDates = response
-            .map<DateTime>((entry) => DateTime.parse(entry['timestamp']))
+            .map<DateTime>((entry) => DateTime.parse(entry['timestamp']).toLocal())
+            .map((date) => DateTime(date.year, date.month, date.day)) // Normalize to just YYYY-MM-DD
             .toSet();
       });
     }
@@ -195,7 +196,7 @@ void _showCalendarPopup(
           children: [
             TableCalendar(
             focusedDay: selectedDate,
-            firstDay: DateTime(2020),
+            firstDay: compostStartDate ?? DateTime(2000, 1, 1),
             lastDay: DateTime.now(),
             calendarFormat:
                             CalendarFormat.month, // Show the full month
@@ -209,6 +210,23 @@ void _showCalendarPopup(
                           },
                         ),
             calendarBuilders: CalendarBuilders(
+               markerBuilder: (context, date, events) {
+      bool hasData = availableDataDates.contains(DateTime(date.year, date.month, date.day));
+      if (hasData) {
+      return Positioned(
+        bottom: 12, // Moves the dot slightly higher
+        child: Container(
+          width: 4,  // Size of the dot
+          height: 4,
+          decoration: const BoxDecoration(
+            color: Colors.green, // Green color
+            shape: BoxShape.circle,
+          ),
+        ),
+      );
+      }
+      return null;
+    },
               defaultBuilder: (context, date, _) {
                 DateTime today = DateTime.now();
                 bool isToday = isSameDay(date, today);
@@ -508,7 +526,6 @@ void _showCalendarPopup(
             },
           ),
           const SizedBox(height: 10),
-
 Column(
   mainAxisAlignment: MainAxisAlignment.center,
   children: [
@@ -517,21 +534,47 @@ Column(
       style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
     ),
     const SizedBox(height: 8),
-
-    // 🔹 Use Wrap instead of Row to prevent overflow
-    Wrap(
-      spacing: 12, // Space between items
-      runSpacing: 6, // Space between rows if wrapped
-      alignment: WrapAlignment.center,
+    Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.start, // Align items to the top
       children: [
-        _buildLegendItemCalendar(Colors.grey.withOpacity(0.3), "Compost Cycle"),
-        _buildLegendItemCalendar(Colors.green.withOpacity(0.5), "Today"),
-        _buildLegendItemCalendar(Colors.transparent, "Selected", hasBorder: true),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildLegendItemCalendar(Colors.grey.withOpacity(0.3), "Compost Cycle"),
+            const SizedBox(height: 6),
+            _buildLegendItemCalendar(Colors.transparent, "Selected", hasBorder: true),
+          ],
+        ),
+        const SizedBox(width: 24), // Space between the two columns
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildLegendItemCalendar(Colors.green.withOpacity(0.5), "Today"),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Container(
+                  width: 6,
+                  height: 6,
+                  margin: const EdgeInsets.only(right: 10, left: 4), // Adjust spacing
+                  decoration: const BoxDecoration(
+                    color: Colors.green,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const Text(
+                  "Data Available",
+                  style: TextStyle(fontSize: 14),
+                ),
+              ],
+            ),
+          ],
+        ),
       ],
     ),
   ],
 ),
-
                       const SizedBox(height: 10),
           ]
           ),
@@ -542,18 +585,29 @@ Column(
     });
 }
   
-Widget _buildLegendItemCalendar(Color color, String label, {bool hasBorder = false}) {
+Widget _buildLegendItemCalendar(Color color, String label, {bool hasBorder = false, bool isDot = false}) {
   return Row(
     children: [
-      Container(
-        width: 16,
-        height: 16,
-        decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
-          border: hasBorder ? Border.all(color: Colors.green, width: 2) : null,
+      if (isDot)
+        Container(
+          width: 6,
+          height: 6,
+          margin: const EdgeInsets.only(right: 4),
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+          ),
+        )
+      else
+        Container(
+          width: 16,
+          height: 16,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            border: hasBorder ? Border.all(color: Colors.green, width: 2) : null,
+          ),
         ),
-      ),
       const SizedBox(width: 8),
       Text(label, style: const TextStyle(fontSize: 14)),
       const SizedBox(width: 16),
