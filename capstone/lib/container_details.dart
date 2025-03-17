@@ -83,14 +83,22 @@ class _ContainerDetailsState extends State<ContainerDetails> {
   Color statusColor = _getStatusColor(weeksBeforeRetrieval);
 
   return GestureDetector(
-    onTap: () {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => CompostCycleHistory(compost: compost),
-        ),
-      );
-    },
+onTap: () {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (context) => CompostCycleHistory(
+        hardwareId: compost['hardware_id'],
+        compostId: compost['compost_id'],
+        startDate: compost['start_date'],
+        endDate: compost['end_date'] ?? DateTime.now().toIso8601String(),
+        startedBy: compost['started_by'] ?? "Unknown",
+        retrievedBy: compost['retrieved_by'] ?? "Unknown",
+      ),
+    ),
+  );
+},
+
     child: Card(
       elevation: 6,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
