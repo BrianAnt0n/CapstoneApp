@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'compost_cycle_history.dart';
 
 class ContainerDetails extends StatefulWidget {
   final int hardwareId;
@@ -72,16 +73,25 @@ class _ContainerDetailsState extends State<ContainerDetails> {
   }
 
   Widget _buildCompostCard(Map<String, dynamic> compost) {
-    DateTime startDate = DateTime.parse(compost['start_date']);
-    DateTime? endDate = compost['end_date'] != null
-        ? DateTime.parse(compost['end_date'])
-        : null;
-    int weeksBeforeRetrieval =
-        _calculateWeeksBeforeRetrieval(startDate, endDate);
-    String status = _getCompostStatus(weeksBeforeRetrieval);
-    Color statusColor = _getStatusColor(weeksBeforeRetrieval);
+  DateTime startDate = DateTime.parse(compost['start_date']);
+  DateTime? endDate = compost['end_date'] != null
+      ? DateTime.parse(compost['end_date'])
+      : null;
+  int weeksBeforeRetrieval =
+      _calculateWeeksBeforeRetrieval(startDate, endDate);
+  String status = _getCompostStatus(weeksBeforeRetrieval);
+  Color statusColor = _getStatusColor(weeksBeforeRetrieval);
 
-    return Card(
+  return GestureDetector(
+    onTap: () {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CompostCycleHistory(compost: compost),
+        ),
+      );
+    },
+    child: Card(
       elevation: 6,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
@@ -90,7 +100,6 @@ class _ContainerDetailsState extends State<ContainerDetails> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 📌 Compost Cycle Title
             Row(
               children: [
                 Container(
@@ -113,16 +122,11 @@ class _ContainerDetailsState extends State<ContainerDetails> {
               ],
             ),
             const SizedBox(height: 12),
-
-            // 📌 Compost Dates
             _buildInfoRow(Icons.calendar_today, "Start Date",
                 _formatDate(compost['start_date']), Colors.blueAccent),
             _buildInfoRow(Icons.event, "End Date",
                 _formatDate(compost['end_date']), Colors.redAccent),
-
             const Divider(height: 20, thickness: 1),
-
-            // 📌 Weeks Before Retrieval
             Row(
               children: [
                 Icon(Icons.schedule, size: 18, color: Colors.orangeAccent),
@@ -135,8 +139,6 @@ class _ContainerDetailsState extends State<ContainerDetails> {
               ],
             ),
             const SizedBox(height: 10),
-
-            // 📌 Compost Status
             Container(
               padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
               decoration: BoxDecoration(
@@ -152,10 +154,7 @@ class _ContainerDetailsState extends State<ContainerDetails> {
                 ),
               ),
             ),
-
             const Divider(height: 20, thickness: 1),
-
-            // 📌 Started by & Retrieved by
             _buildInfoRow(Icons.person, "Started by",
                 compost['started_by'] ?? "Unknown", Colors.green),
             _buildInfoRow(Icons.person_outline, "Retrieved by",
@@ -163,8 +162,10 @@ class _ContainerDetailsState extends State<ContainerDetails> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
+
 
 // 📌 Helper Function for Creating Info Rows
   Widget _buildInfoRow(
