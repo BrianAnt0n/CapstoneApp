@@ -1933,25 +1933,25 @@ Column(
 
       // ✅ Fetch the logged-in user's ID
       final prefs = await SharedPreferences.getInstance();
-      // String? userIdString = prefs.getString("user_id_pref");
-      // int? userId = userIdString != null ? int.tryParse(userIdString) : null;
+      String? userIdString = prefs.getString("user_id_pref");
+      int? userId = userIdString != null ? int.tryParse(userIdString) : null;
 
-      // if (userId == null) {
-      //   print("❌ Error: User ID not found.");
-      //   return;
-      // }
+      if (userId == null) {
+        print("❌ Error: User ID not found.");
+        return;
+      }
 
       // ✅ Fetch `fullname` of the logged-in user
-      // final userResponse = await supabase
-      //     .from('Users')
-      //     .select('fullname')
-      //     .eq('user_id', userId)
-      //     .maybeSingle();
+      final userResponse = await supabase
+          .from('Users')
+          .select('fullname')
+          .eq('user_id', userId)
+          .maybeSingle();
 
-      // String retrievedBy = userResponse?['fullname'] ?? "Unknown";
-      String? fullNameString = prefs.getString("fullname");
+      String retrievedBy = userResponse?['fullname'] ?? "Unknown";
+      // String? fullNameString = prefs.getString("fullname");
 
-      String? retrievedBy = fullNameString;
+      // String? retrievedBy = fullNameString;
       // ✅ Update existing row instead of inserting a new one
       final updateResponse = await supabase
           .from('Compost_Data')
@@ -2134,23 +2134,23 @@ Column(
       String formattedDate = selectedDate!.toIso8601String();
 
       final prefs = await SharedPreferences.getInstance();
-      // String? userIdString = prefs.getString("user_id_pref");
-      // int? userId = userIdString != null ? int.tryParse(userIdString) : null;
+      String? userIdString = prefs.getString("user_id_pref");
+      int? userId = userIdString != null ? int.tryParse(userIdString) : null;
 
-      // if (userId == null) {
-      //   print("❌ Error: User ID not found.");
-      //   return;
-      // }
+      if (userId == null) {
+        print("❌ Error: User ID not found.");
+        return;
+      }
 
       // ✅ Fetch full name instead of username
-      // final userResponse = await Supabase.instance.client
-      //     .from('Users')
-      //     .select('fullname') // ✅ Use fullname
-      //     .eq('user_id', userId)
-      //     .maybeSingle();
-      String? fullNameString = prefs.getString('fullname');
+      final userResponse = await Supabase.instance.client
+          .from('Users')
+          .select('fullname') // ✅ Use fullname
+          .eq('user_id', userId)
+          .maybeSingle();
+      // String? fullNameString = prefs.getString('fullname');
 
-      String? startedBy = fullNameString;
+      String? startedBy = userResponse?['fullname'] ?? "Unknown";
 
       // ✅ Update `start_date` & `started_by` in `Hardware_Sensors_Test`
       final updateResponse = await Supabase.instance.client
