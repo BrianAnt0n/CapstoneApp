@@ -14,6 +14,11 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart'; // ✅ Fixes rootBundle issue
 import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
+import 'package:table_calendar/table_calendar.dart';
+
+
+
+
 
 
 class DataReportPage extends StatefulWidget {
@@ -48,17 +53,16 @@ final GlobalKey frequencyGraphKey = GlobalKey();
  final GlobalKey<_FrequencyGraphWidgetState> frequencyGraphWidgetKey = GlobalKey<_FrequencyGraphWidgetState>();
 
 
-  @override
-  void initState() {
-    super.initState();
+ @override
+void initState() {
+  super.initState();
 
-    firstSelectedDate = DateTime.now().subtract(const Duration(days: 1)); // ✅ Default to Yesterday
+  firstSelectedDate = DateTime.now().subtract(const Duration(days: 1)); // ✅ Default to Yesterday
   secondSelectedDate = DateTime.now().subtract(const Duration(days: 2)); // ✅ Default to 2 days ago
 
-
-    _initializeData();
-  }
-
+  _fetchAvailableDates(); // ✅ Fetch available data dates
+  _initializeData();
+}
   Future<void> _initializeData() async {
     final userLogin = await SharedPrefsHelper.getUserLogin();
     String? storedEmail = userLogin['email'];
@@ -89,34 +93,98 @@ final GlobalKey frequencyGraphKey = GlobalKey();
   }
 
   
+// Date picker na Table Calendar ayos
+  Set<DateTime> availableDataDates = {}; // ✅ Store fetched dates
 
-  // Date Picker Tile Widget
-  Widget _buildDatePickerTile(
-    String title,
-    DateTime selectedDate,
-    Function(DateTime?) onDatePicked,
-  ) {
-    return ListTile(
-      title: Text(
-        title,
-        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-      ),
-      subtitle: Text(
-        DateFormat('yyyy-MM-dd').format(selectedDate),
-        style: const TextStyle(fontSize: 16),
-      ),
-      trailing: const Icon(Icons.calendar_today, color: Colors.green),
-      onTap: () async {
-        DateTime? pickedDate = await showDatePicker(
-          context: context,
-          initialDate: selectedDate,
-          firstDate: DateTime(2020),
-          lastDate: DateTime.now(),
-        );
-        onDatePicked(pickedDate);
-      },
-    );
+
+
+Future<void> _fetchAvailableDates() async {
+  final supabase = Supabase.instance.client;
+
+  try {
+    final response = await supabase
+        .from('History_Average')
+        .select('timestamp');
+
+    if (response.isNotEmpty) {
+      setState(() {
+        availableDataDates = response
+            .map<DateTime>((entry) => DateTime.parse(entry['timestamp']))
+            .toSet();
+      });
+    }
+  } catch (error) {
+    print("❌ Error fetching available dates: $error");
   }
+}
+
+// ✅ Modified Date Picker Tile
+Widget _buildDatePickerTile(
+  BuildContext context,
+  String title,
+  DateTime selectedDate,
+  Function(DateTime?) onDatePicked,
+) {
+  return ListTile(
+    title: Text(
+      title,
+      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+    ),
+    subtitle: Text(
+      DateFormat('yyyy-MM-dd').format(selectedDate),
+      style: const TextStyle(fontSize: 16),
+    ),
+    trailing: const Icon(Icons.calendar_today, color: Colors.green),
+    onTap: () {
+      _showCalendarPopup(context, selectedDate, onDatePicked); // ✅ Open the calendar popup
+    },
+  );
+}
+
+// ✅ Table Calendar Modal with Highlighted Dates
+void _showCalendarPopup(
+  BuildContext context,
+  DateTime selectedDate,
+  Function(DateTime?) onDatePicked,
+) {
+  showDialog(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: const Text("Select a Date"),
+        content: SizedBox(
+          width: 300,
+          height: 400,
+          child: TableCalendar(
+            focusedDay: selectedDate,
+            firstDay: DateTime(2020),
+            lastDay: DateTime.now(),
+            selectedDayPredicate: (day) => isSameDay(selectedDate, day),
+            onDaySelected: (selectedDay, focusedDay) {
+              onDatePicked(selectedDay);
+              Navigator.pop(context); // ✅ Close popup after selection
+            },
+            calendarStyle: const CalendarStyle(
+              todayDecoration: BoxDecoration(
+                color: Colors.green,
+                shape: BoxShape.circle,
+              ),
+              selectedDecoration: BoxDecoration(
+                color: Colors.orange,
+                shape: BoxShape.circle,
+              ),
+            ),
+            eventLoader: (day) {
+              return availableDataDates.contains(day) ? ["Data Available"] : [];
+            },
+          ),
+        ),
+      );
+    },
+  );
+}
+
+
 
   // Data Card Widget
 Widget _buildDataCard(String title, Map<String, String> data, bool isFirstDate) {
@@ -203,44 +271,46 @@ String _formatSensorValue(String sensor, dynamic value) {
 
   String selectedFilter = "Daily"; // Default filter
 
+
+//comparison fetching
   Future<Map<String, String>> _fetchHistoricalData(
     DateTime date,
     int hardwareId,
   ) async {
     
-  String startOfDay = "${DateFormat('yyyy-MM-dd').format(date)} 00:00:00";
-  String endOfDay = "${DateFormat('yyyy-MM-dd').format(date)} 23:59:59";
+  String formattedDate = DateFormat('yyyy-MM-dd').format(date); // ✅ Matches table format
 
-  print("🔍 Fetching historical data for hardware_id: $hardwareId between $startOfDay and $endOfDay");
-  
+  print("🔍 Fetching historical data for hardware_id: $hardwareId on $formattedDate");
 
   try {
     final response = await Supabase.instance.client
-        .from('History_Test_Average')
+        .from('History_Average')
         .select()
         .eq('hardware_id', hardwareId)
-        .gte('timestamp', startOfDay)
-        .lte('timestamp', endOfDay)
-        .order('timestamp', ascending: false)
+        .eq('timestamp', formattedDate) // ✅ Direct match instead of using >= and <=
         .limit(1)
         .maybeSingle();
 
     if (response == null) {
-      print("🚨 No data found for hardware_id: $hardwareId on $startOfDay");
-      print("🟢 API Response: $response");
-
+      print("🚨 No data found for hardware_id: $hardwareId on $formattedDate");
       return _defaultData("N/A");
     }
 
+    // ✅ Format numeric values to 2 decimal places
+    String formatValue(dynamic value, String unit) {
+      if (value == null) return "N/A";
+      return "${double.parse(value.toString()).toStringAsFixed(2)}$unit";
+    }
+
     Map<String, String> parsedData = {
-      "Temperature": "${response['temperature'] ?? 'N/A'}°C",
-      "Dryness Level": "${response['moisture'] ?? 'N/A'}%",
-      "pH Level 1": "${response['ph_level1'] ?? 'N/A'}",
-      "pH Level 2": "${response['ph_level2'] ?? 'N/A'}",
-      "Humidity": "${response['humidity'] ?? 'N/A'}%",
+      "Temperature": formatValue(response['temperature'], "°C"),
+      "Dryness Level": formatValue(response['moisture'], "%"),
+      "pH Level 1": formatValue(response['ph_level1'], ""),
+      "pH Level 2": formatValue(response['ph_level2'], ""),
+      "Humidity": formatValue(response['humidity'], "%"),
     };
 
-    print("✅ Parsed Data for $date: $parsedData");
+    print("✅ Parsed Data for $formattedDate: $parsedData");
     return parsedData;
   } catch (e) {
     print("❌ Error fetching historical data: $e");
@@ -248,7 +318,7 @@ String _formatSensorValue(String sensor, dynamic value) {
   }
 }
 
-
+// frequency fetching
   Future<Map<String, List<Map<String, dynamic>>>> _fetchFrequencyAnalysis(
     int hardwareId,
   ) async {
@@ -879,7 +949,7 @@ await Future.delayed(const Duration(milliseconds: 700)); // Allow UI to settle
 comparisonGraphWidgetKey.currentState?.forceRebuild();
 frequencyGraphWidgetKey.currentState?.forceRebuild();
 
-await Future.delayed(const Duration(milliseconds: 500)); // Allow graphs to repaint
+await Future.delayed(const Duration(milliseconds: 700)); // Allow graphs to repaint
 
 
     // ✅ Capture Graphs
@@ -1301,6 +1371,32 @@ Future<Uint8List> _compressImage(Uint8List imageBytes) async {
 // }
 
 
+Future<void> _onDateSelected(DateTime? pickedDate, {required bool isFirst}) async {
+  if (pickedDate != null) {
+    setState(() {
+      if (isFirst) {
+        firstSelectedDate = pickedDate;
+      } else {
+        secondSelectedDate = pickedDate;
+        hasSecondDate = true;
+      }
+    });
+
+    if (kDebugMode) {
+      print("🔍 Fetching data for ${isFirst ? "first" : "second"} date: $pickedDate");
+    }
+
+    final fetchedData = await _fetchHistoricalData(pickedDate, hardwareId!);
+
+    setState(() {
+      if (isFirst) {
+        firstDateData = fetchedData;
+      } else {
+        secondDateData = fetchedData;
+      }
+    });
+  }
+}
 
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -1339,43 +1435,46 @@ Future<Uint8List> _compressImage(Uint8List imageBytes) async {
         padding: const EdgeInsets.all(12),
         child: Column(
           children: [
-            _buildDatePickerTile("Select First Date", firstSelectedDate, (
-              pickedDate,
-            ) async {
-              if (pickedDate != null) {
-                setState(() {
-                  firstSelectedDate = pickedDate;
-                });
-                firstDateData = await _fetchHistoricalData(
-                  firstSelectedDate,
-                  hardwareId!,
-                );
-                setState(() {});
-              }
-            }),
-
-            _buildDatePickerTile("Select Second Date", secondSelectedDate, (
-              pickedDate,
-            ) async {
-              if (pickedDate != null) {
-                setState(() {
-                  secondSelectedDate = pickedDate;
-                  hasSecondDate = true;
-                });
-
-    if (kDebugMode) {
-      print("🔍 Fetching data for second date: $pickedDate");
+            _buildDatePickerTile(
+  context, // ✅ Add missing BuildContext parameter
+  "Select First Date", // ✅ Title
+  firstSelectedDate, // ✅ Selected date
+  (pickedDate) async {
+    if (pickedDate != null) {
+      setState(() {
+        firstSelectedDate = pickedDate;
+      });
+      firstDateData = await _fetchHistoricalData(firstSelectedDate, hardwareId!);
+      setState(() {});
     }
-    
-    secondDateData = await _fetchHistoricalData(secondSelectedDate, hardwareId!);
-    
-    if (kDebugMode) {
-      print("🔍 Updated secondDateData: $secondDateData");
+  },
+),
+
+_buildDatePickerTile(
+  context, // ✅ Add missing BuildContext parameter
+  "Select Second Date", // ✅ Title
+  secondSelectedDate, // ✅ Selected date
+  (pickedDate) async {
+    if (pickedDate != null) {
+      setState(() {
+        secondSelectedDate = pickedDate;
+        hasSecondDate = true;
+      });
+
+      if (kDebugMode) {
+        print("🔍 Fetching data for second date: $pickedDate");
+      }
+
+      secondDateData = await _fetchHistoricalData(secondSelectedDate, hardwareId!);
+
+      if (kDebugMode) {
+        print("🔍 Updated secondDateData: $secondDateData");
+      }
+
+      setState(() {}); // 🔄 Ensure UI updates
     }
-    
-    setState(() {}); // 🔄 Ensure UI updates
-  }
-}),
+  },
+),
 
             Expanded(
               child: ListView(
@@ -2478,23 +2577,34 @@ class _FrequencyGraphWidgetState extends State<FrequencyGraphWidget> with Automa
     print("🔍 Frequency Data Check: ${widget.frequencyData}");
 
 
-
-    return KeepAlive(
-      keepAlive: true,
-      child: SizedBox(
-        height: 400,
-        child: RepaintBoundary(
-          key: widget.repaintKey,
-          child: _buildTimeBasedFrequencyGraph(),
-        ),
+return Visibility(
+    visible: true,  // ✅ Force visibility even if no data
+    maintainState: true,
+    child: SizedBox(
+      height: 400,
+      child: RepaintBoundary(
+        key: widget.repaintKey,
+        child: _buildTimeBasedFrequencyGraph(),  // ✅ Now inside Visibility
       ),
-    );
+    ),
+  );
+
+    // return KeepAlive(
+    //   keepAlive: true,
+    //   child: SizedBox(
+    //     height: 400,
+    //     child: RepaintBoundary(
+    //       key: widget.repaintKey,
+    //       child: _buildTimeBasedFrequencyGraph(),
+    //     ),
+    //   ),
+    // );
 }
 
 Widget _buildTimeBasedFrequencyGraph() {
-  if (widget.frequencyData.isEmpty) {
-    return const Center(child: Text("No alerts recorded to display."));
-  }
+  // if (widget.frequencyData.isEmpty) {
+  //   return const Center(child: Text("No alerts recorded to display."));
+  // }
 
   List<String> sensorTypes = widget.frequencyData.keys.toList();
   List<String> timestamps = [];
