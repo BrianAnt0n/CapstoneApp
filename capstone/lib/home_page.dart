@@ -3826,6 +3826,17 @@ class OthersPage extends StatelessWidget {
     }
   }
 
+   // Function to open the App Guide PDF
+  Future<void> _openAppGuide() async {
+    final Uri guideUri = Uri.parse(
+      "https://github.com/BrianAnt0n/E-ComposThink-PDF-Guide/releases/download/v1/E-ComposThink_Guide.pdf",
+    );
+
+    if (!await launchUrl(guideUri, mode: LaunchMode.externalApplication)) {
+      throw 'Could not launch $guideUri';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListView(
@@ -3835,6 +3846,14 @@ ListTile(
   leading: const Icon(Icons.person, color: Colors.green),
   title: Row(
     children: [
+
+       // App Guide
+ListTile(
+  leading: const Icon(Icons.help_outline, color: Colors.orange),
+  title: const Text('App Guide'),
+  onTap: _openAppGuide, // Call the new function
+),
+
       const Text('Account Management'),
       if (_hasResetRequests) // ✅ Show red dot if reset requests exist
         Padding(
@@ -3864,19 +3883,8 @@ ListTile(
           title: const Text('ESP Connection'),
           onTap: _downloadApk, // Call the download function
         ),
-        // App Guide
-        // ListTile(
-        //   leading: const Icon(Icons.help_outline, color: Colors.orange),
-        //   title: const Text('App Guide'),
-        //   onTap: () {
-        //     Navigator.push(
-        //       context,
-        //       MaterialPageRoute(builder: (context) => const AppGuidePage()),
-        //     );
-        //   },
-        // ),
 
-        
+
         // Log Out
         ListTile(
           leading: const Icon(Icons.logout, color: Colors.red),
