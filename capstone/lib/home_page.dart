@@ -3841,19 +3841,20 @@ class OthersPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView(
       children: [
-       // Account Management
-ListTile(
-  leading: const Icon(Icons.person, color: Colors.green),
-  title: Row(
-    children: [
 
-       // App Guide
+          // App Guide
 ListTile(
   leading: const Icon(Icons.help_outline, color: Colors.orange),
   title: const Text('App Guide'),
   onTap: _openAppGuide, // Call the new function
 ),
 
+
+       // Account Management
+ListTile(
+  leading: const Icon(Icons.person, color: Colors.green),
+  title: Row(
+    children: [
       const Text('Account Management'),
       if (_hasResetRequests) // ✅ Show red dot if reset requests exist
         Padding(
