@@ -1053,7 +1053,7 @@ List<double> secondValues = labels.map((label) {
     }
     
 
-    await Future.delayed(const Duration(seconds: 2)); // Ensure UI updates
+    await Future.delayed(const Duration(seconds: 1)); // Ensure UI updates
 
     // 📂 Load Fonts
     final regularFont = pw.Font.ttf(await rootBundle.load("assets/fonts/Roboto-Regular.ttf"));
@@ -1093,7 +1093,7 @@ List<double> secondValues = labels.map((label) {
     hiddenComparisonGraphWidgetKey.currentState?.forceRebuild();
     hiddenFrequencyGraphWidgetKey.currentState?.forceRebuild();
 
-    await Future.delayed(const Duration(seconds: 4)); // ⏳ Increased delay to ensure graphs repaint
+    await Future.delayed(const Duration(seconds: 2)); // ⏳ Increased delay to ensure graphs repaint
     if (kDebugMode) print("✅ Hidden graphs should be ready. Capturing now...");
 
     // ✅ Capture Hidden Graphs Instead of On-Screen Ones
@@ -1122,7 +1122,7 @@ List<double> secondValues = labels.map((label) {
     );
 
     /// ✅ Helper for Bullet Points with Bold Formatting for Frequency Summary
-   pw.Widget _buildBulletPoints(String summary) {
+   pw.Widget _buildFrequencyBulletPoints(String summary) {
   List<String> lines = summary.split("\n").where((line) => line.isNotEmpty).toList();
 
   return pw.Column(
@@ -1330,7 +1330,7 @@ List<double> secondValues = labels.map((label) {
                 pw.SizedBox(height: 12),
                 pw.Divider(),
                 pw.SizedBox(height: 12),
-                _buildBulletPoints(frequencySummary),
+                _buildFrequencyBulletPoints(frequencySummary),
               ],
             ),
           ),
@@ -1703,9 +1703,9 @@ Future<Uint8List?> _captureGraphWithCompression(GlobalKey repaintKey, String gra
 
 // ✅ Moved `_waitForGraphRender()` inside `_captureGraph()`
 Future<void> _waitForGraphRender(GlobalKey key, String graphName) async {
-  int retries = 10;
+  int retries = 6;
   while (retries > 0) {
-    await Future.delayed(const Duration(seconds: 3));
+    await Future.delayed(const Duration(seconds: 1));
 
     final boundary = key.currentContext?.findRenderObject() as RenderRepaintBoundary?;
     if (boundary != null && boundary.paintBounds.isFinite && !boundary.debugNeedsPaint) {
