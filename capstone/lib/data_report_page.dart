@@ -15,6 +15,7 @@ import 'package:flutter/services.dart'; // ✅ Fixes rootBundle issue
 import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
 import 'package:table_calendar/table_calendar.dart';
+import 'package:flutter/scheduler.dart';
 
 
 
@@ -46,12 +47,19 @@ class _DataReportPageState extends State<DataReportPage> {
   String frequencySummary = "";
 
  
- final GlobalKey comparisonGraphKey = GlobalKey();
+ // Keys for visible graphs in ListView
+final GlobalKey<_ComparisonGraphWidgetState> comparisonGraphWidgetKey = GlobalKey<_ComparisonGraphWidgetState>();
+final GlobalKey<_FrequencyGraphWidgetState> frequencyGraphWidgetKey = GlobalKey<_FrequencyGraphWidgetState>();
+
+final GlobalKey comparisonGraphKey = GlobalKey();
 final GlobalKey frequencyGraphKey = GlobalKey();
 
-  final GlobalKey<_ComparisonGraphWidgetState> comparisonGraphWidgetKey = GlobalKey<_ComparisonGraphWidgetState>();
- final GlobalKey<_FrequencyGraphWidgetState> frequencyGraphWidgetKey = GlobalKey<_FrequencyGraphWidgetState>();
+// Keys for hidden graphs used in PDF export
+final GlobalKey<_ComparisonGraphWidgetState> hiddenComparisonGraphWidgetKey = GlobalKey<_ComparisonGraphWidgetState>();
+final GlobalKey<_FrequencyGraphWidgetState> hiddenFrequencyGraphWidgetKey = GlobalKey<_FrequencyGraphWidgetState>();
 
+final GlobalKey hiddenComparisonGraphKey = GlobalKey();
+final GlobalKey hiddenFrequencyGraphKey = GlobalKey();
 
  @override
 void initState() {
@@ -1059,6 +1067,8 @@ List<double> secondValues = labels.map((label) {
     isExportingPDF = true; // 🔄 Show Loading Indicator
   });
 
+  
+
     // ✅ Delete old PDFs before generating a new one
   final output = await getTemporaryDirectory();
   final List<FileSystemEntity> files = output.listSync();
@@ -1097,7 +1107,7 @@ List<double> secondValues = labels.map((label) {
     }
     
 
-    await Future.delayed(const Duration(milliseconds: 1000)); // Ensure UI updates
+    await Future.delayed(const Duration(seconds: 1)); // Ensure UI updates
 
     // 📂 Load Fonts
     final regularFont = pw.Font.ttf(await rootBundle.load("assets/fonts/Roboto-Regular.ttf"));
@@ -1132,6 +1142,18 @@ List<double> secondValues = labels.map((label) {
         .replaceAll(firstSelectedDate.toString(), firstDateFormatted)
         .replaceAll(secondSelectedDate.toString(), secondDateFormatted);
 
+           // ✅ Force hidden graphs to render before capturing
+    if (kDebugMode) print("🟢 Triggering hidden graph rebuild...");
+    hiddenComparisonGraphWidgetKey.currentState?.forceRebuild();
+    hiddenFrequencyGraphWidgetKey.currentState?.forceRebuild();
+
+    await Future.delayed(const Duration(seconds: 2)); // ⏳ Increased delay to ensure graphs repaint
+    if (kDebugMode) print("✅ Hidden graphs should be ready. Capturing now...");
+
+    // ✅ Capture Hidden Graphs Instead of On-Screen Ones
+    List<Uint8List> images = await _captureGraphsAsImages(hiddenComparisonGraphKey, hiddenFrequencyGraphKey);
+
+
     final pdf = pw.Document();
 
     /// ✅ Page 1: Title Page
@@ -1154,7 +1176,7 @@ List<double> secondValues = labels.map((label) {
     );
 
     /// ✅ Helper for Bullet Points with Bold Formatting for Frequency Summary
-   pw.Widget _buildBulletPoints(String summary) {
+   pw.Widget _buildFrequencyBulletPoints(String summary) {
   List<String> lines = summary.split("\n").where((line) => line.isNotEmpty).toList();
 
   return pw.Column(
@@ -1362,7 +1384,7 @@ List<double> secondValues = labels.map((label) {
                 pw.SizedBox(height: 12),
                 pw.Divider(),
                 pw.SizedBox(height: 12),
-                _buildBulletPoints(frequencySummary),
+                _buildFrequencyBulletPoints(frequencySummary),
               ],
             ),
           ),
@@ -1370,53 +1392,39 @@ List<double> secondValues = labels.map((label) {
       );
     }
 
-    // ✅ Ensure the UI updates before capturing
-setState(() {});  
-await Future.delayed(const Duration(milliseconds: 700)); // Allow UI to settle
-
-// ✅ Force Graphs to Rebuild BEFORE Capturing
-comparisonGraphWidgetKey.currentState?.forceRebuild();
-frequencyGraphWidgetKey.currentState?.forceRebuild();
-
-await Future.delayed(const Duration(milliseconds: 700)); // Allow graphs to repaint
-
-
-    // ✅ Capture Graphs
-    List<Uint8List> images = await _captureGraphsAsImages();
-
-    // ✅ Page 4: Comparison Graph
-if (images.isNotEmpty) {
-  pdf.addPage(
-    pw.Page(
-      build: (pw.Context context) => pw.Center(
-        child: pw.Column(
-          children: [
-            pw.Text("Comparison Graph", style: pw.TextStyle(fontSize: 20, font: boldFont)),
-            pw.SizedBox(height: 10),
-            pw.Image(pw.MemoryImage(images[0]), width: 400, height: 300),
-          ],
+     /// ✅ Page 4: Comparison Graph
+    if (images.isNotEmpty) {
+      pdf.addPage(
+        pw.Page(
+          build: (pw.Context context) => pw.Center(
+            child: pw.Column(
+              children: [
+                pw.Text("Comparison Graph", style: pw.TextStyle(fontSize: 20, font: boldFont)),
+                pw.SizedBox(height: 10),
+                pw.Image(pw.MemoryImage(images[0]), width: 400, height: 300),
+              ],
+            ),
+          ),
         ),
-      ),
-    ),
-  );
-}
+      );
+    }
 
-// ✅ Page 5: Frequency Graph (if available)
-if (images.length > 1) {
-  pdf.addPage(
-    pw.Page(
-      build: (pw.Context context) => pw.Center(
-        child: pw.Column(
-          children: [
-            pw.Text("Frequency Graph", style: pw.TextStyle(fontSize: 20, font: boldFont)),
-            pw.SizedBox(height: 10),
-            pw.Image(pw.MemoryImage(images[1]), width: 400, height: 300),
-          ],
+    /// ✅ Page 5: Frequency Graph
+    if (images.length > 1) {
+      pdf.addPage(
+        pw.Page(
+          build: (pw.Context context) => pw.Center(
+            child: pw.Column(
+              children: [
+                pw.Text("Frequency Graph", style: pw.TextStyle(fontSize: 20, font: boldFont)),
+                pw.SizedBox(height: 10),
+                pw.Image(pw.MemoryImage(images[1]), width: 400, height: 300),
+              ],
+            ),
+          ),
         ),
-      ),
-    ),
-  );
-}
+      );
+    }
     // ✅ Save and Open the PDF
     final output = await getTemporaryDirectory();
 final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
@@ -1681,13 +1689,16 @@ pw.Widget _buildPDFBulletPoints(String summary, pw.Font customFont) {
 
 // ✅ Helper Function: Captures and Compresses Graphs
 
-  Future<List<Uint8List>> _captureGraphsAsImages() async {
+  Future<List<Uint8List>> _captureGraphsAsImages(
+  GlobalKey comparisonKey, 
+  GlobalKey frequencyKey
+) async {
   if (kDebugMode) print("📸 Starting parallel graph capture...");
 
   // ✅ Run both captures at the same time (no unnecessary waiting)
   final List<Future<Uint8List?>> captureTasks = [
-    _captureGraphWithCompression(comparisonGraphKey, "comparisonGraphKey"),
-    _captureGraphWithCompression(frequencyGraphKey, "frequencyGraphKey"),
+    _captureGraphWithCompression(comparisonKey, "comparisonGraphKey"),
+    _captureGraphWithCompression(frequencyKey, "frequencyGraphKey"),
   ];
 
   final results = await Future.wait(captureTasks);
@@ -1698,6 +1709,7 @@ pw.Widget _buildPDFBulletPoints(String summary, pw.Font customFont) {
   if (kDebugMode) print("📸 Total images captured: ${images.length}");
   return images;
 }
+
 
 
 
@@ -1745,13 +1757,18 @@ Future<Uint8List?> _captureGraphWithCompression(GlobalKey repaintKey, String gra
 
 // ✅ Moved `_waitForGraphRender()` inside `_captureGraph()`
 Future<void> _waitForGraphRender(GlobalKey key, String graphName) async {
-  int retries = 5; // Maximum retries
+  int retries = 6;
   while (retries > 0) {
-    await Future.delayed(const Duration(milliseconds: 300));
+    await Future.delayed(const Duration(seconds: 1));
 
     final boundary = key.currentContext?.findRenderObject() as RenderRepaintBoundary?;
     if (boundary != null && boundary.paintBounds.isFinite && !boundary.debugNeedsPaint) {
       if (kDebugMode) print("✅ $graphName is fully rendered.");
+      
+      // ✅ Force Flutter to complete the UI frame before returning
+      await Future.delayed(const Duration(milliseconds: 500));
+      await SchedulerBinding.instance.endOfFrame;
+
       return;
     }
 
@@ -1761,6 +1778,7 @@ Future<void> _waitForGraphRender(GlobalKey key, String graphName) async {
 
   if (kDebugMode) print("❌ $graphName never finished rendering.");
 }
+
 
 
 Future<Uint8List> _compressImage(Uint8List imageBytes) async {
@@ -1830,165 +1848,129 @@ Future<void> _onDateSelected(DateTime? pickedDate, {required bool isFirst}) asyn
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
-  @override
-  Widget build(BuildContext context) {
+@override
+Widget build(BuildContext context) {
+  if (kDebugMode) {
+    print("🔍 BUILDING PAGE - comparisonGraphKey exists: ${comparisonGraphKey.currentContext != null}");
+  }
 
-      if (kDebugMode) {
-        print("🔍 BUILDING PAGE - comparisonGraphKey exists: ${comparisonGraphKey.currentContext != null}");
-      }
+  if (kDebugMode) {
+    print("🔍 comparisonGraphKey exists in UI: ${comparisonGraphKey.currentContext != null}");
+  }
 
-    // 🔍 Debugging Log
-      if (kDebugMode) {
-        print("🔍 comparisonGraphKey exists in UI: ${comparisonGraphKey.currentContext != null}");
-      }
+  if (kDebugMode) {
+    print("🔍 First Date Data: $firstDateData");
+    print("🔍 Second Date Data: $secondDateData");
+  }
 
-       // 🔍 Check if first and second date data are updating
-    if (kDebugMode) {
-      print("🔍 First Date Data: $firstDateData");
-    }
-    if (kDebugMode) {
-      print("🔍 Second Date Data: $secondDateData");
-    }
+  return Stack(
+    children: [
+      Scaffold(
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          title: const Text("Data Report", style: TextStyle(color: Colors.white)),
+          backgroundColor: Colors.green[700],
+          elevation: 4,
+          iconTheme: const IconThemeData(color: Colors.white),
+        ),
+        body: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            children: [
+              _buildDatePickerTile(
+                context, "Select First Date", firstSelectedDate, 
+                (pickedDate) async {
+                  if (pickedDate != null) {
+                    setState(() {
+                      firstSelectedDate = pickedDate;
+                    });
+                    firstDateData = await _fetchHistoricalData(firstSelectedDate, hardwareId!);
+                    setState(() {});
+                  }
+                },
+              ),
 
+              _buildDatePickerTile(
+                context, "Select Second Date", secondSelectedDate,
+                (pickedDate) async {
+                  if (pickedDate != null) {
+                    setState(() {
+                      secondSelectedDate = pickedDate;
+                      hasSecondDate = true;
+                    });
 
+                    if (kDebugMode) {
+                      print("🔍 Fetching data for second date: $pickedDate");
+                    }
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: const Text("Data Report", style: TextStyle(color: Colors.white)),
-        backgroundColor: Colors.green[700],
-        elevation: 4,
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          children: [
-            _buildDatePickerTile(
-  context, // ✅ Add missing BuildContext parameter
-  "Select First Date", // ✅ Title
-  firstSelectedDate, // ✅ Selected date
-  (pickedDate) async {
-    if (pickedDate != null) {
-      setState(() {
-        firstSelectedDate = pickedDate;
-      });
-      firstDateData = await _fetchHistoricalData(firstSelectedDate, hardwareId!);
-      setState(() {});
-    }
-  },
-),
+                    secondDateData = await _fetchHistoricalData(secondSelectedDate, hardwareId!);
 
-_buildDatePickerTile(
-  context, // ✅ Add missing BuildContext parameter
-  "Select Second Date", // ✅ Title
-  secondSelectedDate, // ✅ Selected date
-  (pickedDate) async {
-    if (pickedDate != null) {
-      setState(() {
-        secondSelectedDate = pickedDate;
-        hasSecondDate = true;
-      });
+                    if (kDebugMode) {
+                      print("🔍 Updated secondDateData: $secondDateData");
+                    }
 
-      if (kDebugMode) {
-        print("🔍 Fetching data for second date: $pickedDate");
-      }
+                    setState(() {});
+                  }
+                },
+              ),
 
-      secondDateData = await _fetchHistoricalData(secondSelectedDate, hardwareId!);
+              Expanded(
+                child: ListView(
+                  children: [
+                    _buildDataCard("First Date Data", firstDateData, true),
+                    _buildDataCard("Second Date Data", secondDateData, false),
+                    const SizedBox(height: 16),
 
-      if (kDebugMode) {
-        print("🔍 Updated secondDateData: $secondDateData");
-      }
-
-      setState(() {}); // 🔄 Ensure UI updates
-    }
-  },
-),
-
-            Expanded(
-              child: ListView(
-                children: [
-                  _buildDataCard("First Date Data", firstDateData, true),
-                  _buildDataCard("Second Date Data", secondDateData, false),
-                  const SizedBox(height: 16),
-
-                 ComparisonGraphWidget(
-                    key: comparisonGraphWidgetKey, // ✅ Add this line
-                    repaintKey: comparisonGraphKey,
-                    firstDateData: firstDateData,
-                    secondDateData: secondDateData,
-                    widgetKey: comparisonGraphWidgetKey, // ✅ Add this line
-                  ),
-
-
-
-                  const SizedBox(height: 12),
-
-
-
-
-                  const Divider(thickness: 2,color: Colors.black26,), // ✅ Adds a Visual Separator
-
-                  // ✅ Filter Dropdown for Daily/Weekly (AFTER Divider)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 10,
-                      horizontal: 16,
+                    // ✅ Visible Graphs for User Interaction
+                    ComparisonGraphWidget(
+                      key: comparisonGraphWidgetKey,
+                      repaintKey: comparisonGraphKey,
+                      firstDateData: firstDateData,
+                      secondDateData: secondDateData,
+                      widgetKey: comparisonGraphWidgetKey,
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          "Filter: ",
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
+
+                    const SizedBox(height: 12),
+
+                    const Divider(thickness: 2, color: Colors.black26),
+
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            "Filter: ",
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                           ),
-                        ),
-                        DropdownButton<String>(
-                          value: selectedFilter,
-                          items:
-                              ["Daily", "Weekly"].map((String value) {
-                                return DropdownMenuItem<String>(
-                                  value: value,
-                                  child: Text(
-                                    value,
-                                    style: const TextStyle(fontSize: 16),
-                                  ),
-                                );
-                              }).toList(),
-                          onChanged: (newValue) async {
-                            if (newValue != null) {
-                              setState(() {
-                                selectedFilter = newValue;
-                              });
+                          DropdownButton<String>(
+                            value: selectedFilter,
+                            items: ["Daily", "Weekly"].map((String value) {
+                              return DropdownMenuItem<String>(
+                                value: value,
+                                child: Text(value, style: const TextStyle(fontSize: 16)),
+                              );
+                            }).toList(),
+                            onChanged: (newValue) async {
+                              if (newValue != null) {
+                                setState(() {
+                                  selectedFilter = newValue;
+                                });
 
-                              // ✅ Fetch Updated Data Based on Filter
-                              frequencyAnalysisData =
-                                  await _fetchFrequencyAnalysis(hardwareId!);
-                              setState(() {});
-                            }
-                          },
-                        ),
-                      ],
+                                frequencyAnalysisData = await _fetchFrequencyAnalysis(hardwareId!);
+                                setState(() {});
+                              }
+                            },
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
 
-                  // Build Frequency Analysis Card
-                  _buildFrequencyAnalysisCard(),
+                    _buildFrequencyAnalysisCard(),
 
-                  const SizedBox(height: 32), // ✅ Adds spacing before the graph
+                    const SizedBox(height: 32),
 
-                  // Build Time Based Frequency Graph
-
-                  // if (frequencyAnalysisData.isNotEmpty)
-                  //   RepaintBoundary(
-                  //     key: frequencyGraphKey,
-                  //     child: _buildTimeBasedFrequencyGraph(),
-                  //   ),
-
-
-                // if (frequencyAnalysisData.isNotEmpty)
+                    // ✅ Visible Graph
                     FrequencyGraphWidget(
                       key: frequencyGraphWidgetKey,
                       repaintKey: frequencyGraphKey,
@@ -1996,47 +1978,67 @@ _buildDatePickerTile(
                       selectedFilter: selectedFilter,
                     ),
 
+                    const SizedBox(height: 16),
+                    const Divider(thickness: 2, color: Colors.black26),
 
-                  const SizedBox(height: 16,), // Adds spacing before the conclusion
-                   const Divider(thickness: 2, color: Colors.black26,), // ✅ Adds a Visual Separator
+                    _buildConclusionWidget(),
 
-                  // ✅ Conclusion
-                  _buildConclusionWidget(),
+                    const SizedBox(height: 16),
 
-                  // ✅ Export PDF Button
-                  const SizedBox(height: 16),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: ElevatedButton.icon(
-                      icon: const Icon(Icons.picture_as_pdf),
-                      label: Text(isExportingPDF
-                          ? "Exporting..."
-                          : "Export as PDF"), // 🔄 Update text while exporting
-                      onPressed: isExportingPDF
-                          ? null // ⛔ Disable button while exporting
-                          : () async {
-                              await _exportToPDF();
-                            },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green[700],
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 12,
-                          horizontal: 20,
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: ElevatedButton.icon(
+                        icon: const Icon(Icons.picture_as_pdf),
+                        label: Text(isExportingPDF ? "Exporting..." : "Export as PDF"),
+                        onPressed: isExportingPDF ? null : () async {
+                          await _exportToPDF();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green[700],
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
                         ),
                       ),
                     ),
-                  ),
 
-                  const SizedBox(height: 16), // ✅ Adds spacing after button
-                ],
+                    const SizedBox(height: 16),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    );
-  }
+
+      // ✅ Hidden Graphs (Rendered but Invisible)
+      Positioned(
+        left: -9999, // Moves off-screen
+        child: Opacity(
+          opacity: 0.0, // Fully invisible but still renders
+          child: Column(
+            children: [
+              ComparisonGraphWidget(
+                key: hiddenComparisonGraphWidgetKey,
+                repaintKey: hiddenComparisonGraphKey,
+                firstDateData: firstDateData,
+                secondDateData: secondDateData,
+                widgetKey: hiddenComparisonGraphWidgetKey,
+              ),
+              const SizedBox(height: 16),
+              FrequencyGraphWidget(
+                key: hiddenFrequencyGraphWidgetKey,
+                repaintKey: hiddenFrequencyGraphKey,
+                frequencyData: frequencyAnalysisData,
+                selectedFilter: selectedFilter,
+              ),
+            ],
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
 
   Widget _buildFrequencyAnalysisCard() {
     return Card(
@@ -3381,3 +3383,4 @@ SingleChildScrollView(
     }
   }
 }
+
