@@ -3408,8 +3408,7 @@ class _ContainerPageState extends State<ContainerPage> {
                               if (isSelected) {
                                 containerState.selectContainer(0);
                               } else {
-                                containerState
-                                    .selectContainer(container['container_id']);
+                                containerState.selectContainer(container['container_id']);
                               }
                             },
                           ),
@@ -3499,13 +3498,27 @@ Future<void> renameContainer(int containerId, String newName) async {
 }
 
 Future<void> deleteContainer(int containerId) async {
-  final supabase = Supabase.instance.client;
-  await supabase
-      .from('Containers_test')
-      .delete()
-      .eq('container_id', containerId)
-      .select();
+  final prefs = await SharedPreferences.getInstance();
+  int? selectedContainerId = prefs.getInt('selected_container_id');
+
+  if (selectedContainerId == containerId) {
+    Fluttertoast.showToast(
+      msg: "You cannot delete a container that is currently selected.",
+      toastLength: Toast.LENGTH_LONG,
+      gravity: ToastGravity.CENTER,
+    );
+    return; // Stop deletion
+  }
+
+  try {
+    final supabase = Supabase.instance.client;
+    await supabase.from('Containers_test').delete().eq('container_id', containerId).select();
+    Fluttertoast.showToast(msg: "Container deleted successfully.");
+  } catch (e) {
+    Fluttertoast.showToast(msg: "Error deleting container: $e");
+  }
 }
+
 
 void _removeSelectedContainer() async {
   final prefs = await SharedPreferences.getInstance();
