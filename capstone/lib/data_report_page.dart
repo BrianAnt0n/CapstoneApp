@@ -47,19 +47,19 @@ class _DataReportPageState extends State<DataReportPage> {
   String frequencySummary = "";
 
  
- // Keys for visible graphs in ListView
+//  // Keys for visible graphs in ListView
 final GlobalKey<_ComparisonGraphWidgetState> comparisonGraphWidgetKey = GlobalKey<_ComparisonGraphWidgetState>();
 final GlobalKey<_FrequencyGraphWidgetState> frequencyGraphWidgetKey = GlobalKey<_FrequencyGraphWidgetState>();
 
 final GlobalKey comparisonGraphKey = GlobalKey();
 final GlobalKey frequencyGraphKey = GlobalKey();
 
-// Keys for hidden graphs used in PDF export
-final GlobalKey<_ComparisonGraphWidgetState> hiddenComparisonGraphWidgetKey = GlobalKey<_ComparisonGraphWidgetState>();
-final GlobalKey<_FrequencyGraphWidgetState> hiddenFrequencyGraphWidgetKey = GlobalKey<_FrequencyGraphWidgetState>();
+// // Keys for hidden graphs used in PDF export
+// final GlobalKey<_ComparisonGraphWidgetState> hiddenComparisonGraphWidgetKey = GlobalKey<_ComparisonGraphWidgetState>();
+// final GlobalKey<_FrequencyGraphWidgetState> hiddenFrequencyGraphWidgetKey = GlobalKey<_FrequencyGraphWidgetState>();
 
-final GlobalKey hiddenComparisonGraphKey = GlobalKey();
-final GlobalKey hiddenFrequencyGraphKey = GlobalKey();
+// final GlobalKey hiddenComparisonGraphKey = GlobalKey();
+// final GlobalKey hiddenFrequencyGraphKey = GlobalKey();
 
  @override
 void initState() {
@@ -1110,11 +1110,12 @@ List<double> secondValues = labels.map((label) {
     await Future.delayed(const Duration(seconds: 1)); // Ensure UI updates
 
     // 📂 Load Fonts
-    final regularFont = pw.Font.ttf(await rootBundle.load("assets/fonts/Roboto-Regular.ttf"));
-    final blackFont = pw.Font.ttf(await rootBundle.load("assets/fonts/Roboto-Black.ttf"));
-    final boldFont = pw.Font.ttf(await rootBundle.load("assets/fonts/Roboto-Bold.ttf"));
-    final lightFont = pw.Font.ttf(await rootBundle.load("assets/fonts/Roboto-Light.ttf"));
-    final italicFont = pw.Font.ttf(await rootBundle.load("assets/fonts/Roboto-Italic.ttf"));
+// 📂 Load Fonts as pw.Font
+final regularFont = await pw.Font.ttf(await rootBundle.load("assets/fonts/Roboto-Regular.ttf"));
+final blackFont = await pw.Font.ttf(await rootBundle.load("assets/fonts/Roboto-Black.ttf"));
+final boldFont = await pw.Font.ttf(await rootBundle.load("assets/fonts/Roboto-Bold.ttf"));
+final lightFont = await pw.Font.ttf(await rootBundle.load("assets/fonts/Roboto-Light.ttf"));
+final italicFont = await pw.Font.ttf(await rootBundle.load("assets/fonts/Roboto-Italic.ttf"));
 
     final generatedDate = DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now());
 
@@ -1142,16 +1143,16 @@ List<double> secondValues = labels.map((label) {
         .replaceAll(firstSelectedDate.toString(), firstDateFormatted)
         .replaceAll(secondSelectedDate.toString(), secondDateFormatted);
 
-           // ✅ Force hidden graphs to render before capturing
-    if (kDebugMode) print("🟢 Triggering hidden graph rebuild...");
-    hiddenComparisonGraphWidgetKey.currentState?.forceRebuild();
-    hiddenFrequencyGraphWidgetKey.currentState?.forceRebuild();
+    //        // ✅ Force hidden graphs to render before capturing
+    // if (kDebugMode) print("🟢 Triggering hidden graph rebuild...");
+    // hiddenComparisonGraphWidgetKey.currentState?.forceRebuild();
+    // hiddenFrequencyGraphWidgetKey.currentState?.forceRebuild();
 
-    await Future.delayed(const Duration(seconds: 2)); // ⏳ Increased delay to ensure graphs repaint
-    if (kDebugMode) print("✅ Hidden graphs should be ready. Capturing now...");
+    // await Future.delayed(const Duration(seconds: 2)); // ⏳ Increased delay to ensure graphs repaint
+    // if (kDebugMode) print("✅ Hidden graphs should be ready. Capturing now...");
 
-    // ✅ Capture Hidden Graphs Instead of On-Screen Ones
-    List<Uint8List> images = await _captureGraphsAsImages(hiddenComparisonGraphKey, hiddenFrequencyGraphKey);
+    // // ✅ Capture Hidden Graphs Instead of On-Screen Ones
+    // List<Uint8List> images = await _captureGraphsAsImages(hiddenComparisonGraphKey, hiddenFrequencyGraphKey);
 
 
     final pdf = pw.Document();
@@ -1392,16 +1393,24 @@ List<double> secondValues = labels.map((label) {
       );
     }
 
-     /// ✅ Page 4: Comparison Graph
-    if (images.isNotEmpty) {
+ /// ✅ Page 4: Comparison Graph
+    if (firstDateData.isNotEmpty && secondDateData.isNotEmpty) {
       pdf.addPage(
         pw.Page(
           build: (pw.Context context) => pw.Center(
-            child: pw.Column(
+            child: pw.Column( // Make sure Column exists
               children: [
                 pw.Text("Comparison Graph", style: pw.TextStyle(fontSize: 20, font: boldFont)),
                 pw.SizedBox(height: 10),
-                pw.Image(pw.MemoryImage(images[0]), width: 400, height: 300),
+                // Call the comparison chart function here
+                _drawComparisonChartPdf(
+                  firstData: firstDateData,
+                  secondData: secondDateData,
+                  regularFont: regularFont, // Pass loaded pw.Font
+                  boldFont: boldFont,       // Pass loaded pw.Font
+                ),
+                // Remove or keep commented out:
+                // pw.Image(pw.MemoryImage(images[0]), width: 400, height: 300),
               ],
             ),
           ),
@@ -1410,15 +1419,23 @@ List<double> secondValues = labels.map((label) {
     }
 
     /// ✅ Page 5: Frequency Graph
-    if (images.length > 1) {
+      if (frequencyAnalysisData.isNotEmpty)  {
       pdf.addPage(
         pw.Page(
           build: (pw.Context context) => pw.Center(
-            child: pw.Column(
+            child: pw.Column( // Make sure Column exists
               children: [
-                pw.Text("Frequency Graph", style: pw.TextStyle(fontSize: 20, font: boldFont)),
+                pw.Text("Frequency Graph ($selectedFilter)", style: pw.TextStyle(fontSize: 20, font: boldFont)), // Added filter display
                 pw.SizedBox(height: 10),
-                pw.Image(pw.MemoryImage(images[1]), width: 400, height: 300),
+                // Call the frequency chart function here
+                _drawFrequencyChartPdf(
+                  frequencyData: frequencyAnalysisData,
+                  filter: selectedFilter,
+                  regularFont: regularFont, // Pass loaded pw.Font
+                  boldFont: boldFont,       // Pass loaded pw.Font
+                ),
+                // Remove or keep commented out:
+                // pw.Image(pw.MemoryImage(images[1]), width: 400, height: 300),
               ],
             ),
           ),
@@ -1687,111 +1704,111 @@ pw.Widget _buildPDFBulletPoints(String summary, pw.Font customFont) {
 }
 
 
-// ✅ Helper Function: Captures and Compresses Graphs
+// // ✅ Helper Function: Captures and Compresses Graphs
 
-  Future<List<Uint8List>> _captureGraphsAsImages(
-  GlobalKey comparisonKey, 
-  GlobalKey frequencyKey
-) async {
-  if (kDebugMode) print("📸 Starting parallel graph capture...");
+//   Future<List<Uint8List>> _captureGraphsAsImages(
+//   GlobalKey comparisonKey, 
+//   GlobalKey frequencyKey
+// ) async {
+//   if (kDebugMode) print("📸 Starting parallel graph capture...");
 
-  // ✅ Run both captures at the same time (no unnecessary waiting)
-  final List<Future<Uint8List?>> captureTasks = [
-    _captureGraphWithCompression(comparisonKey, "comparisonGraphKey"),
-    _captureGraphWithCompression(frequencyKey, "frequencyGraphKey"),
-  ];
+//   // ✅ Run both captures at the same time (no unnecessary waiting)
+//   final List<Future<Uint8List?>> captureTasks = [
+//     _captureGraphWithCompression(comparisonKey, "comparisonGraphKey"),
+//     _captureGraphWithCompression(frequencyKey, "frequencyGraphKey"),
+//   ];
 
-  final results = await Future.wait(captureTasks);
+//   final results = await Future.wait(captureTasks);
 
-  // ✅ Filter out null results and return captured images
-  final images = results.whereType<Uint8List>().toList();
+//   // ✅ Filter out null results and return captured images
+//   final images = results.whereType<Uint8List>().toList();
 
-  if (kDebugMode) print("📸 Total images captured: ${images.length}");
-  return images;
-}
-
-
-
-
-Future<Uint8List?> _captureGraphWithCompression(GlobalKey repaintKey, String graphName) async {
-  if (kDebugMode) print("🔍 Attempting to capture $graphName...");
-
-  if (repaintKey.currentContext == null || !repaintKey.currentContext!.mounted) {
-    if (kDebugMode) print("⚠ $graphName context is NULL or not mounted! Skipping capture.");
-    return null;
-  }
-
-  // ✅ Ensure the widget is rendered BEFORE checking its paint status
-  await _waitForGraphRender(repaintKey, graphName);
-
-  final boundary = repaintKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
-  if (boundary == null || boundary.debugNeedsPaint) {
-    if (kDebugMode) print("⚠ $graphName is not ready! Skipping...");
-    return null;
-  }
-
-  try {
-    ui.Image image = await boundary.toImage(pixelRatio: 2.5);
-    ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-    Uint8List? pngBytes = byteData?.buffer.asUint8List();
-
-    if (pngBytes == null) {
-      if (kDebugMode) print("❌ Failed to capture $graphName.");
-      return null;
-    }
-
-    Uint8List compressedBytes = await _compressImage(pngBytes);
-
-    if (kDebugMode) {
-      print("✅ Captured & Compressed $graphName - Original: ${pngBytes.length ~/ 1024} KB → Compressed: ${compressedBytes.length ~/ 1024} KB");
-    }
-
-    return compressedBytes;
-  } catch (e) {
-    if (kDebugMode) print("❌ Error capturing $graphName: $e");
-    return null;
-  }
-}
+//   if (kDebugMode) print("📸 Total images captured: ${images.length}");
+//   return images;
+// }
 
 
 
-// ✅ Moved `_waitForGraphRender()` inside `_captureGraph()`
-Future<void> _waitForGraphRender(GlobalKey key, String graphName) async {
-  int retries = 6;
-  while (retries > 0) {
-    await Future.delayed(const Duration(seconds: 1));
 
-    final boundary = key.currentContext?.findRenderObject() as RenderRepaintBoundary?;
-    if (boundary != null && boundary.paintBounds.isFinite && !boundary.debugNeedsPaint) {
-      if (kDebugMode) print("✅ $graphName is fully rendered.");
+// Future<Uint8List?> _captureGraphWithCompression(GlobalKey repaintKey, String graphName) async {
+//   if (kDebugMode) print("🔍 Attempting to capture $graphName...");
+
+//   if (repaintKey.currentContext == null || !repaintKey.currentContext!.mounted) {
+//     if (kDebugMode) print("⚠ $graphName context is NULL or not mounted! Skipping capture.");
+//     return null;
+//   }
+
+//   // ✅ Ensure the widget is rendered BEFORE checking its paint status
+//   await _waitForGraphRender(repaintKey, graphName);
+
+//   final boundary = repaintKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+//   if (boundary == null || boundary.debugNeedsPaint) {
+//     if (kDebugMode) print("⚠ $graphName is not ready! Skipping...");
+//     return null;
+//   }
+
+//   try {
+//     ui.Image image = await boundary.toImage(pixelRatio: 2.5);
+//     ByteData? byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+//     Uint8List? pngBytes = byteData?.buffer.asUint8List();
+
+//     if (pngBytes == null) {
+//       if (kDebugMode) print("❌ Failed to capture $graphName.");
+//       return null;
+//     }
+
+//     Uint8List compressedBytes = await _compressImage(pngBytes);
+
+//     if (kDebugMode) {
+//       print("✅ Captured & Compressed $graphName - Original: ${pngBytes.length ~/ 1024} KB → Compressed: ${compressedBytes.length ~/ 1024} KB");
+//     }
+
+//     return compressedBytes;
+//   } catch (e) {
+//     if (kDebugMode) print("❌ Error capturing $graphName: $e");
+//     return null;
+//   }
+// }
+
+
+
+// // ✅ Moved `_waitForGraphRender()` inside `_captureGraph()`
+// Future<void> _waitForGraphRender(GlobalKey key, String graphName) async {
+//   int retries = 6;
+//   while (retries > 0) {
+//     await Future.delayed(const Duration(seconds: 1));
+
+//     final boundary = key.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+//     if (boundary != null && boundary.paintBounds.isFinite && !boundary.debugNeedsPaint) {
+//       if (kDebugMode) print("✅ $graphName is fully rendered.");
       
-      // ✅ Force Flutter to complete the UI frame before returning
-      await Future.delayed(const Duration(milliseconds: 500));
-      await SchedulerBinding.instance.endOfFrame;
+//       // ✅ Force Flutter to complete the UI frame before returning
+//       await Future.delayed(const Duration(milliseconds: 500));
+//       await SchedulerBinding.instance.endOfFrame;
 
-      return;
-    }
+//       return;
+//     }
 
-    retries--;
-    if (kDebugMode) print("⏳ Waiting for $graphName to render... ($retries retries left)");
-  }
+//     retries--;
+//     if (kDebugMode) print("⏳ Waiting for $graphName to render... ($retries retries left)");
+//   }
 
-  if (kDebugMode) print("❌ $graphName never finished rendering.");
-}
+//   if (kDebugMode) print("❌ $graphName never finished rendering.");
+// }
 
 
 
-Future<Uint8List> _compressImage(Uint8List imageBytes) async {
-  img.Image? image = img.decodeImage(imageBytes);
-  if (image == null) return imageBytes; // ✅ Return original if decoding fails
+// Future<Uint8List> _compressImage(Uint8List imageBytes) async {
+//   img.Image? image = img.decodeImage(imageBytes);
+//   if (image == null) return imageBytes; // ✅ Return original if decoding fails
 
-  // ✅ Resize only if the image is too large
-  if (image.width > 1000) {
-    image = img.copyResize(image, width: 900);
-  }
+//   // ✅ Resize only if the image is too large
+//   if (image.width > 1000) {
+//     image = img.copyResize(image, width: 900);
+//   }
 
-  return Uint8List.fromList(img.encodeJpg(image, quality: 80)); // ✅ Adjust quality for better balance
-}
+//   return Uint8List.fromList(img.encodeJpg(image, quality: 80)); // ✅ Adjust quality for better balance
+// }
 
 
 
@@ -2010,31 +2027,31 @@ Widget build(BuildContext context) {
         ),
       ),
 
-      // ✅ Hidden Graphs (Rendered but Invisible)
-      Positioned(
-        left: -9999, // Moves off-screen
-        child: Opacity(
-          opacity: 0.0, // Fully invisible but still renders
-          child: Column(
-            children: [
-              ComparisonGraphWidget(
-                key: hiddenComparisonGraphWidgetKey,
-                repaintKey: hiddenComparisonGraphKey,
-                firstDateData: firstDateData,
-                secondDateData: secondDateData,
-                widgetKey: hiddenComparisonGraphWidgetKey,
-              ),
-              const SizedBox(height: 16),
-              FrequencyGraphWidget(
-                key: hiddenFrequencyGraphWidgetKey,
-                repaintKey: hiddenFrequencyGraphKey,
-                frequencyData: frequencyAnalysisData,
-                selectedFilter: selectedFilter,
-              ),
-            ],
-          ),
-        ),
-      ),
+      // // ✅ Hidden Graphs (Rendered but Invisible)
+      // Positioned(
+      //   left: -9999, // Moves off-screen
+      //   child: Opacity(
+      //     opacity: 0.0, // Fully invisible but still renders
+      //     child: Column(
+      //       children: [
+      //         ComparisonGraphWidget(
+      //           key: hiddenComparisonGraphWidgetKey,
+      //           repaintKey: hiddenComparisonGraphKey,
+      //           firstDateData: firstDateData,
+      //           secondDateData: secondDateData,
+      //           widgetKey: hiddenComparisonGraphWidgetKey,
+      //         ),
+      //         const SizedBox(height: 16),
+      //         FrequencyGraphWidget(
+      //           key: hiddenFrequencyGraphWidgetKey,
+      //           repaintKey: hiddenFrequencyGraphKey,
+      //           frequencyData: frequencyAnalysisData,
+      //           selectedFilter: selectedFilter,
+      //         ),
+      //       ],
+      //     ),
+      //   ),
+      // ),
     ],
   );
 }
@@ -2755,6 +2772,211 @@ if (frequencyAnalysisData.isNotEmpty) {
   );
 }
 
+// Function to draw the comparison chart in PDF (Using pw.Chart - Fixed Axis Params)
+pw.Widget _drawComparisonChartPdf({
+  required Map<String, String> firstData,
+  required Map<String, String> secondData,
+  required pw.Font regularFont,
+  required pw.Font boldFont,
+}) {
+  const double chartWidth = 400; const double chartHeight = 200;
+  List<String> labels = ["Temp", "Dry", "pH1", "pH2", "Hum"]; // Shorter labels
+  List<double> firstValues = []; List<double> secondValues = []; double maxValue = 0;
+
+  // --- Data Parsing ---
+  for (int i = 0; i < labels.length; i++) { String fullLabel = ["Temperature", "Dryness Level", "pH Level 1", "pH Level 2", "Humidity"][i]; double parseValue(String? rawValue) { if (rawValue == null || rawValue.toLowerCase() == "n/a") { return 0.0; } String n = rawValue.replaceAll(RegExp('[^0-9.]'), ''); return double.tryParse(n) ?? 0.0; } double val1 = parseValue(firstData[fullLabel]); double val2 = parseValue(secondData[fullLabel]); firstValues.add(val1); secondValues.add(val2); if (val1 > maxValue) maxValue = val1; if (val2 > maxValue) maxValue = val2; }
+  if (maxValue == 0) maxValue = 10; else maxValue *= 1.15;
+  // --- End Parsing ---
+
+  return pw.Container( width: chartWidth, height: chartHeight,
+    child: pw.Chart(
+      grid: pw.CartesianGrid(
+        xAxis: pw.FixedAxis( List.generate(labels.length, (index) => index.toDouble()),
+          divisions: true,
+          // Removed axisTickLength
+          // Use format for labels, not labelBuilder
+          format: (value) => labels[value.toInt()], // Use format to get label text
+          textStyle: pw.TextStyle(font: regularFont, fontSize: 8), // Use textStyle
+        ),
+        yAxis: pw.FixedAxis([0, maxValue / 2, maxValue],
+          format: (v) => v.toStringAsFixed(0),
+          divisions: true,
+          // Removed axisTickLength
+          textStyle: pw.TextStyle(font: regularFont, fontSize: 8), // Use textStyle
+        ),
+      ),
+      datasets: [
+        pw.BarDataSet( legend: 'First Date', color: PdfColors.blue400, width: 12,
+          data: List<pw.PointChartValue>.generate( labels.length, (i) => pw.PointChartValue(i.toDouble() - 0.15, firstValues[i]), ),
+        ),
+        pw.BarDataSet( legend: 'Second Date', color: PdfColors.green400, width: 12,
+          data: List<pw.PointChartValue>.generate( labels.length, (i) => pw.PointChartValue(i.toDouble() + 0.15, secondValues[i]), ),
+        ),
+      ],
+    ),
+  );
+}
+
+
+// Function to draw the frequency chart(s) in PDF (Using pw.Chart - Fixed Axis Params)
+pw.Widget _drawFrequencyChartPdf({
+  required Map<String, List<dynamic>> frequencyData,
+  required String filter,
+  required pw.Font regularFont,
+  required pw.Font boldFont,
+}) {
+  if (frequencyData.isEmpty) {
+    // If there's no frequency data at all, return a message. [cite: 605]
+    return pw.Container(width: 400, height: 50, child: pw.Center(child: pw.Text("No alert data available.", style: pw.TextStyle(font: regularFont))));
+  }
+
+  List<pw.Widget> chartWidgets = []; // Initialize list to hold generated widgets (charts or text) [cite: 606]
+  const double chartWidth = 400; // Define chart width [cite: 606]
+  const double chartHeight = 100; // Define chart height [cite: 606]
+  const double spacing = 10; // Define spacing between elements [cite: 607]
+
+  // Helper to get PDF color based on sensor type
+  PdfColor getPdfSensorColor(String s) {
+    switch (s.toLowerCase()){
+      case "temperature": return PdfColors.red;
+      case "moisture": return PdfColors.blue; // Note: 'dryness' is handled later if needed
+      case "ph_level1": return PdfColors.green;
+      case "ph_level2": return PdfColors.lightGreen;
+      case "humidity": return PdfColors.orange;
+      default: return PdfColors.grey;
+     }
+  }
+
+  // Helper to format timestamp string for PDF
+  String formatPdfTimestamp(String t, String f) {
+     try {
+       DateTime pT=DateFormat("yyyy-MM-dd hh:mm a").parse(t); // Parse the timestamp string [cite: 609]
+       // Format based on 'Weekly' or 'Daily' filter [cite: 610]
+       return(f=="Weekly") ? DateFormat("EEE h:mma").format(pT) : DateFormat("h:mm a").format(pT);
+     } catch (e){
+       return "Err"; // Return error string if parsing fails [cite: 610]
+     }
+  }
+
+  // --- NEW --- Helper for basic sensor value formatting within PDF text fallback
+  String formatPdfSensorValue(String sensorType, double value) {
+      // Normalize sensor type name (e.g., handle 'moisture' vs 'dryness')
+      String normalizedSensor = sensorType.toLowerCase();
+      if (normalizedSensor == "moisture") {
+        normalizedSensor = "dryness level"; // Align with display name if needed
+      }
+
+      if (normalizedSensor.contains("temp")) {
+          return "${value.toStringAsFixed(1)}°C"; // Format temperature [cite: 312, 547]
+      } else if (normalizedSensor.contains("dryness") || normalizedSensor.contains("humidity")) {
+          return "${value.toInt()}%"; // Format dryness/humidity [cite: 313, 548]
+      } else if (normalizedSensor.contains("ph")) {
+          return value.toStringAsFixed(2); // Format pH [cite: 314, 549]
+      }
+      return value.toStringAsFixed(2); // Default formatting [cite: 315, 550]
+  }
+  // --- END NEW ---
+
+  // Iterate through each sensor type in the frequency data [cite: 610]
+  frequencyData.forEach((sensorType, sensorPointsRaw) {
+    // Cast raw data to the expected type and skip if empty [cite: 610]
+    List<Map<String, dynamic>> sensorPoints = List<Map<String, dynamic>>.from(sensorPointsRaw);
+    if(sensorPoints.isEmpty) return;
+
+    // --- EDIT: Handle single data point case ---
+    if (sensorPoints.length < 2) {
+        // If only one data point exists, display text instead of a chart
+        double value = double.tryParse(sensorPoints.first["Value"]?.toString() ?? '0') ?? 0;
+        String timestamp = formatPdfTimestamp(sensorPoints.first["Time"]?.toString() ?? '', filter);
+        // Use the new formatting helper
+        String formattedValue = formatPdfSensorValue(sensorType, value);
+        // Display name adjustment
+        String displayName = sensorType == 'moisture' ? 'Dryness' : sensorType;
+
+        // Add a text widget describing the single alert [cite: 614]
+        chartWidgets.add(
+            pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                    pw.Text("$displayName Alerts ($filter)", style: pw.TextStyle(font: boldFont, fontSize: 10)), // Sensor title [cite: 614]
+                    pw.SizedBox(height: 3), // Spacing [cite: 614]
+                    pw.Text("Single alert recorded: $formattedValue at $timestamp", style: pw.TextStyle(font: regularFont, fontSize: 9)), // Text description
+                    pw.SizedBox(height: spacing), // Bottom spacing [cite: 618]
+                ]
+            )
+        );
+    } else {
+      // --- ORIGINAL CHART LOGIC (when 2 or more points exist) ---
+      double maxValue=0; List<String> timestamps=[]; List<double> values=[]; // Initialize variables for chart data [cite: 610]
+      // Process points to find max value and populate lists [cite: 610]
+      for(var p in sensorPoints){
+        double v=double.tryParse(p["Value"]?.toString()??'0')??0;
+        if(v>maxValue)maxValue=v; // Find max Y value [cite: 610]
+        timestamps.add(p["Time"]?.toString()??''); // Collect timestamps [cite: 610]
+        values.add(v); // Collect values [cite: 610]
+      }
+      // Adjust maxValue for padding, with a minimum floor [cite: 601]
+      if(maxValue==0){maxValue=10;}else{maxValue*=1.15;}
+      const double lblFS = 6; // Font size for axis labels [cite: 611]
+
+      // --- X-axis label calculation (remains the same) ---
+      List<double> xPositions = List.generate(timestamps.length, (i) => i.toDouble()); // X positions for bars [cite: 611]
+      int skip = (timestamps.length / (chartWidth / 25)).ceil(); if(skip<1)skip=1; // Label skipping logic [cite: 611]
+      Map<double, String> xAxisLabelMap = {}; // Map for storing formatted labels [cite: 611]
+      for(int i=0; i<timestamps.length; i++){
+          if (i % skip == 0) { // Apply skipping logic [cite: 611]
+               xAxisLabelMap[i.toDouble()] = formatPdfTimestamp(timestamps[i], filter); // Format and store label [cite: 612]
+          }
+      }
+      List<double> labeledXPositions = xAxisLabelMap.keys.toList(); // Get positions that have labels [cite: 614]
+      // --- End X-axis label calculation ---
+
+      // Add the chart widget [cite: 614]
+      chartWidgets.add( pw.Column( crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+          // Sensor Title [cite: 614]
+          pw.Text("${sensorType=='moisture'?'Dryness':sensorType} Alerts ($filter)", style: pw.TextStyle(font: boldFont, fontSize: 10)),
+          pw.SizedBox(height: 3), // Spacing [cite: 614]
+          // Container for the chart [cite: 614]
+          pw.Container( width: chartWidth, height: chartHeight,
+            child: pw.Chart(
+              grid: pw.CartesianGrid(
+                // X Axis Configuration
+                xAxis: pw.FixedAxis( labeledXPositions, // Only positions with labels [cite: 614]
+                    divisions: false, // No division lines needed if labels are sparse [cite: 615]
+                    format: (value) => xAxisLabelMap[value] ?? '', // Get label from map [cite: 615]
+                    textStyle: pw.TextStyle(font: regularFont, fontSize: lblFS), // Label style [cite: 615]
+                ),
+                // Y Axis Configuration
+                yAxis: pw.FixedAxis( [0, maxValue], // Y range from 0 to calculated max [cite: 616]
+                    format: (v) => v.toStringAsFixed(0), // Format Y labels as integers [cite: 616]
+                    divisions: true, // Show Y division lines [cite: 616]
+                    textStyle: pw.TextStyle(font: regularFont, fontSize: lblFS), // Label style [cite: 616]
+                ),
+              ),
+              // Bar Data Set
+              datasets: [
+                pw.BarDataSet(
+                  color: getPdfSensorColor(sensorType), width: 4, // Bar color and width [cite: 617]
+                  // Generate chart values from data
+                  data: List<pw.PointChartValue>.generate(
+                    timestamps.length, (i) => pw.PointChartValue(i.toDouble(), values[i]),
+                  ),
+                ),
+              ],
+            ),
+          ), pw.SizedBox(height: spacing), // Spacing after the chart [cite: 618]
+        ])
+      );
+      // --- END OF ORIGINAL CHART LOGIC ---
+    }
+  });
+
+  // Return a column containing all generated widgets (charts or text) [cite: 619]
+  return pw.Column( children: chartWidgets, crossAxisAlignment: pw.CrossAxisAlignment.start );
+}
+
+
+///////////////
 // ✅ Helper Function: Formats text into bullet points with bold values
 InlineSpan _buildBulletSpan(String label, String text, String boldValue) {
   return WidgetSpan(
