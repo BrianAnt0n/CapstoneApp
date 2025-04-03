@@ -2779,32 +2779,58 @@ pw.Widget _drawComparisonChartPdf({
   required pw.Font regularFont,
   required pw.Font boldFont,
 }) {
-  const double chartWidth = 400; const double chartHeight = 200;
-  List<String> labels = ["Temp", "Dry", "pH1", "pH2", "Hum"]; // Shorter labels
-  List<double> firstValues = []; List<double> secondValues = []; double maxValue = 0;
+  const double chartWidth = 400; // Chart container width [cite: 595]
+  const double chartHeight = 200; // Chart container height [cite: 595]
+  List<String> labels = ["Temp", "Dry", "pH1", "pH2", "Hum"]; // Category labels [cite: 595]
+  List<double> firstValues = []; List<double> secondValues = []; double maxValue = 0; // Initialize data lists [cite: 596]
 
-  // --- Data Parsing ---
-  for (int i = 0; i < labels.length; i++) { String fullLabel = ["Temperature", "Dryness Level", "pH Level 1", "pH Level 2", "Humidity"][i]; double parseValue(String? rawValue) { if (rawValue == null || rawValue.toLowerCase() == "n/a") { return 0.0; } String n = rawValue.replaceAll(RegExp('[^0-9.]'), ''); return double.tryParse(n) ?? 0.0; } double val1 = parseValue(firstData[fullLabel]); double val2 = parseValue(secondData[fullLabel]); firstValues.add(val1); secondValues.add(val2); if (val1 > maxValue) maxValue = val1; if (val2 > maxValue) maxValue = val2; }
-  if (maxValue == 0) maxValue = 10; else maxValue *= 1.15;
+  // --- Data Parsing (remains the same) ---
+  for (int i = 0; i < labels.length; i++) {
+    String fullLabel = ["Temperature", "Dryness Level", "pH Level 1", "pH Level 2", "Humidity"][i];
+    double parseValue(String? rawValue) {
+       if (rawValue == null || rawValue.toLowerCase() == "n/a") { return 0.0; }
+       String n = rawValue.replaceAll(RegExp('[^0-9.]'), '');
+       return double.tryParse(n) ?? 0.0;
+    }
+    double val1 = parseValue(firstData[fullLabel]);
+    double val2 = parseValue(secondData[fullLabel]);
+    firstValues.add(val1);
+    secondValues.add(val2);
+    if (val1 > maxValue) maxValue = val1;
+    if (val2 > maxValue) maxValue = val2;
+  }
+  if (maxValue == 0) maxValue = 10; else maxValue *= 1.15; // Adjust max Y value for padding
   // --- End Parsing ---
 
-  return pw.Container( width: chartWidth, height: chartHeight,
+  // --- EDIT: Define wider X-axis range values ---
+  final List<double> xAxisValuesWithPadding = [-0.5, 0.0, 1.0, 2.0, 3.0, 4.0, 4.5];
+
+  return pw.Container( width: chartWidth, height: chartHeight, // Apply fixed size [cite: 602]
     child: pw.Chart(
       grid: pw.CartesianGrid(
-        xAxis: pw.FixedAxis( List.generate(labels.length, (index) => index.toDouble()),
-          divisions: true,
-          // Removed axisTickLength
-          // Use format for labels, not labelBuilder
-          format: (value) => labels[value.toInt()], // Use format to get label text
-          textStyle: pw.TextStyle(font: regularFont, fontSize: 8), // Use textStyle
+        // --- EDIT: Modify xAxis definition ---
+        xAxis: pw.FixedAxis(
+          xAxisValuesWithPadding, // Use values that include padding
+          divisions: false, // No divisions needed between main labels
+          // Format labels: Only show for 0.0 to 4.0, hide for -0.5 and 4.5
+          format: (value) {
+            int? intValue = value.toInt();
+            // Check if the value corresponds to an original label index
+            if (value >= 0 && value < labels.length && value == intValue) {
+               return labels[intValue]; // Return the label [cite: 603]
+            }
+            return ''; // Return empty string for padding values
+          },
+          textStyle: pw.TextStyle(font: regularFont, fontSize: 8), // Label style [cite: 603]
         ),
+        // Y-Axis remains the same
         yAxis: pw.FixedAxis([0, maxValue / 2, maxValue],
           format: (v) => v.toStringAsFixed(0),
           divisions: true,
-          // Removed axisTickLength
-          textStyle: pw.TextStyle(font: regularFont, fontSize: 8), // Use textStyle
+          textStyle: pw.TextStyle(font: regularFont, fontSize: 8),
         ),
       ),
+      // Datasets remain the same
       datasets: [
         pw.BarDataSet( legend: 'First Date', color: PdfColors.blue400, width: 12,
           data: List<pw.PointChartValue>.generate( labels.length, (i) => pw.PointChartValue(i.toDouble() - 0.15, firstValues[i]), ),
@@ -2826,20 +2852,21 @@ pw.Widget _drawFrequencyChartPdf({
   required pw.Font boldFont,
 }) {
   if (frequencyData.isEmpty) {
-    // If there's no frequency data at all, return a message. [cite: 605]
+    // If there's no frequency data at all, return a message.
     return pw.Container(width: 400, height: 50, child: pw.Center(child: pw.Text("No alert data available.", style: pw.TextStyle(font: regularFont))));
   }
 
-  List<pw.Widget> chartWidgets = []; // Initialize list to hold generated widgets (charts or text) [cite: 606]
-  const double chartWidth = 400; // Define chart width [cite: 606]
-  const double chartHeight = 100; // Define chart height [cite: 606]
-  const double spacing = 10; // Define spacing between elements [cite: 607]
+  List<pw.Widget> chartWidgets = []; // Initialize list
+  // Increased chart dimensions
+  const double chartWidth = 500; // Increased from 400
+  const double chartHeight = 120; // Increased from 100
+  const double spacing = 10; // Define spacing
 
   // Helper to get PDF color based on sensor type
   PdfColor getPdfSensorColor(String s) {
     switch (s.toLowerCase()){
       case "temperature": return PdfColors.red;
-      case "moisture": return PdfColors.blue; // Note: 'dryness' is handled later if needed
+      case "moisture": return PdfColors.blue;
       case "ph_level1": return PdfColors.green;
       case "ph_level2": return PdfColors.lightGreen;
       case "humidity": return PdfColors.orange;
@@ -2850,128 +2877,112 @@ pw.Widget _drawFrequencyChartPdf({
   // Helper to format timestamp string for PDF
   String formatPdfTimestamp(String t, String f) {
      try {
-       DateTime pT=DateFormat("yyyy-MM-dd hh:mm a").parse(t); // Parse the timestamp string [cite: 609]
-       // Format based on 'Weekly' or 'Daily' filter [cite: 610]
-       return(f=="Weekly") ? DateFormat("EEE h:mma").format(pT) : DateFormat("h:mm a").format(pT);
+       DateTime pT=DateFormat("yyyy-MM-dd hh:mm a").parse(t);
+       // Added newline for Weekly format
+       return(f=="Weekly") ? DateFormat("EEE\nh:mma").format(pT) : DateFormat("h:mm a").format(pT);
      } catch (e){
-       return "Err"; // Return error string if parsing fails [cite: 610]
+       return "Err";
      }
   }
 
-  // --- NEW --- Helper for basic sensor value formatting within PDF text fallback
+  // Helper for basic sensor value formatting within PDF text fallback
   String formatPdfSensorValue(String sensorType, double value) {
-      // Normalize sensor type name (e.g., handle 'moisture' vs 'dryness')
       String normalizedSensor = sensorType.toLowerCase();
-      if (normalizedSensor == "moisture") {
-        normalizedSensor = "dryness level"; // Align with display name if needed
-      }
+      if (normalizedSensor == "moisture") normalizedSensor = "dryness level";
 
-      if (normalizedSensor.contains("temp")) {
-          return "${value.toStringAsFixed(1)}°C"; // Format temperature [cite: 312, 547]
-      } else if (normalizedSensor.contains("dryness") || normalizedSensor.contains("humidity")) {
-          return "${value.toInt()}%"; // Format dryness/humidity [cite: 313, 548]
-      } else if (normalizedSensor.contains("ph")) {
-          return value.toStringAsFixed(2); // Format pH [cite: 314, 549]
-      }
-      return value.toStringAsFixed(2); // Default formatting [cite: 315, 550]
+      if (normalizedSensor.contains("temp")) return "${value.toStringAsFixed(1)}°C";
+      if (normalizedSensor.contains("dryness") || normalizedSensor.contains("humidity")) return "${value.toInt()}%";
+      if (normalizedSensor.contains("ph")) return value.toStringAsFixed(2);
+      return value.toStringAsFixed(2); // Default formatting
   }
-  // --- END NEW ---
 
-  // Iterate through each sensor type in the frequency data [cite: 610]
+  // Iterate through each sensor type in the frequency data
   frequencyData.forEach((sensorType, sensorPointsRaw) {
-    // Cast raw data to the expected type and skip if empty [cite: 610]
     List<Map<String, dynamic>> sensorPoints = List<Map<String, dynamic>>.from(sensorPointsRaw);
-    if(sensorPoints.isEmpty) return;
+    if(sensorPoints.isEmpty) return; // Skip if no points
 
-    // --- EDIT: Handle single data point case ---
+    // Handle single data point case (display text)
     if (sensorPoints.length < 2) {
-        // If only one data point exists, display text instead of a chart
         double value = double.tryParse(sensorPoints.first["Value"]?.toString() ?? '0') ?? 0;
         String timestamp = formatPdfTimestamp(sensorPoints.first["Time"]?.toString() ?? '', filter);
-        // Use the new formatting helper
         String formattedValue = formatPdfSensorValue(sensorType, value);
-        // Display name adjustment
         String displayName = sensorType == 'moisture' ? 'Dryness' : sensorType;
-
-        // Add a text widget describing the single alert [cite: 614]
         chartWidgets.add(
-            pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                    pw.Text("$displayName Alerts ($filter)", style: pw.TextStyle(font: boldFont, fontSize: 10)), // Sensor title [cite: 614]
-                    pw.SizedBox(height: 3), // Spacing [cite: 614]
-                    pw.Text("Single alert recorded: $formattedValue at $timestamp", style: pw.TextStyle(font: regularFont, fontSize: 9)), // Text description
-                    pw.SizedBox(height: spacing), // Bottom spacing [cite: 618]
+            pw.Column( crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+                    pw.Text("$displayName Alerts ($filter)", style: pw.TextStyle(font: boldFont, fontSize: 10)),
+                    pw.SizedBox(height: 3),
+                    pw.Text("Single alert recorded: $formattedValue at $timestamp", style: pw.TextStyle(font: regularFont, fontSize: 9)),
+                    pw.SizedBox(height: spacing),
                 ]
             )
         );
     } else {
-      // --- ORIGINAL CHART LOGIC (when 2 or more points exist) ---
-      double maxValue=0; List<String> timestamps=[]; List<double> values=[]; // Initialize variables for chart data [cite: 610]
-      // Process points to find max value and populate lists [cite: 610]
-      for(var p in sensorPoints){
+      // --- CHART LOGIC (when 2 or more points exist) ---
+      double maxValue=0; List<String> timestamps=[]; List<double> values=[];
+      for(var p in sensorPoints){ // Process points
         double v=double.tryParse(p["Value"]?.toString()??'0')??0;
-        if(v>maxValue)maxValue=v; // Find max Y value [cite: 610]
-        timestamps.add(p["Time"]?.toString()??''); // Collect timestamps [cite: 610]
-        values.add(v); // Collect values [cite: 610]
+        if(v>maxValue)maxValue=v;
+        timestamps.add(p["Time"]?.toString()??'');
+        values.add(v);
       }
-      // Adjust maxValue for padding, with a minimum floor [cite: 601]
-      if(maxValue==0){maxValue=10;}else{maxValue*=1.15;}
-      const double lblFS = 6; // Font size for axis labels [cite: 611]
+      if(maxValue==0){maxValue=10;}else{maxValue*=1.15;} // Adjust max Y
+      const double lblFS = 6; // Label font size
 
-      // --- X-axis label calculation (remains the same) ---
-      List<double> xPositions = List.generate(timestamps.length, (i) => i.toDouble()); // X positions for bars [cite: 611]
-      int skip = (timestamps.length / (chartWidth / 25)).ceil(); if(skip<1)skip=1; // Label skipping logic [cite: 611]
-      Map<double, String> xAxisLabelMap = {}; // Map for storing formatted labels [cite: 611]
+      // --- X-axis label calculation ---
+      List<double> xPositions = List.generate(timestamps.length, (i) => i.toDouble());
+      // More aggressive label skipping
+      int skip = (timestamps.length / (chartWidth / 18)).ceil(); // Increased aggression (was / 25)
+      if(skip < 1) skip = 1; // Ensure skip is at least 1
+
+      Map<double, String> xAxisLabelMap = {};
       for(int i=0; i<timestamps.length; i++){
-          if (i % skip == 0) { // Apply skipping logic [cite: 611]
-               xAxisLabelMap[i.toDouble()] = formatPdfTimestamp(timestamps[i], filter); // Format and store label [cite: 612]
+          if (i % skip == 0) { // Apply skipping logic
+               // Use multi-line format for weekly labels
+               xAxisLabelMap[i.toDouble()] = formatPdfTimestamp(timestamps[i], filter); // Now potentially multi-line
           }
       }
-      List<double> labeledXPositions = xAxisLabelMap.keys.toList(); // Get positions that have labels [cite: 614]
+      List<double> labeledXPositions = xAxisLabelMap.keys.toList(); // Get positions with labels
       // --- End X-axis label calculation ---
 
-      // Add the chart widget [cite: 614]
+      // Add the chart widget
       chartWidgets.add( pw.Column( crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-          // Sensor Title [cite: 614]
-          pw.Text("${sensorType=='moisture'?'Dryness':sensorType} Alerts ($filter)", style: pw.TextStyle(font: boldFont, fontSize: 10)),
-          pw.SizedBox(height: 3), // Spacing [cite: 614]
-          // Container for the chart [cite: 614]
-          pw.Container( width: chartWidth, height: chartHeight,
+          pw.Text("${sensorType=='moisture'?'Dryness':sensorType} Alerts ($filter)", style: pw.TextStyle(font: boldFont, fontSize: 10)), // Title
+          pw.SizedBox(height: 3),
+          pw.Container( width: chartWidth, height: chartHeight, // Use updated dimensions
             child: pw.Chart(
               grid: pw.CartesianGrid(
                 // X Axis Configuration
-                xAxis: pw.FixedAxis( labeledXPositions, // Only positions with labels [cite: 614]
-                    divisions: false, // No division lines needed if labels are sparse [cite: 615]
-                    format: (value) => xAxisLabelMap[value] ?? '', // Get label from map [cite: 615]
-                    textStyle: pw.TextStyle(font: regularFont, fontSize: lblFS), // Label style [cite: 615]
+                xAxis: pw.FixedAxis( labeledXPositions, // Use positions with labels
+                    divisions: false,
+                    // Format potentially multi-line label
+                    format: (value) => xAxisLabelMap[value] ?? '', // Get label (possibly multi-line)
+                    // Added lineSpacing for multi-line labels
+                    textStyle: pw.TextStyle(font: regularFont, fontSize: lblFS, lineSpacing: 1.5), // Added lineSpacing
                 ),
                 // Y Axis Configuration
-                yAxis: pw.FixedAxis( [0, maxValue], // Y range from 0 to calculated max [cite: 616]
-                    format: (v) => v.toStringAsFixed(0), // Format Y labels as integers [cite: 616]
-                    divisions: true, // Show Y division lines [cite: 616]
-                    textStyle: pw.TextStyle(font: regularFont, fontSize: lblFS), // Label style [cite: 616]
+                yAxis: pw.FixedAxis( [0, maxValue],
+                    format: (v) => v.toStringAsFixed(0), divisions: true,
+                    textStyle: pw.TextStyle(font: regularFont, fontSize: lblFS),
                 ),
               ),
               // Bar Data Set
               datasets: [
                 pw.BarDataSet(
-                  color: getPdfSensorColor(sensorType), width: 4, // Bar color and width [cite: 617]
-                  // Generate chart values from data
+                  color: getPdfSensorColor(sensorType), width: 4,
                   data: List<pw.PointChartValue>.generate(
                     timestamps.length, (i) => pw.PointChartValue(i.toDouble(), values[i]),
                   ),
                 ),
               ],
             ),
-          ), pw.SizedBox(height: spacing), // Spacing after the chart [cite: 618]
+          ), pw.SizedBox(height: spacing), // Spacing after chart
         ])
       );
-      // --- END OF ORIGINAL CHART LOGIC ---
+      // --- END OF CHART LOGIC ---
     }
   });
 
-  // Return a column containing all generated widgets (charts or text) [cite: 619]
+  // Return a column containing all generated widgets
   return pw.Column( children: chartWidgets, crossAxisAlignment: pw.CrossAxisAlignment.start );
 }
 
