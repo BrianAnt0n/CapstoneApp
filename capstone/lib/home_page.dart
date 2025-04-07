@@ -2033,14 +2033,20 @@ void _startCompost() async {
 
   await showModalBottomSheet(
     context: context,
+    isScrollControlled: true, // allows more height and better scroll behavior
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
     builder: (BuildContext context) {
       return StatefulBuilder(
         builder: (context, setState) {
-          return Padding(
-            padding: const EdgeInsets.all(16.0),
+          return SingleChildScrollView(
+            padding: EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 16,
+              bottom: MediaQuery.of(context).viewInsets.bottom + 32,
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -2066,16 +2072,16 @@ void _startCompost() async {
                     });
                   },
                   headerStyle: const HeaderStyle(
-                    formatButtonVisible: false, // Hide format button
-                    titleCentered: true, // Center the title
+                    formatButtonVisible: false,
+                    titleCentered: true,
                   ),
                   calendarStyle: CalendarStyle(
                     selectedDecoration: BoxDecoration(
-                      color: Colors.green, // Selected date color
+                      color: Colors.green,
                       shape: BoxShape.circle,
                     ),
                     todayDecoration: BoxDecoration(
-                      color: Colors.blue, // Today's date color
+                      color: Colors.blue,
                       shape: BoxShape.circle,
                     ),
                   ),
