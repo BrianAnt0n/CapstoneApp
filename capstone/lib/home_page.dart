@@ -2026,174 +2026,338 @@ Column(
     }
   }
 
-  void _startCompost() async {
-    DateTime tempDate = DateTime.now();
-    TimeOfDay tempTime = TimeOfDay.now();
-    DateTime? selectedDate;
+// Star Compost Function
+void _startCompost() async {
+  DateTime today = DateTime.now();
+  DateTime selectedDate = today;
 
-    await showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Center(
-                    child: Text(
-                      "Start Compost Cycle",
-                      style:
-                          TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+  await showModalBottomSheet(
+    context: context,
+    isScrollControlled: true, // allows more height and better scroll behavior
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (BuildContext context) {
+      return StatefulBuilder(
+        builder: (context, setState) {
+          return SingleChildScrollView(
+            padding: EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 16,
+              bottom: MediaQuery.of(context).viewInsets.bottom + 32,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Center(
+                  child: Text(
+                    "Start Compost Cycle",
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // TableCalendar Widget
+                TableCalendar(
+                  firstDay: DateTime(2000),
+                  lastDay: today,
+                  focusedDay: selectedDate,
+                  selectedDayPredicate: (day) => isSameDay(day, selectedDate),
+                  calendarFormat: CalendarFormat.month,
+                  onDaySelected: (selectedDay, focusedDay) {
+                    setState(() {
+                      selectedDate = selectedDay;
+                    });
+                  },
+                  headerStyle: const HeaderStyle(
+                    formatButtonVisible: false,
+                    titleCentered: true,
+                  ),
+                  calendarStyle: CalendarStyle(
+                    selectedDecoration: BoxDecoration(
+                      color: Colors.green,
+                      shape: BoxShape.circle,
+                    ),
+                    todayDecoration: BoxDecoration(
+                      color: Colors.blue,
+                      shape: BoxShape.circle,
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  ListTile(
-                    leading:
-                        const Icon(Icons.calendar_today, color: Colors.blue),
-                    title: const Text("Select Date",
-                        style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.w500)),
-                    subtitle: Text(DateFormat.yMMMMd().format(tempDate)),
-                    trailing: const Icon(Icons.arrow_forward_ios, size: 18),
-                    onTap: () async {
-                      DateTime? pickedDate = await showDatePicker(
-                        context: context,
-                        initialDate: tempDate,
-                        firstDate: DateTime(2000),
-                        lastDate: DateTime.now(), // Prevents selecting future dates
-                      );
-                      if (pickedDate != null) {
-                        setState(() => tempDate = pickedDate);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text("Cancel",
-                            style: TextStyle(fontSize: 16)),
-                      ),
-                      ElevatedButton(
-                        onPressed: () {
-                          selectedDate = DateTime(
-                            tempDate.year,
-                            tempDate.month,
-                            tempDate.day,
-                            tempTime.hour,
-                            tempTime.minute,
-                          );
-                          Navigator.pop(context);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 24, vertical: 12),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8)),
-                          backgroundColor: Colors.green,
-                        ),
-                        child: const Text("Confirm",
-                            style:
-                                TextStyle(fontSize: 16, color: Colors.white)),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
+                ),
 
-    if (selectedDate == null) {
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text("Cancel", style: TextStyle(fontSize: 16)),
+                    ),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context, selectedDate);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        backgroundColor: Colors.green,
+                      ),
+                      child: const Text("Confirm", style: TextStyle(fontSize: 16, color: Colors.white)),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    },
+  ).then((pickedDate) {
+    if (pickedDate == null) {
       print("⚠️ No date selected. Compost start cancelled.");
       return;
     }
 
-    try {
-      if (selectedHardwareId == null) {
-        print("🔍 Fetching hardware ID...");
-        await _fetchAndSetHardwareId(selectedContainerId!);
-      }
+    // Continue with the existing logic to update Supabase and state
+    _processCompostStart(pickedDate);
+  });
+}
 
-      if (selectedHardwareId == null) {
-        print("❌ Error: No hardware_id found for container.");
-        return;
-      }
-
-      String formattedDate = selectedDate!.toIso8601String();
-
-      final prefs = await SharedPreferences.getInstance();
-      String? userIdString = prefs.getString("user_id_pref");
-      int? userId = userIdString != null ? int.tryParse(userIdString) : null;
-
-      if (userId == null) {
-        print("❌ Error: User ID not found.");
-        return;
-      }
-
-      // ✅ Fetch full name instead of username
-      final userResponse = await Supabase.instance.client
-          .from('Users')
-          .select('fullname') // ✅ Use fullname
-          .eq('user_id', userId)
-          .maybeSingle();
-      // String? fullNameString = prefs.getString('fullname');
-
-      String? startedBy = userResponse?['fullname'] ?? "Unknown";
-
-      // ✅ Update `start_date` & `started_by` in `Hardware_Sensors_Test`
-      final updateResponse = await Supabase.instance.client
-          .from('Hardware_Sensors_Test')
-          .update({
-            'start_date': formattedDate,
-            'started_by': startedBy, // ✅ Store full name
-          })
-          .eq('hardware_id', selectedHardwareId!)
-          .select()
-          .single();
-
-      if (updateResponse == null) {
-        print("❌ Error: Update failed, no rows affected.");
-        return;
-      }
-
-      // ✅ Insert into `Compost_Data` with `started_by` (No `container_id`)
-      // final compostInsertResponse =
-      //     await Supabase.instance.client.from('Compost_Data').insert({
-      //   'hardware_id': selectedHardwareId!, // ✅ Removed `container_id`
-      //   'start_date': formattedDate,
-      //   'started_by': startedBy, // ✅ Store who started the compost
-      // }).select();
-
-      // if (compostInsertResponse == null || compostInsertResponse.isEmpty) {
-      //   print("❌ Error: Compost_Data insert failed.");
-      //   return;
-      // }
-
-      setState(() {
-        _containerAddedDate = selectedDate;
-        _calculateContainerAge();
-      });
-
-      print("✅ Compost start date updated successfully by: $startedBy");
-
-      // ✅ Call `_refreshData()` to update UI
-      _refreshData();
-    } catch (error) {
-      print("🚨 Error starting compost: $error");
+// Extracted logic for better readability
+void _processCompostStart(DateTime selectedDate) async {
+  try {
+    if (selectedHardwareId == null) {
+      print("🔍 Fetching hardware ID...");
+      await _fetchAndSetHardwareId(selectedContainerId!);
     }
-  }
 
+    if (selectedHardwareId == null) {
+      print("❌ Error: No hardware_id found for container.");
+      return;
+    }
+
+    String formattedDate = selectedDate.toIso8601String();
+
+    final prefs = await SharedPreferences.getInstance();
+    String? userIdString = prefs.getString("user_id_pref");
+    int? userId = userIdString != null ? int.tryParse(userIdString) : null;
+
+    if (userId == null) {
+      print("❌ Error: User ID not found.");
+      return;
+    }
+
+    final userResponse = await Supabase.instance.client
+        .from('Users')
+        .select('fullname')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+    String? startedBy = userResponse?['fullname'] ?? "Unknown";
+
+    final updateResponse = await Supabase.instance.client
+        .from('Hardware_Sensors_Test')
+        .update({
+          'start_date': formattedDate,
+          'started_by': startedBy,
+        })
+        .eq('hardware_id', selectedHardwareId!)
+        .select()
+        .single();
+
+    if (updateResponse == null) {
+      print("❌ Error: Update failed, no rows affected.");
+      return;
+    }
+
+    setState(() {
+      _containerAddedDate = selectedDate;
+      _calculateContainerAge();
+    });
+
+    print("✅ Compost start date updated successfully by: $startedBy");
+
+    _refreshData();
+  } catch (error) {
+    print("🚨 Error starting compost: $error");
+  }
+}
+
+
+
+  // void _startCompost() async {
+  //   DateTime tempDate = DateTime.now();
+  //   TimeOfDay tempTime = TimeOfDay.now();
+  //   DateTime? selectedDate;
+
+  //   await showModalBottomSheet(
+  //     context: context,
+  //     shape: const RoundedRectangleBorder(
+  //       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+  //     ),
+  //     builder: (BuildContext context) {
+  //       return StatefulBuilder(
+  //         builder: (context, setState) {
+  //           return Padding(
+  //             padding: const EdgeInsets.all(16.0),
+  //             child: Column(
+  //               mainAxisSize: MainAxisSize.min,
+  //               crossAxisAlignment: CrossAxisAlignment.start,
+  //               children: [
+  //                 const Center(
+  //                   child: Text(
+  //                     "Start Compost Cycle",
+  //                     style:
+  //                         TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+  //                   ),
+  //                 ),
+  //                 const SizedBox(height: 20),
+  //                 ListTile(
+  //                   leading:
+  //                       const Icon(Icons.calendar_today, color: Colors.blue),
+  //                   title: const Text("Select Date",
+  //                       style: TextStyle(
+  //                           fontSize: 16, fontWeight: FontWeight.w500)),
+  //                   subtitle: Text(DateFormat.yMMMMd().format(tempDate)),
+  //                   trailing: const Icon(Icons.arrow_forward_ios, size: 18),
+  //                   onTap: () async {
+  //                     DateTime? pickedDate = await showDatePicker(
+  //                       context: context,
+  //                       initialDate: tempDate,
+  //                       firstDate: DateTime(2000),
+  //                       lastDate: DateTime.now(), // Prevents selecting future dates
+  //                     );
+  //                     if (pickedDate != null) {
+  //                       setState(() => tempDate = pickedDate);
+  //                     }
+  //                   },
+  //                 ),
+  //                 const SizedBox(height: 20),
+  //                 Row(
+  //                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+  //                   children: [
+  //                     TextButton(
+  //                       onPressed: () => Navigator.pop(context),
+  //                       child: const Text("Cancel",
+  //                           style: TextStyle(fontSize: 16)),
+  //                     ),
+  //                     ElevatedButton(
+  //                       onPressed: () {
+  //                         selectedDate = DateTime(
+  //                           tempDate.year,
+  //                           tempDate.month,
+  //                           tempDate.day,
+  //                           tempTime.hour,
+  //                           tempTime.minute,
+  //                         );
+  //                         Navigator.pop(context);
+  //                       },
+  //                       style: ElevatedButton.styleFrom(
+  //                         padding: const EdgeInsets.symmetric(
+  //                             horizontal: 24, vertical: 12),
+  //                         shape: RoundedRectangleBorder(
+  //                             borderRadius: BorderRadius.circular(8)),
+  //                         backgroundColor: Colors.green,
+  //                       ),
+  //                       child: const Text("Confirm",
+  //                           style:
+  //                               TextStyle(fontSize: 16, color: Colors.white)),
+  //                     ),
+  //                   ],
+  //                 ),
+  //               ],
+  //             ),
+  //           );
+  //         },
+  //       );
+  //     },
+  //   );
+
+  //   if (selectedDate == null) {
+  //     print("⚠️ No date selected. Compost start cancelled.");
+  //     return;
+  //   }
+
+  //   try {
+  //     if (selectedHardwareId == null) {
+  //       print("🔍 Fetching hardware ID...");
+  //       await _fetchAndSetHardwareId(selectedContainerId!);
+  //     }
+
+  //     if (selectedHardwareId == null) {
+  //       print("❌ Error: No hardware_id found for container.");
+  //       return;
+  //     }
+
+  //     String formattedDate = selectedDate!.toIso8601String();
+
+  //     final prefs = await SharedPreferences.getInstance();
+  //     String? userIdString = prefs.getString("user_id_pref");
+  //     int? userId = userIdString != null ? int.tryParse(userIdString) : null;
+
+  //     if (userId == null) {
+  //       print("❌ Error: User ID not found.");
+  //       return;
+  //     }
+
+  //     // ✅ Fetch full name instead of username
+  //     final userResponse = await Supabase.instance.client
+  //         .from('Users')
+  //         .select('fullname') // ✅ Use fullname
+  //         .eq('user_id', userId)
+  //         .maybeSingle();
+  //     // String? fullNameString = prefs.getString('fullname');
+
+  //     String? startedBy = userResponse?['fullname'] ?? "Unknown";
+
+  //     // ✅ Update `start_date` & `started_by` in `Hardware_Sensors_Test`
+  //     final updateResponse = await Supabase.instance.client
+  //         .from('Hardware_Sensors_Test')
+  //         .update({
+  //           'start_date': formattedDate,
+  //           'started_by': startedBy, // ✅ Store full name
+  //         })
+  //         .eq('hardware_id', selectedHardwareId!)
+  //         .select()
+  //         .single();
+
+  //     if (updateResponse == null) {
+  //       print("❌ Error: Update failed, no rows affected.");
+  //       return;
+  //     }
+
+  //     // ✅ Insert into `Compost_Data` with `started_by` (No `container_id`)
+  //     // final compostInsertResponse =
+  //     //     await Supabase.instance.client.from('Compost_Data').insert({
+  //     //   'hardware_id': selectedHardwareId!, // ✅ Removed `container_id`
+  //     //   'start_date': formattedDate,
+  //     //   'started_by': startedBy, // ✅ Store who started the compost
+  //     // }).select();
+
+  //     // if (compostInsertResponse == null || compostInsertResponse.isEmpty) {
+  //     //   print("❌ Error: Compost_Data insert failed.");
+  //     //   return;
+  //     // }
+
+  //     setState(() {
+  //       _containerAddedDate = selectedDate;
+  //       _calculateContainerAge();
+  //     });
+
+  //     print("✅ Compost start date updated successfully by: $startedBy");
+
+  //     // ✅ Call `_refreshData()` to update UI
+  //     _refreshData();
+  //   } catch (error) {
+  //     print("🚨 Error starting compost: $error");
+  //   }
+  // }
+
+// Compost Buttons
   Widget _buildCompostButtons() {
     int weeks =
         _calculateContainerAge(); // ✅ Calculate age based on actual date
