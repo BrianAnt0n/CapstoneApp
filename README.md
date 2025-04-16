@@ -23,9 +23,14 @@ The following folders/files are critical for synchronization. Please ensure they
 
 ---
 
+
+## **E-ComposThink Guide**
+[E-ComposThink PDF Guide](https://github.com/BrianAnt0n/E-ComposThink-PDF-Guide/).
+
 ## **ESP Connection Application**  
 To connect to the ESP module, please refer to our dedicated ESP Connection application:  
 [ESP Connection App Repository](https://github.com/BrianAnt0n/ESP-CONNECTION-APP)
+
 
 ---
 
