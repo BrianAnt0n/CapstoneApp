@@ -235,6 +235,7 @@ class _DashboardPageState extends State<DashboardPage> {
   Future<Map<String, dynamic>>? _sensorDataFuture;
   Future<List<Map<String, dynamic>>>? _notesFuture;
   Future<List<Map<String, dynamic>>>? _historyFuture;
+  List<DateTime> _disabledStartDates = [];
   int? selectedContainerId;
   final TextEditingController _notesController = TextEditingController();
   DateTime _selectedDate = DateTime.now();
@@ -278,11 +279,34 @@ class _DashboardPageState extends State<DashboardPage> {
   void initState() {
     super.initState();
     _loadUserId(); //
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       _refreshData();
+
+      if (selectedContainerId != null) {
+      int? hardwareId = await fetchHardwareId(selectedContainerId!);
+      if (hardwareId != null) {
+        await _fetchDisabledStartDates(hardwareId); // ✅ Pass hardwareId here
+      }
+    }
     });
   }
+
+Future<void> _fetchDisabledStartDates(int hardwareId) async {
+  final supabase = Supabase.instance.client;
+
+  try {
+    final response = await supabase
+        .from('Compost_Data')
+        .select('start_date')
+        .eq('hardware_id', hardwareId); // ✅ Filter by hardware_id
+
+    _disabledStartDates = response
+        .map<DateTime>((item) => DateTime.parse(item['start_date']).toLocal())
+        .toList();
+  } catch (e) {
+    print("❌ Error fetching disabled start dates: $e");
+  }
+}
 
   int? userId;
 
@@ -1977,6 +2001,17 @@ void _startCompost() async {
   DateTime today = DateTime.now();
   DateTime selectedDate = today;
 
+  if (selectedHardwareId == null) {
+    await _fetchAndSetHardwareId(selectedContainerId!);
+  }
+
+  if (selectedHardwareId == null) {
+    print("❌ No hardware ID found.");
+    return;
+  }
+
+  await _fetchDisabledStartDates(selectedHardwareId!);
+
   await showModalBottomSheet(
     context: context,
     isScrollControlled: true, // allows more height and better scroll behavior
@@ -2017,21 +2052,107 @@ void _startCompost() async {
                       selectedDate = selectedDay;
                     });
                   },
-                  headerStyle: const HeaderStyle(
-                    formatButtonVisible: false,
-                    titleCentered: true,
-                  ),
-                  calendarStyle: CalendarStyle(
-                    selectedDecoration: BoxDecoration(
-                      color: Colors.green,
-                      shape: BoxShape.circle,
-                    ),
-                    todayDecoration: BoxDecoration(
-                      color: Colors.blue,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
+       headerStyle: HeaderStyle(
+                          titleCentered: true,
+                          formatButtonVisible: false,
+                          leftChevronIcon: const Icon(Icons.chevron_left),
+                          rightChevronIcon: const Icon(Icons.chevron_right),
+                          titleTextFormatter: (date, locale) {
+                            return DateFormat.yMMMM(locale).format(date);
+                          },
+                        ),
+                          calendarBuilders: CalendarBuilders(
+    selectedBuilder: (context, date, _) {
+      return Container(
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.green, width: 2),
+        ),
+        child: Text(
+          date.day.toString(),
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
+        ),
+      );
+    },
+    todayBuilder: (context, date, _) {
+      return Container(
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.green.withOpacity(0.5),
+        ),
+        child: Text(
+          date.day.toString(),
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
+        ),
+      );
+    },
+  ),
+                        enabledDayPredicate: (day) {
+  return !_disabledStartDates.any((disabledDate) =>
+    disabledDate.year == day.year &&
+    disabledDate.month == day.month &&
+    disabledDate.day == day.day);
+},
                 ),
+
+const SizedBox(height: 16),
+const Center(
+  child: Text(
+    "Legend",
+    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+  ),
+),
+const SizedBox(height: 8),
+Center(
+  child: Wrap(
+    alignment: WrapAlignment.center,
+    spacing: 24,
+    runSpacing: 8,
+    children: [
+      Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 16,
+            height: 16,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.green.withOpacity(0.5), // Today
+            ),
+          ),
+          const SizedBox(width: 8),
+          const Text("Today"),
+        ],
+      ),
+      Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 16,
+            height: 16,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.green, width: 2), // Selected
+            ),
+          ),
+          const SizedBox(width: 8),
+          const Text("Selected"),
+        ],
+      ),
+    ],
+  ),
+),
+
 
                 const SizedBox(height: 20),
                 Row(
@@ -2068,12 +2189,10 @@ void _startCompost() async {
       return;
     }
 
-
     // Continue with the existing logic to update Supabase and state
     _processCompostStart(pickedDate);
   });
 }
-
 // Extracted logic for better readability
 void _processCompostStart(DateTime selectedDate) async {
   try {
