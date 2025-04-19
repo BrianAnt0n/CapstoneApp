@@ -9,13 +9,15 @@ class CompostCycleHistory extends StatefulWidget {
   final String endDate;
   final String startedBy;
   final String retrievedBy;
+  final String compostLabel;
 
   const CompostCycleHistory({Key? key,         required this.hardwareId,
     required this.compostId,
     required this.startDate,
     required this.endDate,
     required this.startedBy,
-    required this.retrievedBy,}) : super(key: key);
+    required this.retrievedBy,
+    required this.compostLabel,}) : super(key: key);
 
   @override
   _CompostCycleHistoryState createState() => _CompostCycleHistoryState();
@@ -215,6 +217,7 @@ class _CompostCycleHistoryState extends State<CompostCycleHistory> {
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
+                  _buildDetailRow("Compost Label", widget.compostLabel, Icons.label, Colors.indigo),
                   _buildDetailRow("Start Date", widget.startDate, Icons.calendar_today, Colors.blue),
                   _buildDetailRow("Started By", widget.startedBy, Icons.person, Colors.green),
                   _buildDetailRow("End Date", widget.endDate, Icons.event, Colors.red),

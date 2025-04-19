@@ -1928,128 +1928,110 @@ Column(
     }
   }
 
-  Future<void> _retrieveCompost(int hardwareId, int containerId) async {
-    try {
-      final supabase = Supabase.instance.client;
+Future<void> _retrieveCompost(int hardwareId, int containerId, {required String compostLabel}) async {
+  try {
+    final supabase = Supabase.instance.client;
 
-      // ✅ Fetch Start Date from `Hardware_Sensors_Test`
-      final sensorData = await supabase
-          .from('Hardware_Sensors_Test')
-          .select('start_date, started_by')
-          .eq('hardware_id', hardwareId)
-          .maybeSingle();
+    final sensorData = await supabase
+        .from('Hardware_Sensors_Test')
+        .select('start_date, started_by')
+        .eq('hardware_id', hardwareId)
+        .maybeSingle();
 
-      if (sensorData == null || sensorData['start_date'] == null) {
-        print("No start date found for hardware ID: $hardwareId");
-        return;
-      }
-
-      if (sensorData == null || sensorData['started_by'] == null) {
-        print("No start date found for hardware ID: $hardwareId");
-        return;
-      }
-
-      final startDate = sensorData['start_date'];
-      print("Fetched start date: $startDate");
-      final startedBy = sensorData['started_by'];
-      print("Fetched start date: $startDate");
-
-      // ✅ Fetch the logged-in user's ID
-      final prefs = await SharedPreferences.getInstance();
-      String? userIdString = prefs.getString("user_id_pref");
-      int? userId = userIdString != null ? int.tryParse(userIdString) : null;
-
-      if (userId == null) {
-        print("❌ Error: User ID not found.");
-        return;
-      }
-
-      // ✅ Fetch `fullname` of the logged-in user
-      final userResponse = await supabase
-          .from('Users')
-          .select('fullname')
-          .eq('user_id', userId)
-          .maybeSingle();
-
-      String retrievedBy = userResponse?['fullname'] ?? "Unknown";
-      // String? fullNameString = prefs.getString("fullname");
-
-      // String? retrievedBy = fullNameString;
-      // ✅ Update existing row instead of inserting a new one
-      final updateResponse = await supabase
-          .from('Compost_Data')
-          .insert({
-            'hardware_id' : hardwareId,
-            'start_date': startDate,
-            'started_by': startedBy, // ✅ Store who started the compost
-            'end_date': DateTime.now().toIso8601String(),
-            'retrieved_by': retrievedBy, // ✅ Store the user who retrieved it
-          })
-          .select();
-
-      if (updateResponse.isEmpty) {
-        print("❌ Error: No rows updated in Compost_Data.");
-        return;
-      }
-
-      print(
-          "✅ Compost data updated for hardware ID: $hardwareId, retrieved by: $retrievedBy");
-
-      // ✅ Nullify `start_date` in `Hardware_Sensors_Test`
-      await supabase
-          .from('Hardware_Sensors_Test')
-          .update({'start_date': null}).eq('hardware_id', hardwareId);
-
-      print("✅ Start date set to NULL for hardware ID: $hardwareId");
-
-      // ✅ Refresh UI
-      if (mounted) {
-        setState(() {
-          _containerAddedDate = null;
-          _calculateContainerAge();
-        });
-      }
-
-      _refreshData(); // ✅ Ensure UI updates properly
-    } catch (e) {
-      print("🚨 Error retrieving compost: $e");
+    if (sensorData == null || sensorData['start_date'] == null || sensorData['started_by'] == null) {
+      print("❌ Required data missing from Hardware_Sensors_Test.");
+      return;
     }
-  }
 
-  Future<void> _confirmRetrieveCompost(int hardwareId, int containerId) async {
-    bool? confirm = await showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text("Confirm Compost Retrieval"),
-          content: const Text(
-              "Are you sure you want to retrieve the compost? This action will delete historical data."),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop(false); // Cancel
-              },
-              child: const Text("Cancel"),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop(true); // Confirm
-              },
-              child:
-                  const Text("Retrieve", style: TextStyle(color: Colors.red)),
+    final startDate = sensorData['start_date'];
+    final startedBy = sensorData['started_by'];
+
+    final prefs = await SharedPreferences.getInstance();
+    String? userIdString = prefs.getString("user_id_pref");
+    int? userId = userIdString != null ? int.tryParse(userIdString) : null;
+
+    if (userId == null) {
+      print("❌ Error: User ID not found.");
+      return;
+    }
+
+    final userResponse = await supabase
+        .from('Users')
+        .select('fullname')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+    String retrievedBy = userResponse?['fullname'] ?? "Unknown";
+
+    await supabase.from('Compost_Data').insert({
+      'hardware_id': hardwareId,
+      'start_date': startDate,
+      'started_by': startedBy,
+      'end_date': DateTime.now().toIso8601String(),
+      'retrieved_by': retrievedBy,
+      'compost_label': compostLabel, // ✅ New field
+    });
+
+    await supabase
+        .from('Hardware_Sensors_Test')
+        .update({'start_date': null})
+        .eq('hardware_id', hardwareId);
+
+    if (mounted) {
+      setState(() {
+        _containerAddedDate = null;
+        _calculateContainerAge();
+      });
+    }
+
+    _refreshData();
+    print("✅ Compost retrieved and labeled: $compostLabel");
+  } catch (e) {
+    print("🚨 Error retrieving compost: $e");
+  }
+}
+
+Future<void> _confirmRetrieveCompost(int hardwareId, int containerId) async {
+  final TextEditingController labelController = TextEditingController();
+  String? label = await showDialog<String>(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        title: const Text("Retrieve Compost"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text("Please enter a label for this compost:"),
+            const SizedBox(height: 10),
+            TextField(
+              controller: labelController,
+              decoration: const InputDecoration(
+                hintText: "Enter compost label",
+                border: OutlineInputBorder(),
+              ),
             ),
           ],
-        );
-      },
-    );
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(null),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(labelController.text.trim()),
+            child: const Text("Confirm", style: TextStyle(color: Colors.green)),
+          ),
+        ],
+      );
+    },
+  );
 
-    if (confirm == true) {
-      await _retrieveCompost(hardwareId, containerId);
-    } else {
-      print("Compost retrieval canceled.");
-    }
+  if (label != null && label.isNotEmpty) {
+    await _retrieveCompost(hardwareId, containerId, compostLabel: label);
+  } else {
+    print("Compost retrieval canceled or label not provided.");
   }
-
+}
 
 // Star Compost Function
 void _startCompost() async {
