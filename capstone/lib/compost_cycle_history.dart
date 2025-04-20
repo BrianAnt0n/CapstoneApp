@@ -212,12 +212,11 @@ class _CompostCycleHistoryState extends State<CompostCycleHistory> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    "Compost Cycle Details",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  Text(
+                    widget.compostLabel,
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
-                  _buildDetailRow("Compost Label", widget.compostLabel, Icons.label, Colors.indigo),
                   _buildDetailRow("Start Date", widget.startDate, Icons.calendar_today, Colors.blue),
                   _buildDetailRow("Started By", widget.startedBy, Icons.person, Colors.green),
                   _buildDetailRow("End Date", widget.endDate, Icons.event, Colors.red),

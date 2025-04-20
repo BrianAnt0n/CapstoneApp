@@ -121,7 +121,7 @@ onTap: () {
                 ),
                 const SizedBox(width: 12),
                 Text(
-                  "Compost Cycle",
+                  compost['compost_label'],
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -131,7 +131,7 @@ onTap: () {
               ],
             ),
             const SizedBox(height: 12), 
-            _buildInfoRow(Icons.label, "Compost Label", compost['compost_label'],  Colors.indigo),
+            // _buildInfoRow(Icons.label, "Compost Label", compost['compost_label'],  Colors.indigo),
             _buildInfoRow(Icons.calendar_today, "Start Date",
                 _formatDate(compost['start_date']), Colors.blueAccent),
             _buildInfoRow(Icons.event, "End Date",
