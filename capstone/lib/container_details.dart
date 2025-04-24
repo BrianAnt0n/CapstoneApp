@@ -72,7 +72,7 @@ class _ContainerDetailsState extends State<ContainerDetails> {
     return response ?? [];
   }
 
-  Widget _buildCompostCard(Map<String, dynamic> compost) {
+Widget _buildCompostCard(Map<String, dynamic> compost) {
   DateTime startDate = DateTime.parse(compost['start_date']);
   DateTime? endDate = compost['end_date'] != null
       ? DateTime.parse(compost['end_date'])
@@ -83,23 +83,22 @@ class _ContainerDetailsState extends State<ContainerDetails> {
   Color statusColor = _getStatusColor(weeksBeforeRetrieval);
 
   return GestureDetector(
-onTap: () {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (context) => CompostCycleHistory(
-        hardwareId: compost['hardware_id'],
-        compostId: compost['compost_id'],
-        startDate: compost['start_date'],
-        endDate: compost['end_date'] ?? DateTime.now().toIso8601String(),
-        startedBy: compost['started_by'] ?? "Unknown",
-        retrievedBy: compost['retrieved_by'] ?? "Unknown",
-        compostLabel: compost['compost_label'] ?? "Unknown",
-      ),
-    ),
-  );
-},
-
+    onTap: () {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CompostCycleHistory(
+            hardwareId: compost['hardware_id'],
+            compostId: compost['compost_id'],
+            startDate: compost['start_date'],
+            endDate: compost['end_date'] ?? DateTime.now().toIso8601String(),
+            startedBy: compost['started_by'] ?? "Unknown",
+            retrievedBy: compost['retrieved_by'] ?? "Unknown",
+            compostLabel: compost['compost_label'] ?? "Unknown",
+          ),
+        ),
+      );
+    },
     child: Card(
       elevation: 6,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
@@ -110,23 +109,33 @@ onTap: () {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: statusColor.withOpacity(0.1),
-                  ),
-                  child: Icon(Icons.recycling, size: 28, color: statusColor),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: statusColor.withOpacity(0.1),
+                      ),
+                      child:
+                          Icon(Icons.recycling, size: 28, color: statusColor),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      compost['compost_label'],
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blueAccent.shade700,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Text(
-                  compost['compost_label'],
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blueAccent.shade700,
-                  ),
+                IconButton(
+                  icon: const Icon(Icons.delete, color: Colors.redAccent),
+                  onPressed: () => _confirmDelete(compost['compost_id']),
                 ),
               ],
             ),
@@ -175,6 +184,43 @@ onTap: () {
     ),
   );
 }
+
+void _confirmDelete(int compostId) {
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        title: const Text("Delete Entry"),
+        content: const Text("Are you sure you want to delete this compost record?"),
+        actions: [
+          TextButton(
+            child: const Text("Cancel"),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          TextButton(
+            child: const Text("Delete", style: TextStyle(color: Colors.red)),
+            onPressed: () {
+              Navigator.of(context).pop(); // Close dialog
+              _deleteCompostEntry(compostId);
+            },
+          ),
+        ],
+      );
+    },
+  );
+}
+
+Future<void> _deleteCompostEntry(int compostId) async {
+  await Supabase.instance.client
+      .from('Compost_Data')
+      .delete()
+      .eq('compost_id', compostId);
+
+  setState(() {
+    _pastCompostFuture = _fetchPastCompost(widget.hardwareId); // Refresh list
+  });
+}
+
 
 
 // 📌 Helper Function for Creating Info Rows
