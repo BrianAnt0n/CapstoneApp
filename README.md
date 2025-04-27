@@ -30,8 +30,8 @@ A glimpse of the E-ComposThink application in action:
 
 | | | |
 |:---:|:---:|:---:|
-| ![Sample 1](assets/screenshots/screen1.jpg) <br> **Sample 1** | ![Sample 2](assets/screenshots/screen2.jpg) <br> **Sample 2** | ![Sample 3](assets/screenshots/screen3.jpg) <br> **Sample 3** |
-| ![Sample 4](assets/screenshots/screen4.jpg) <br> **Sample 4** |  ![Sample 5](assets/screenshots/screen5.jpg) <br> **Sample 5** | ![Sample 6](assets/screenshots/screen6.jpg) <br> **Sample 6** |
+| ![Sample 1](capstone/assets/screenshots/screen1.jpg) <br> **Sample 1** | ![Sample 2](capstone/assets/screenshots/screen2.jpg) <br> **Sample 2** | ![Sample 3](capstone/assets/screenshots/screen3.jpg) <br> **Sample 3** |
+| ![Sample 4](capstone/assets/screenshots/screen4.jpg) <br> **Sample 4** |  ![Sample 5](capstone/assets/screenshots/screen5.jpg) <br> **Sample 5** | ![Sample 6](capstone/assets/screenshots/screen6.jpg) <br> **Sample 6** |
 
 </div>
 
