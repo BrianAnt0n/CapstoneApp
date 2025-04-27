@@ -53,4 +53,4 @@ To connect to the ESP module, please refer to our dedicated ESP Connection appli
 ## **Getting Started**
 1. Clone this repository.  
    ```bash
-   git clone https://github.com/your-repo-link.git
+   git clone https://github.com/BrianAnt0n/CapstoneApp.git
