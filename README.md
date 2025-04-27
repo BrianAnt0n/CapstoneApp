@@ -35,7 +35,7 @@ A glimpse of the E-ComposThink application in action:
 
 </div>
 
-> 📷 **Tip:** Save your screenshots inside the `assets/screenshots/` folder and update the filenames here accordingly.
+<!-- T 📷 **Tip:** Save your screenshots inside the `assets/screenshots/` folder and update the filenames here accordingly. -->
 
 ---
 
