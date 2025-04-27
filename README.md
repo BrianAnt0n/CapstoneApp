@@ -17,20 +17,36 @@ The following folders/files are critical for synchronization. Please ensure they
 
 - **`lib/`**: Contains the main source code for the Flutter application.  
 - **`pubspec.yaml`**: Manages dependencies and configuration for the Flutter app.
-- **`assets/`**: Pictures, etc.
+- **`assets/`**: Pictures, screenshots, etc.
 
 > **Note:** Other folders are excluded using `.gitignore`.
 
 ---
 
+## **Screenshots / Photos**
+A glimpse of the E-ComposThink application in action:
+
+<div align="center">
+
+| | | |
+|:---:|:---:|:---:|
+| ![Sample 1](assets/screenshots/screen1.jpg) <br> **Sample 1** | ![Sample 2](assets/screenshots/screen2.jpg) <br> **Sample 2** | ![Sample 3](assets/screenshots/screen3.jpg) <br> **Sample 3** |
+| ![Sample 4](assets/screenshots/screen4.jpg) <br> **Sample 4** |  ![Sample 5](assets/screenshots/screen5.jpg) <br> **Sample 5** | ![Sample 6](assets/screenshots/screen6.jpg) <br> **Sample 6** |
+
+</div>
+
+> 📷 **Tip:** Save your screenshots inside the `assets/screenshots/` folder and update the filenames here accordingly.
+
+---
 
 ## **E-ComposThink Guide**
-[E-ComposThink PDF Guide](https://github.com/BrianAnt0n/E-ComposThink-PDF-Guide/).
+[E-ComposThink PDF Guide](https://github.com/BrianAnt0n/E-ComposThink-PDF-Guide/)
+
+---
 
 ## **ESP Connection Application**  
 To connect to the ESP module, please refer to our dedicated ESP Connection application:  
 [ESP Connection App Repository](https://github.com/BrianAnt0n/ESP-CONNECTION-APP)
-
 
 ---
 
